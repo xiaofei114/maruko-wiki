@@ -1,0 +1,51 @@
+# 用户账号表
+user:
+  id: 主键
+  name: 用户名
+  account_number: 账号
+  password: 密码哈希
+  permission: 权限 (1:超级管理员, 2:管理员, 3:普通用户)
+  is_banned: 是否封禁
+  create_time: 创建时间
+  update_time: 更新时间
+# 相册
+photo_album:
+  id: 主键
+  user_id: 创建标签的用户id（外键）
+  name: 标签名
+  introduction: 简介
+  is_deleted: 是否删除
+  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  create_time: 创建时间
+  update_time: 更新时间
+# 照片
+photo:
+  id: 主键
+  album_id: 相册id（外键）
+  user_id: 创建标签的用户id（外键）
+  name: 照片名
+  url: 照片url
+  is_deleted: 是否删除
+  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  create_time: 创建时间
+  update_time: 更新时间
+# 音声分类
+audio_classification:
+  id: 主键
+  user_id: 创建标签的用户id（外键）
+  name: 分类名
+  is_deleted: 是否删除
+  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  create_time: 创建时间
+  update_time: 更新时间
+# 音声
+audio:
+  id: 主键
+  classification_id: 音声分类id（外键）
+  user_id: 创建标签的用户id（外键）
+  name: 音声名
+  url: 音声url
+  is_deleted: 是否删除
+  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  create_time: 创建时间
+  update_time: 更新时间

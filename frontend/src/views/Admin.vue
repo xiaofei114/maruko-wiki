@@ -134,7 +134,7 @@ const fetchAlbumCategories = async () => {
 const fetchUsers = async () => {
     try {
         const response = await getUsers()
-        users.value = response.data
+        users.value = response.data.sort((a, b) => a.permission - b.permission)
     } catch (error) {
         console.error('获取用户列表失败:', error)
         ElMessage.error('获取用户列表失败')
@@ -1129,7 +1129,7 @@ onMounted(() => {
                                 </template>
                                 <el-descriptions :column="2" border>
                                     <el-descriptions-item label="账号">{{ selectedUser.account_number
-                                        }}</el-descriptions-item>
+                                    }}</el-descriptions-item>
                                     <el-descriptions-item label="权限">
                                         <el-tag :type="getPermissionType(selectedUser.permission)">
                                             {{ getPermissionLabel(selectedUser.permission) }}
@@ -1141,7 +1141,7 @@ onMounted(() => {
                                         </el-tag>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="注册时间">{{ formatTime(selectedUser.create_time)
-                                        }}</el-descriptions-item>
+                                    }}</el-descriptions-item>
                                 </el-descriptions>
                                 <template #footer v-if="selectedUser.permission !== 1">
                                     <div class="user-actions">

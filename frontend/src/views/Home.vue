@@ -1,7 +1,7 @@
 <template>
   <div class="live-room-page">
     <!-- 顶部导航栏 -->
-    <Top/>
+    <Top />
     <div class="body">
       <!-- 主播信息卡片 -->
       <div class="anchor-card">
@@ -43,7 +43,7 @@
               <el-statistic :value="roomInfo.attention">
                 <template #title>
                   <div
-                      style="display: inline-flex; align-items: center;color: #409eff;font-size: 15px;font-weight: bold;">
+                    style="display: inline-flex; align-items: center;color: #409eff;font-size: 15px;font-weight: bold;">
                     丸子今天10w粉了吗？
                   </div>
                 </template>
@@ -66,7 +66,7 @@
               <el-statistic :value="captain.length">
                 <template #title>
                   <div
-                      style="display: inline-flex; align-items: center;color: #409eff;font-size: 15px;font-weight: bold;">
+                    style="display: inline-flex; align-items: center;color: #409eff;font-size: 15px;font-weight: bold;">
                     今天又多了几个爹呢？
                   </div>
                 </template>
@@ -170,10 +170,10 @@
 </template>
 
 <script setup>
-import {ref, onMounted} from 'vue'
-import {useRouter} from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import Top from '@/components/Top.vue'
-import {getRoomInfo, getMasterInfo, getTopListNew} from '@/api/bilibiliApis.js'
+import { getRoomInfo, getMasterInfo, getTopListNew } from '@/api/bilibiliApis.js'
 
 const router = useRouter()
 
@@ -256,6 +256,11 @@ const getUserInfo = async () => {
 }
 
 const getCaptain = async (list = [], page = 1) => {
+  //防止死循环的熔断机制
+  if (page > 100) {
+    return list
+  }
+
   let all = [...list]
   const captainInfo = await getTopListNew(page)
 
@@ -911,5 +916,4 @@ onMounted(() => {
   }
 
 }
-
 </style>

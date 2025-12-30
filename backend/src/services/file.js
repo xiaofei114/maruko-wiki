@@ -52,6 +52,16 @@ export async function getFile(filePath, req, res) {  // 添加 req 参数
         // 记录访问日志
         logger.info(`文件访问: ${filePath} (${contentType})`);
 
+        // 设置 CORS 头，允许跨域访问媒体文件
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
+
+        // 对于音频和视频文件，设置额外的头以支持范围请求
+        if (contentType.startsWith('audio/') || contentType.startsWith('video/')) {
+            res.setHeader('Accept-Ranges', 'bytes');
+        }
+
         // 简单直接返回文件
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', stat.size);

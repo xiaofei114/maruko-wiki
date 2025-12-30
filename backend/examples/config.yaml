@@ -2,7 +2,6 @@ httpPort: 6660
 domainName:
   - http://localhost:6660
   - http://localhost:5173
-apiPort: 6661
 token: maruko
 log:
   cmd: info

@@ -1,4 +1,4 @@
-import http from '@/utils/bilibiliHttp.js'
+import http from '@/utils/http.js'
 
 // 常量配置
 const CONFIG = {
@@ -11,7 +11,7 @@ const CONFIG = {
  * @returns {Promise}
  */
 export function getRoomInfo() {
-    return http.get('/room/v1/Room/get_info', {
+    return http.get('/api/bilibili/room/v1/Room/get_info', {
         params: {
             room_id: CONFIG.ROOM_ID
         }
@@ -23,7 +23,7 @@ export function getRoomInfo() {
  * @returns {Promise}
  */
 export function getMasterInfo() {
-    return http.get('/live_user/v1/Master/info', {
+    return http.get('/api/bilibili/live_user/v1/Master/info', {
         params: {
             uid: CONFIG.USER_ID
         }
@@ -36,7 +36,7 @@ export function getMasterInfo() {
  * @returns {Promise}
  */
 export function getTopListNew(page = 1) {
-    return http.get('/xlive/app-room/v2/guardTab/topListNew', {
+    return http.get('/api/bilibili/xlive/app-room/v2/guardTab/topListNew', {
         params: {
             roomid: CONFIG.ROOM_ID,
             ruid: CONFIG.USER_ID,

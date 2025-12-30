@@ -8,6 +8,5 @@ import chalk from 'chalk';
     await import('./src/components/sql.js').then(module => module.default());
     await import('./src/components/redis.js').then(module => module.default());
     await import('./src/components/email.js').then(module => module.default());
-    await import('./src/components/bilibiliApis.js').then(module => module.default());
     await import('./src/components/http.js').then(module => module.default());
 })();

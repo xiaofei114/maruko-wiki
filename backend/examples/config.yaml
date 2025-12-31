@@ -17,4 +17,5 @@ email:
   auth:
     user: # 请填写您的邮箱
     pass: # 请填写您的邮箱密码
-  from: MarukoNode <请填写您的邮箱地址>
+  from: 用户名 <请填写您的邮箱地址>
+  subject: # 邮件标题

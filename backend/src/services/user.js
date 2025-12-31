@@ -33,7 +33,7 @@ export async function sendVerificationCode(email, emailTransporter, appConfig) {
     const mailOptions = {
         from: appConfig.email.from,
         to: email,
-        subject: '小猫丸子Wiki 验证码',
+        subject: appConfig.email.subject || '默认标题',
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <p>您好！</p>

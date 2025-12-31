@@ -38,6 +38,11 @@ const router = createRouter({
             component: () => import('../views/Download.vue'),
         },
         {
+            path: '/announcement',
+            name: 'announcement',
+            component: () => import('../views/Announcement.vue'),
+        },
+        {
             path: '/admin',
             name: 'admin',
             component: () => import('../views/Admin.vue'),

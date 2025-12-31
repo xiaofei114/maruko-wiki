@@ -1,10 +1,10 @@
 <script setup>
-import {ref, computed} from 'vue'
-import {useRouter} from 'vue-router'
-import {useUserStore} from '@/stores/user'
-import {storeToRefs} from 'pinia'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import { storeToRefs } from 'pinia'
 import img from '@/assets/猫玩伴.png'
- 
+
 
 // 响应式数据
 const showDropdown = ref(false)
@@ -16,7 +16,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 // 使用storeToRefs确保响应性
-const {token, user} = storeToRefs(userStore)
+const { token, user } = storeToRefs(userStore)
 
 // 用户状态的计算属性，确保响应性
 const isAuthenticated = computed(() => !!token.value && !!user.value)
@@ -42,19 +42,17 @@ const getPermissionName = () => {
 }
 
 // 导航菜单项
-const navItems = [
-  {name: '首页', path: '/', icon: 'fas fa-home'},
-  {name: '相簿', path: '/photo-album', icon: 'fas fa-images'},
-  {name: '音声', path: '/audio', icon: 'fas fa-music'}
-]
-
-// 条件导航菜单项
-const conditionalNavItems = computed(() => {
-  const items = []
+const navItems = computed(() => {
+  const items = [
+    { name: '首页', path: '/', icon: 'fas fa-home' },
+    { name: '相簿', path: '/photo-album', icon: 'fas fa-images' },
+    { name: '音声', path: '/audio', icon: 'fas fa-music' },
+    { name: '公告', path: '/announcement', icon: 'fas fa-bullhorn' }
+  ]
 
   // 下载页面 - 需要登录
   // if (isAuthenticated.value) {
-  //   items.push({
+  //   items.splice(3, 0, {
   //     name: '下载',
   //     path: '/download',
   //     icon: 'fas fa-download'
@@ -82,9 +80,8 @@ const activeNav = computed(() => {
     return '相簿'
   }
 
-  // 检查所有可能的导航项
-  const allNavItems = [...navItems, ...conditionalNavItems.value]
-  return allNavItems.find(item => item.path === currentPath)?.name || '首页'
+  // 检查所有导航项
+  return navItems.value.find(item => item.path === currentPath)?.name || '首页'
 })
 
 // 导航方法
@@ -98,7 +95,7 @@ const navigateTo = (path) => {
 const userMenuItems = [
   // { name: '个人中心', icon: 'fas fa-user', action: 'profile' },
   // { name: '设置', icon: 'fas fa-cog', action: 'settings' },
-  {name: '退出登录', icon: 'fas fa-sign-out-alt', action: 'logout'}
+  { name: '退出登录', icon: 'fas fa-sign-out-alt', action: 'logout' }
 ]
 
 
@@ -176,8 +173,8 @@ const handleUserMenuClick = (action) => {
     <div class="container">
       <!-- 左侧品牌区域 -->
       <div class="brand">
-        <router-link to="/" class="brand-link" @click="onBrandClick" @keydown="onBrandKeydown">
-          <el-avatar :size="28" :src="img" class="brand-avatar" />
+        <el-avatar :size="28" :src="img" class="brand-avatar" @click="onBrandClick" />
+        <router-link to="/" class="brand-link" @keydown="onBrandKeydown">
           <span class="brand-text">小猫丸子Wiki</span>
         </router-link>
         <!-- 移动端菜单触发器已移除，保留品牌头像和文字 -->
@@ -187,11 +184,8 @@ const handleUserMenuClick = (action) => {
       <nav class="navigation desktop-nav" role="navigation" aria-label="主导航">
         <ul class="nav-list">
           <li v-for="item in navItems" :key="item.path" class="nav-item"
-              :class="{ active: activeNav === item.name }" @click="navigateTo(item.path)">
-            <span>{{ item.name }}</span>
-          </li>
-          <li v-for="item in conditionalNavItems" :key="item.path" class="nav-item conditional-nav"
-              :class="{ active: activeNav === item.name }" @click="navigateTo(item.path)">
+            :class="{ active: activeNav === item.name, 'conditional-nav': item.path === '/admin' || item.path === '/download' }"
+            @click="navigateTo(item.path)">
             <span>{{ item.name }}</span>
           </li>
         </ul>
@@ -213,7 +207,7 @@ const handleUserMenuClick = (action) => {
           <!-- 用户下拉菜单 -->
           <div v-if="showDropdown" class="user-dropdown" @click.stop>
             <div class="dropdown-header">
-              <el-avatar :size="45" :src="img"/>
+              <el-avatar :size="45" :src="img" />
               <div class="dropdown-info">
                 <div class="dropdown-name">{{ username }}</div>
                 <el-tag :type="getPermissionName().type" style="padding: 0;">
@@ -226,7 +220,7 @@ const handleUserMenuClick = (action) => {
 
             <ul class="dropdown-menu">
               <li v-for="item in userMenuItems" :key="item.action" class="dropdown-item"
-                  @click="handleUserMenuClick(item.action)">
+                @click="handleUserMenuClick(item.action)">
                 <span>{{ item.name }}</span>
               </li>
             </ul>
@@ -244,9 +238,8 @@ const handleUserMenuClick = (action) => {
             </button>
           </div>
           <ul class="mobile-nav-list">
-            <li v-for="item in [...navItems, ...conditionalNavItems]" :key="item.path"
-                class="mobile-nav-item" :class="{ active: activeNav === item.name }"
-                @click="navigateTo(item.path)">
+            <li v-for="item in navItems" :key="item.path" class="mobile-nav-item"
+              :class="{ active: activeNav === item.name }" @click="navigateTo(item.path)">
               <i :class="item.icon"></i>
               <span>{{ item.name }}</span>
             </li>
@@ -316,7 +309,7 @@ const handleUserMenuClick = (action) => {
 .brand-avatar {
   margin-right: 8px;
   border-radius: 6px;
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* 桌面端隐藏品牌头像（仅移动端显示） */
@@ -340,9 +333,6 @@ const handleUserMenuClick = (action) => {
   left: 50vw;
   transform: translateX(-50%);
 }
-
-/* 中央 Logo（替代原本的淡淡小方块） */
-/* 中间 logo 已移除 - 保留相关提示样式 */
 
 /* 可见的移动端标签，提示这是导航栏 */
 .nav-label {
@@ -632,7 +622,8 @@ const handleUserMenuClick = (action) => {
   }
 
   .navigation {
-    display: none; /* 在移动端隐藏桌面导航 */
+    display: none;
+    /* 在移动端隐藏桌面导航 */
   }
 
   .user-area {
@@ -872,6 +863,7 @@ const handleUserMenuClick = (action) => {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -882,6 +874,7 @@ const handleUserMenuClick = (action) => {
     opacity: 0;
     transform: translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

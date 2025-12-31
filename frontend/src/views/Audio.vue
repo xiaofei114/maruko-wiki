@@ -657,10 +657,8 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <div v-if="loading" class="loading-state">
-                <el-icon class="is-loading">
-                    <Loading />
-                </el-icon>
+            <div v-if="loading" class="loading-container">
+                <div class="loading-spinner"></div>
                 <p>正在加载音声列表...</p>
             </div>
             <div v-else-if="error" class="error-state">
@@ -753,6 +751,36 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 50px 20px;
+    text-align: center;
+    margin-bottom: 22px;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #409eff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
 .audio-page {
     min-height: 100vh;
     background: #f5f7fa;
@@ -981,7 +1009,7 @@ onBeforeUnmount(() => {
 
     .page-hero {
         padding: 40px 20px;
-        margin-bottom: 20px;
+        margin-bottom: 30px;
     }
 
     .hero-title {
@@ -1017,6 +1045,28 @@ onBeforeUnmount(() => {
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-hero {
+        padding: 30px 15px;
+        margin-bottom: 20px;
+    }
+
+    .hero-title {
+        font-size: 2.2rem;
+    }
+}
+
+@media (max-width: 375px) {
+    .page-hero {
+        padding: 25px 12px;
+        margin-bottom: 15px;
+    }
+
+    .hero-title {
+        font-size: 1.8rem;
     }
 }
 

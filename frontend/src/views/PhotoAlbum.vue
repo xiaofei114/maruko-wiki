@@ -153,10 +153,8 @@ onMounted(() => {
           <p class="hero-subtitle">记录精彩时刻，与你分享美好时光</p>
         </div>
       </div>
-      <div v-if="loading">
-        <el-icon>
-          <Loading />
-        </el-icon>
+      <div v-if="loading" class="loading-container">
+        <div class="loading-spinner"></div>
         <p>正在加载相册...</p>
       </div>
       <div v-else-if="error">
@@ -275,6 +273,36 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 20px;
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #409eff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .photo-album-page {
   min-height: 100vh;
   background: #f5f7fa;

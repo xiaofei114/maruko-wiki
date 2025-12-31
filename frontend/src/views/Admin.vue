@@ -134,7 +134,14 @@ const fetchAlbumCategories = async () => {
 const fetchUsers = async () => {
     try {
         const response = await getUsers()
-        users.value = response.data.sort((a, b) => a.permission - b.permission)
+        users.value = response.data.sort((a, b) => {
+            // 首先按权限等级排序（权限低的在前）
+            if (a.permission !== b.permission) {
+                return a.permission - b.permission
+            }
+            // 相同权限的按注册时间排序（早注册的在前）
+            return parseInt(a.create_time || 0) - parseInt(b.create_time || 0)
+        })
     } catch (error) {
         console.error('获取用户列表失败:', error)
         ElMessage.error('获取用户列表失败')
@@ -621,21 +628,15 @@ const handleDeletePhoto = async (photo, album) => {
 
         await deletePhoto(photo.id)
 
-        // 从本地相册数据中移除照片
-        const albumIndex = albumTags.value.findIndex(a => a.id === album.id)
-        if (albumIndex > -1) {
-            const photoIndex = albumTags.value[albumIndex].photos.findIndex(p => p.id === photo.id)
-            if (photoIndex > -1) {
-                albumTags.value[albumIndex].photos.splice(photoIndex, 1)
-
-                // 如果删除的是当前选中相册中的照片，更新选中状态
-                if (selectedAlbum.value && selectedAlbum.value.id === album.id) {
-                    selectedAlbum.value.photos.splice(photoIndex, 1)
-                }
-            }
-        }
-
         ElMessage.success('照片已删除')
+
+        // 重新获取数据（保持数据同步）
+        await fetchAlbumCategories()
+
+        // 如果删除的是当前选中相册中的照片，更新选中状态
+        if (selectedAlbum.value && selectedAlbum.value.id === album.id) {
+            selectedAlbum.value.photos = selectedAlbum.value.photos.filter(p => p.id !== photo.id)
+        }
     } catch (error) {
         if (error !== 'cancel') {
             console.error('删除照片失败:', error)
@@ -706,6 +707,12 @@ const handleDeleteAlbum = async (album) => {
 
         await deleteAlbum(album.id)
 
+        // 从本地相册数据中立即移除相册
+        const albumIndex = albumTags.value.findIndex(a => a.id === album.id)
+        if (albumIndex > -1) {
+            albumTags.value.splice(albumIndex, 1)
+        }
+
         // 如果删除的是当前选中的相册，清空选择状态
         if (selectedAlbum.value && selectedAlbum.value.id === album.id) {
             selectedAlbum.value = null
@@ -715,7 +722,7 @@ const handleDeleteAlbum = async (album) => {
 
         ElMessage.success('相册已删除')
 
-        // 重新获取数据
+        // 重新获取数据（保持数据同步）
         await fetchAlbumCategories()
     } catch (error) {
         if (error !== 'cancel') {
@@ -1224,8 +1231,8 @@ onMounted(() => {
 /* 响应式页面头部 */
 @media (max-width: 768px) {
     .page-hero {
-        margin-bottom: 24px;
-        padding: 40px 16px;
+        margin-bottom: 30px;
+        padding: 40px 20px;
         border-radius: 16px;
     }
 }
@@ -1233,8 +1240,8 @@ onMounted(() => {
 @media (max-width: 480px) {
     .page-hero {
         margin-bottom: 20px;
-        padding: 32px 12px;
-        border-radius: 12px;
+        padding: 30px 15px;
+        border-radius: 15px;
     }
 }
 
@@ -1458,6 +1465,8 @@ onMounted(() => {
     .left-panel {
         width: 100%;
         max-height: 400px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .right-panel {
@@ -1474,6 +1483,8 @@ onMounted(() => {
 
     .left-panel {
         max-height: 350px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .right-panel {
@@ -1559,6 +1570,7 @@ onMounted(() => {
     .category-tabs :deep(.el-tabs__content) {
         padding: 16px;
         height: calc(100% - 60px);
+        -webkit-overflow-scrolling: touch;
     }
 }
 
@@ -1566,6 +1578,7 @@ onMounted(() => {
     .category-tabs :deep(.el-tabs__content) {
         padding: 12px;
         height: calc(100% - 55px);
+        -webkit-overflow-scrolling: touch;
     }
 }
 

@@ -33,10 +33,9 @@ export async function sendVerificationCode(email, emailTransporter, appConfig) {
     const mailOptions = {
         from: appConfig.email.from,
         to: email,
-        subject: '猫丸子Wiki 验证码',
+        subject: '小猫丸子Wiki 验证码',
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">猫丸子Wiki 验证码</h2>
                 <p>您好！</p>
                 <p>您的验证码是：<strong style="font-size: 24px; color: #007bff;">${verificationCode}</strong></p>
                 <p>验证码将在3分钟后过期，请及时使用。</p>

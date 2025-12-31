@@ -404,6 +404,7 @@ const goBack = () => {
   width: 100%;
   /* min-height: 260px; */
   perspective: 1000px;
+  -webkit-perspective: 1000px;
   transition: all 0.3s ease;
 }
 
@@ -413,11 +414,15 @@ const goBack = () => {
   height: 100%;
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
+  transform-origin: center center;
+  -webkit-transform-origin: center center;
   transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  -webkit-transition: -webkit-transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .form-container.flipped .form-card {
   transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
 }
 
 .login-form,
@@ -428,11 +433,17 @@ const goBack = () => {
   width: 100%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  -ms-backface-visibility: hidden;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transform-origin: center center;
+  -webkit-transform-origin: center center;
 }
 
 .register-form {
   transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
 }
 
 /* 邮箱行布局 */

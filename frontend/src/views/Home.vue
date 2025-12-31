@@ -14,6 +14,7 @@
             <p class="anchor-id">房间号: {{ roomInfo.short_id || roomInfo.room_id || '---' }}</p>
           </div>
         </div>
+        <el-button type="primary" plain @click="goToSpaceRoom">进入主页</el-button>
       </div>
 
       <!-- 加载状态 -->
@@ -24,7 +25,6 @@
 
       <!-- 错误状态 -->
       <div v-else-if="error" class="error-container">
-        <i class="fas fa-exclamation-triangle"></i>
         <h3>加载失败</h3>
         <p>{{ error }}</p>
         <button @click="fetchRoomInfo" class="retry-btn">重试</button>
@@ -35,15 +35,13 @@
 
         <div class="module-card fans-module">
           <div class="module-header">
-            <i class="fas fa-heart"></i>
             <h2>粉丝数量</h2>
           </div>
           <div class="module-body">
             <div class="fans-count">
               <el-statistic :value="roomInfo.attention">
                 <template #title>
-                  <div
-                    style="display: inline-flex; align-items: center;color: #409eff;font-size: 15px;font-weight: bold;">
+                  <div class="stat-title">
                     丸子今天10w粉了吗？
                   </div>
                 </template>
@@ -58,15 +56,13 @@
 
         <div class="module-card revenue-module">
           <div class="module-header">
-            <i class="fas fa-chart-line"></i>
             <h2>舰长数量</h2>
           </div>
           <div class="module-body">
             <div class="fans-count">
               <el-statistic :value="captain.length">
                 <template #title>
-                  <div
-                    style="display: inline-flex; align-items: center;color: #409eff;font-size: 15px;font-weight: bold;">
+                  <div class="stat-title">
                     今天又多了几个爹呢？
                   </div>
                 </template>
@@ -81,17 +77,15 @@
 
         <div class="module-card status-module">
           <div class="module-header">
-            <i class="fas fa-satellite-dish"></i>
             <h2>直播状态</h2>
           </div>
           <img class="module-img" :src="roomInfo.user_cover" alt="直播封面">
           <div class="module-body">
             <div class="status-content">
-              <div class="status-indicator" :class="getStatusClass(roomInfo.live_status)">
+              <div class="status-indicator clickable" @click="goToLiveRoom">
                 {{ getStatusText(roomInfo.live_status) }}
               </div>
               <div v-if="roomInfo.live_status === 1" class="online-count">
-                <i class="fas fa-eye"></i>
                 当前观看人数: <strong>{{ formatNumber(roomInfo.online) }}</strong>
               </div>
               <div v-else class="offline-notice">
@@ -103,25 +97,24 @@
 
         <div class="module-card info-module" v-if="roomInfo.live_status !== 0">
           <div class="module-header">
-            <i class="fas fa-info-circle"></i>
             <h2>直播信息</h2>
           </div>
           <div class="module-body">
             <div class="info-grid">
               <div class="info-item">
-                <span class="label"><i class="fas fa-map-marker-alt"></i> 分区:</span>
+                <span class="label">分区:</span>
                 <span class="value">{{ roomInfo.parent_area_name || '---' }} - {{ roomInfo.area_name || '---' }}</span>
               </div>
               <div class="info-item">
-                <span class="label"><i class="fas fa-clock"></i> 开始时间:</span>
+                <span class="label">开始时间:</span>
                 <span class="value">{{ roomInfo.live_time || '---' }}</span>
               </div>
               <div class="info-item full-width">
-                <span class="label"><i class="fas fa-heading"></i> 直播标题:</span>
+                <span class="label">直播标题:</span>
                 <span class="value">{{ roomInfo.title || '---' }}</span>
               </div>
               <div class="info-item full-width" v-if="roomInfo.description">
-                <span class="label"><i class="fas fa-align-left"></i> 直播间描述:</span>
+                <span class="label">直播间描述:</span>
                 <span class="value">{{ roomInfo.description }}</span>
               </div>
             </div>
@@ -138,7 +131,6 @@
         <div class="maruko-content">
           <div class="module-card photo-album-module" @click="goToPhotoAlbum" style="cursor: pointer;">
             <div class="module-header">
-              <i class="fas fa-images"></i>
               <h2>丸子相簿</h2>
             </div>
             <div class="module-body">
@@ -152,7 +144,6 @@
 
           <div class="module-card message-module" @click="goToAudio" style="cursor: pointer;">
             <div class="module-header">
-              <i class="fas fa-comment-dots"></i>
               <h2>丸子音声</h2>
             </div>
             <div class="module-body">
@@ -197,26 +188,6 @@ const getStatusText = (status) => {
   return statusMap[status] || '未知状态'
 }
 
-// 获取直播状态对应的CSS类
-const getStatusClass = (status) => {
-  const classMap = {
-    0: 'status-offline',
-    1: 'status-live',
-    2: 'status-replay'
-  }
-  return classMap[status] || 'status-unknown'
-}
-
-// 获取直播状态图标
-const getStatusIcon = (status) => {
-  const iconMap = {
-    0: 'fas fa-moon',
-    1: 'fas fa-broadcast-tower',
-    2: 'fas fa-redo'
-  }
-  return iconMap[status] || 'fas fa-question'
-}
-
 // 格式化数字（添加千位分隔符）
 const formatNumber = (num) => {
   if (!num && num !== 0) return '---'
@@ -231,6 +202,16 @@ const goToPhotoAlbum = () => {
 // 导航到音频页面
 const goToAudio = () => {
   router.push('/audio')
+}
+
+// 跳转到主页
+const goToSpaceRoom = () => {
+  window.open('https://space.bilibili.com/3546938511198692', '_blank')
+}
+
+// 跳转到直播间
+const goToLiveRoom = () => {
+  window.open('https://live.bilibili.com/1929354869', '_blank')
 }
 
 // 获取直播间信息
@@ -257,27 +238,14 @@ const getUserInfo = async () => {
 
 const getCaptain = async (list = [], page = 1) => {
   //防止死循环的熔断机制
-  if (page > 100) {
-    return list
-  }
+  if (page > 100) return
 
-  let all = [...list]
+  captain.value.push(...list)
   const captainInfo = await getTopListNew(page)
 
-  if (page == 1) {
-    all.push(...captainInfo.data.top3)
-  }
+  if (page == 1) captain.value.push(...captainInfo.data.top3)
 
-  if (captainInfo.data.list.length > 0) {
-    const nextPageData = await getCaptain([...all, ...captainInfo.data.list], page + 1)
-    return nextPageData
-  }
-
-  return all
-}
-
-const getThings = async () => {
-  captain.value = await getCaptain()
+  if (captainInfo.data.list.length > 0) await getCaptain(captainInfo.data.list, page + 1)
 }
 
 // 组件挂载后获取直播间信息
@@ -286,7 +254,7 @@ onMounted(() => {
   setInterval(fetchRoomInfo, 60000)
   fetchRoomInfo()
   getUserInfo()
-  getThings()
+  getCaptain()
 })
 </script>
 
@@ -510,12 +478,66 @@ onMounted(() => {
 .status-indicator {
   display: inline-flex;
   align-items: center;
-  padding: 10px 20px;
-  border-radius: 30px;
+  padding: 12px 24px;
+  border-radius: 50px;
   color: white;
   font-weight: 600;
   margin-bottom: 15px;
   font-size: 16px;
+  background:
+    linear-gradient(135deg, rgba(64, 158, 255, 0.7) 0%, rgba(102, 177, 255, 0.6) 50%, rgba(64, 158, 255, 0.7) 100%),
+    linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(102, 177, 255, 0.2) 100%);
+  background-size: 200% 200%, 100% 100%;
+  background-blend-mode: normal;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 4px 15px rgba(64, 158, 255, 0.4),
+    0 2px 8px rgba(64, 158, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+  opacity: 0.7;
+}
+
+.status-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.6s ease;
+}
+
+.status-indicator.clickable {
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.status-indicator.clickable:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow:
+    0 8px 25px rgba(64, 158, 255, 0.6),
+    0 4px 15px rgba(64, 158, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  background-position: right center;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.status-indicator.clickable:hover::before {
+  left: 100%;
+}
+
+.status-indicator.clickable:active {
+  transform: translateY(-1px) scale(1.01);
+  transition: all 0.1s ease;
 }
 
 .online-count {
@@ -533,8 +555,7 @@ onMounted(() => {
 }
 
 .offline-notice {
-  color: #999;
-  font-style: italic;
+  color: #666;
 }
 
 .fans-count {
@@ -548,6 +569,14 @@ onMounted(() => {
   justify-content: center;
   gap: 10px;
   flex-direction: column;
+}
+
+.stat-title {
+  display: inline-flex;
+  align-items: center;
+  color: #409eff;
+  font-size: 15px;
+  font-weight: bold;
 }
 
 .info-grid {
@@ -734,6 +763,10 @@ onMounted(() => {
     margin: 10px 0;
   }
 
+  .stat-title {
+    font-size: 14px;
+  }
+
   .floating-login-btn i {
     font-size: 14px;
   }
@@ -741,6 +774,26 @@ onMounted(() => {
   /* 触摸设备优化 */
   .module-card {
     -webkit-tap-highlight-color: rgba(64, 158, 255, 0.1);
+  }
+
+  .status-indicator {
+    padding: 10px 20px;
+    font-size: 15px;
+  }
+
+  .status-indicator {
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+  }
+
+  .status-indicator.clickable:hover {
+    transform: none;
+    box-shadow:
+      0 4px 15px rgba(64, 158, 255, 0.5),
+      0 2px 8px rgba(64, 158, 255, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .photo-album-module,
@@ -818,6 +871,15 @@ onMounted(() => {
     margin: 8px 0;
   }
 
+  .stat-title {
+    font-size: 13px;
+  }
+
+  .status-indicator {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
   .info-grid {
     gap: 12px;
   }
@@ -868,6 +930,10 @@ onMounted(() => {
     margin: 6px 0;
   }
 
+  .stat-title {
+    font-size: 12px;
+  }
+
   .retry-btn {
     padding: 8px 16px;
     font-size: 13px;
@@ -913,6 +979,15 @@ onMounted(() => {
 
   .fans-count {
     font-size: 16px;
+  }
+
+  .stat-title {
+    font-size: 11px;
+  }
+
+  .status-indicator {
+    padding: 6px 12px;
+    font-size: 13px;
   }
 
 }

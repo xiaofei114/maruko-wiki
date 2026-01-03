@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { ElMessageBox, ElMessage, ElLoading } from 'element-plus'
 import { UploadFilled, Loading, Warning, VideoPlay } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -37,6 +37,7 @@ const currentTrackIndex = ref(-1)
 const isPlaying = ref(false)
 const volume = ref(0.9)
 const audioUnlocked = ref(false)
+const backgroundAudios = ref([]) // 存储后台音频实例（当不自动停止时使用）
 
 // 地狱绘卷模式
 const hellScrollAudios = ref([]) // 存储多个音频实例
@@ -50,6 +51,7 @@ const { isAuthenticated } = storeToRefs(userStore)
 const loopPlaylist = ref(false)     // 列表循环（到末尾回到开头）
 const shuffle = ref(false)          // 随机播放
 const brainwash = ref(false)        // 洗脑循环：当前曲目无限循环
+const autoStopOnSwitch = ref(true)  // 切换音频时自动停止当前播放，默认开启
 
 // 上传音声相关
 const uploadDialogVisible = ref(false)
@@ -144,24 +146,54 @@ function playCurrent() {
     // 将相对路径转换为完整的URL
     const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
     const fullUrl = track.url.startsWith('http') ? track.url : baseUrl + track.url
-    audio.value.src = fullUrl
-    audio.value.loop = !!brainwash.value // 洗脑模式：当前曲目循环
-    audio.value.volume = volume.value
-    // 确保音频已解锁
-    if (!audioUnlocked.value) {
-        unlockAudio()
-    }
-    audio.value.play().then(() => {
-        isPlaying.value = true
-    }).catch((error) => {
-        console.error('播放失败:', error)
-        ElMessage.error('播放失败，请联系管理员')
-        // 如果播放失败，尝试解锁音频
+
+    if (autoStopOnSwitch.value) {
+        // 自动停止模式：停止当前播放并播放新音频
+        audio.value.pause()
+        audio.value.currentTime = 0
+        isPlaying.value = false
+
+        audio.value.src = fullUrl
+        audio.value.loop = !!brainwash.value // 洗脑模式：当前曲目循环
+        audio.value.volume = volume.value
+        // 确保音频已解锁
         if (!audioUnlocked.value) {
             unlockAudio()
         }
-        isPlaying.value = false
-    })
+        audio.value.play().then(() => {
+            isPlaying.value = true
+        }).catch((error) => {
+            console.error('播放失败:', error)
+            ElMessage.error('播放失败，请联系管理员')
+            // 如果播放失败，尝试解锁音频
+            if (!audioUnlocked.value) {
+                unlockAudio()
+            }
+            isPlaying.value = false
+        })
+    } else {
+        // 不自动停止模式：让当前音频继续播放，新音频作为后台音频
+        const backgroundAudio = new Audio(fullUrl)
+        backgroundAudio.volume = volume.value
+        backgroundAudio.loop = !!brainwash.value // 洗脑循环：后台音频也参与循环
+        backgroundAudio.preload = 'auto'
+
+        // 添加播放结束时的清理逻辑
+        backgroundAudio.addEventListener('ended', () => {
+            const index = backgroundAudios.value.indexOf(backgroundAudio)
+            if (index > -1) {
+                backgroundAudios.value.splice(index, 1)
+            }
+        })
+
+        // 尝试播放后台音频
+        backgroundAudio.play().catch((error) => {
+            console.error('后台音频播放失败:', error)
+        })
+
+        // 存储后台音频实例以便管理
+        backgroundAudios.value.push(backgroundAudio)
+    }
 }
 
 function playTrack(sectionIdx, trackIdx) {
@@ -192,6 +224,13 @@ function stopPlayback(resetModes = true) {
         audio.value.loop = false
     }
     isPlaying.value = false
+
+    // 停止所有后台音频
+    backgroundAudios.value.forEach(bgAudio => {
+        bgAudio.pause()
+        bgAudio.currentTime = 0
+    })
+    backgroundAudios.value = []
 
     // 可选择是否重置播放模式
     if (resetModes) {
@@ -258,9 +297,23 @@ function toggleBrainwash() {
         return
     }
     brainwash.value = !brainwash.value
+
+    // 更新主音频的循环状态
     if (audio.value) {
         audio.value.loop = !!brainwash.value
     }
+
+    // 更新所有后台音频的循环状态
+    backgroundAudios.value.forEach(bgAudio => {
+        bgAudio.loop = !!brainwash.value
+    })
+}
+
+function toggleAutoStopOnSwitch() {
+    // 如果地狱绘卷模式开启，不允许切换其他模式
+    if (isHellScrollMode.value) return
+
+    autoStopOnSwitch.value = !autoStopOnSwitch.value
 }
 
 async function startHellScroll() {
@@ -595,6 +648,24 @@ async function handleUpload() {
     }
 }
 
+// 监听音量变化，同步更新所有活跃音频
+watch(volume, (newVolume) => {
+    // 更新主音频音量
+    if (audio.value) {
+        audio.value.volume = newVolume
+    }
+    // 更新所有后台音频音量
+    backgroundAudios.value.forEach(bgAudio => {
+        bgAudio.volume = newVolume
+    })
+    // 更新地狱绘卷音频音量（如果在播放）
+    if (isHellScrollMode.value) {
+        hellScrollAudios.value.forEach(hellAudio => {
+            hellAudio.volume = newVolume * 0.3 // 保持地狱绘卷的音量比例
+        })
+    }
+})
+
 // 组件挂载时获取音声列表
 onMounted(() => {
     fetchAudioList()
@@ -607,6 +678,13 @@ onBeforeUnmount(() => {
         audio.value.removeEventListener('ended', onTrackEnded)
         audio.value = null
     }
+
+    // 清理所有后台音频实例
+    backgroundAudios.value.forEach(bgAudio => {
+        bgAudio.pause()
+        bgAudio.removeEventListener('ended', () => { })
+    })
+    backgroundAudios.value = []
 
     // 清理地狱绘卷音频实例
     stopHellScroll()
@@ -641,6 +719,10 @@ onBeforeUnmount(() => {
                         <el-button :type="brainwash ? 'danger' : 'default'" @click="toggleBrainwash"
                             :disabled="isHellScrollMode" plain>
                             洗脑循环: {{ brainwash ? '开' : '关' }}
+                        </el-button>
+                        <el-button :type="autoStopOnSwitch ? 'success' : 'default'" @click="toggleAutoStopOnSwitch"
+                            :disabled="isHellScrollMode" plain>
+                            切换时停止: {{ autoStopOnSwitch ? '开' : '关' }}
                         </el-button>
                         <el-button type="danger" @click="startHellScroll" :disabled="isHellScrollMode" plain>
                             🔥 地狱绘卷模式
@@ -689,11 +771,11 @@ onBeforeUnmount(() => {
                     <div class="section-body">
                         <div v-for="(item, tidx) in section.items" :key="item.url" class="track-row">
                             <div class="track-info">
-                                <el-tag
-                                    :type="currentSectionIndex === sidx && currentTrackIndex === tidx ? 'error' : 'primary'"
-                                    @click="playTrack(sidx, tidx)" class="audio-tag">
+                                <el-button
+                                    :type="currentSectionIndex === sidx && currentTrackIndex === tidx ? 'danger' : 'primary'"
+                                    @click="playTrack(sidx, tidx)" class="audio-tag" plain>
                                     {{ item.name }}
-                                </el-tag>
+                                </el-button>
                             </div>
                         </div>
                     </div>

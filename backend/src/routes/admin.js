@@ -6,7 +6,8 @@ import {
     updateAudio,
     deleteAudio,
     updateAudioClassification,
-    deleteAudioClassification
+    deleteAudioClassification,
+    createAudioClassification
 } from '../services/audio.js';
 import {
     getAlbumsForAdmin,
@@ -15,7 +16,8 @@ import {
     deleteAlbum,
     reviewPhoto,
     updatePhoto,
-    deletePhoto
+    deletePhoto,
+    createAlbum
 } from '../services/album.js';
 
 const router = express.Router();
@@ -33,9 +35,36 @@ router.post('/audios/:id/review', ...createAdminValidatedRouteHandler({
 router.put('/audios/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
     name: { required: false, minLength: 1, maxLength: 100 },
-    classification_id: { type: 'id', required: false }
+    classification_id: { type: 'id', required: false },
+    new_classification_name: { required: false, minLength: 1, maxLength: 50 }
 }, async (req) => {
-    return await updateAudio(req.params.id, req.body, req.user.id);
+    const { name, classification_id, new_classification_name } = req.body;
+
+    let finalClassificationId = classification_id;
+
+    // 如果提供了新分类名称，创建新分类
+    if (new_classification_name?.trim()) {
+        const createResult = await createAudioClassification(new_classification_name.trim(), req.user.id);
+        if (!createResult.success) {
+            return createResult;
+        }
+        finalClassificationId = createResult.data.classificationId;
+    }
+
+    // 如果既没有提供新分类名称，也没有提供现有分类ID，且没有要更新的其他字段，返回错误
+    if (!finalClassificationId && !name?.trim()) {
+        return {
+            success: false,
+            message: '请提供要更新的字段（名称、新分类名称或现有分类ID）',
+            code: 400
+        };
+    }
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (finalClassificationId !== undefined) updateData.classification_id = finalClassificationId;
+
+    return await updateAudio(req.params.id, updateData, req.user.id);
 }, 2));
 
 router.delete('/audios/:id', ...createAdminValidatedRouteHandler({
@@ -93,9 +122,41 @@ router.post('/photos/:id/review', ...createAdminValidatedRouteHandler({
 router.put('/photos/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
     name: { required: false, minLength: 1, maxLength: 100 },
-    album_id: { type: 'id', required: false }
+    album_id: { type: 'id', required: false },
+    new_album_name: { required: false, minLength: 1, maxLength: 100 },
+    new_album_introduction: { required: false, maxLength: 500 }
 }, async (req) => {
-    return await updatePhoto(req.params.id, req.body, req.user.id);
+    const { name, album_id, new_album_name, new_album_introduction } = req.body;
+
+    let finalAlbumId = album_id;
+
+    // 如果提供了新相册名称，创建新相册
+    if (new_album_name?.trim()) {
+        const albumData = {
+            name: new_album_name.trim(),
+            introduction: new_album_introduction?.trim() || ''
+        };
+        const createResult = await createAlbum(albumData, req.user.id);
+        if (!createResult.success) {
+            return createResult;
+        }
+        finalAlbumId = createResult.data.albumId;
+    }
+
+    // 如果既没有提供新相册名称，也没有提供现有相册ID，且没有要更新的其他字段，返回错误
+    if (!finalAlbumId && !name?.trim()) {
+        return {
+            success: false,
+            message: '请提供要更新的字段（名称、新相册名称或现有相册ID）',
+            code: 400
+        };
+    }
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (finalAlbumId !== undefined) updateData.album_id = finalAlbumId;
+
+    return await updatePhoto(req.params.id, updateData, req.user.id);
 }, 2));
 
 router.delete('/photos/:id', ...createAdminValidatedRouteHandler({

@@ -4,7 +4,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { User, Picture, Files, Plus, VideoPlay, Edit, Delete, InfoFilled, Loading, Check, VideoPause } from '@element-plus/icons-vue'
+import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause } from '@element-plus/icons-vue'
 import {
     getAudioCategories,
     reviewAudio,
@@ -28,7 +28,6 @@ import {
 
 // 用户状态
 const userStore = useUserStore()
-const { isAuthenticated } = storeToRefs(userStore)
 const { permission } = storeToRefs(userStore)
 
 // 活跃标签页
@@ -42,40 +41,106 @@ const selectedUser = ref(null)
 // 编辑对话框
 const editCategoryDialog = ref(false)
 const editingCategory = ref(null)
+const editCategoryFormRef = ref(null)
 const editCategoryForm = ref({
     name: ''
 })
 
+// 分类编辑表单验证规则
+const editCategoryFormRules = {
+    name: [
+        { required: true, message: '请输入分类名称', trigger: 'blur' },
+        { min: 1, max: 50, message: '分类名称长度应在1-50个字符', trigger: 'blur' }
+    ]
+}
+
 // 编辑音频对话框
 const editAudioDialog = ref(false)
 const editingAudio = ref(null)
+const editAudioFormRef = ref(null)
 const editAudioForm = ref({
-    name: ''
+    name: '',
+    classification_id: '',
+    new_classification_name: ''
 })
+
+// 音频编辑表单验证规则
+const editAudioFormRules = {
+    name: [
+        { required: true, message: '请输入音频名称', trigger: 'blur' },
+        { min: 1, max: 100, message: '音频名称长度应在1-100个字符', trigger: 'blur' }
+    ]
+}
 
 // 编辑相册对话框
 const editAlbumDialog = ref(false)
 const editingAlbum = ref(null)
+const editAlbumFormRef = ref(null)
 const editAlbumForm = ref({
     name: '',
     introduction: ''
 })
 
+// 相册编辑表单验证规则
+const editAlbumFormRules = {
+    name: [
+        { required: true, message: '请输入相册名称', trigger: 'blur' },
+        { min: 1, max: 100, message: '相册名称长度应在1-100个字符', trigger: 'blur' }
+    ]
+}
+
 // 编辑照片对话框
 const editPhotoDialog = ref(false)
 const editingPhoto = ref(null)
+const editPhotoFormRef = ref(null)
 const editPhotoForm = ref({
-    name: ''
+    name: '',
+    album_id: '',
+    new_album_name: '',
+    new_album_introduction: ''
 })
+
+// 照片编辑表单验证规则
+const editPhotoFormRules = {
+    name: [
+        { required: true, message: '请输入照片名称', trigger: 'blur' },
+        { min: 1, max: 100, message: '照片名称长度应在1-100个字符', trigger: 'blur' }
+    ]
+}
 
 // 音频播放
 const playingAudioId = ref(null)
 const audioPlayers = ref(new Map())
 
-// 加载状态
-const loading = ref(false)
-const audioLoading = ref(false)
-const albumLoading = ref(false)
+// 筛选和分页状态
+// 音频筛选
+const audioFilters = ref({
+    name: '',
+    status: '',
+    uploader: '',
+    dateRange: []
+})
+
+// 相册筛选
+const albumFilters = ref({
+    name: '',
+    status: '',
+    uploader: '',
+    dateRange: []
+})
+
+// 分页状态
+const audioPagination = ref({
+    currentPage: 1,
+    pageSize: 10,
+    total: 0
+})
+
+const albumPagination = ref({
+    currentPage: 1,
+    pageSize: 10,
+    total: 0
+})
 
 // API数据
 const audioCategories = ref([])
@@ -104,30 +169,119 @@ const contentStats = computed(() => {
     }
 })
 
+// 筛选和分页计算属性
+const filteredAudios = computed(() => {
+    if (!selectedAudio.value) return []
+
+    let audios = [...selectedAudio.value.audios]
+
+    // 名称筛选
+    if (audioFilters.value.name) {
+        audios = audios.filter(audio =>
+            audio.name.toLowerCase().includes(audioFilters.value.name.toLowerCase())
+        )
+    }
+
+    // 状态筛选
+    if (audioFilters.value.status !== '') {
+        audios = audios.filter(audio => audio.is_review === parseInt(audioFilters.value.status))
+    }
+
+    // 上传者筛选
+    if (audioFilters.value.uploader) {
+        audios = audios.filter(audio =>
+            audio.user_name.toLowerCase().includes(audioFilters.value.uploader.toLowerCase())
+        )
+    }
+
+    // 时间范围筛选
+    if (audioFilters.value.dateRange && audioFilters.value.dateRange.length === 2) {
+        const [startDate, endDate] = audioFilters.value.dateRange
+        const startTime = new Date(startDate).getTime() / 1000
+        const endTime = new Date(endDate).getTime() / 1000 + 86400 // 加一天
+
+        audios = audios.filter(audio => {
+            const audioTime = parseInt(audio.create_time)
+            return audioTime >= startTime && audioTime <= endTime
+        })
+    }
+
+    // 更新分页总数
+    audioPagination.value.total = audios.length
+
+    return audios
+})
+
+const paginatedAudios = computed(() => {
+    const start = (audioPagination.value.currentPage - 1) * audioPagination.value.pageSize
+    const end = start + audioPagination.value.pageSize
+    return filteredAudios.value.slice(start, end)
+})
+
+const filteredPhotos = computed(() => {
+    if (!selectedAlbum.value) return []
+
+    let photos = [...selectedAlbum.value.photos]
+
+    // 名称筛选
+    if (albumFilters.value.name) {
+        photos = photos.filter(photo =>
+            photo.name.toLowerCase().includes(albumFilters.value.name.toLowerCase())
+        )
+    }
+
+    // 状态筛选
+    if (albumFilters.value.status !== '') {
+        photos = photos.filter(photo => photo.is_review === parseInt(albumFilters.value.status))
+    }
+
+    // 上传者筛选
+    if (albumFilters.value.uploader) {
+        photos = photos.filter(photo =>
+            photo.user_name.toLowerCase().includes(albumFilters.value.uploader.toLowerCase())
+        )
+    }
+
+    // 时间范围筛选
+    if (albumFilters.value.dateRange && albumFilters.value.dateRange.length === 2) {
+        const [startDate, endDate] = albumFilters.value.dateRange
+        const startTime = new Date(startDate).getTime() / 1000
+        const endTime = new Date(endDate).getTime() / 1000 + 86400 // 加一天
+
+        photos = photos.filter(photo => {
+            const photoTime = parseInt(photo.create_time)
+            return photoTime >= startTime && photoTime <= endTime
+        })
+    }
+
+    // 更新分页总数
+    albumPagination.value.total = photos.length
+
+    return photos
+})
+
+const paginatedPhotos = computed(() => {
+    const start = (albumPagination.value.currentPage - 1) * albumPagination.value.pageSize
+    const end = start + albumPagination.value.pageSize
+    return filteredPhotos.value.slice(start, end)
+})
+
 // 数据获取方法
 const fetchAudioCategories = async () => {
     try {
-        audioLoading.value = true
         const response = await getAudioCategories()
         audioCategories.value = response.data
     } catch (error) {
-        console.error('获取音频分类失败:', error)
         ElMessage.error('获取音频分类失败')
-    } finally {
-        audioLoading.value = false
     }
 }
 
 const fetchAlbumCategories = async () => {
     try {
-        albumLoading.value = true
         const response = await getAlbumCategories()
         albumTags.value = response.data
     } catch (error) {
-        console.error('获取相册分类失败:', error)
         ElMessage.error('获取相册分类失败')
-    } finally {
-        albumLoading.value = false
     }
 }
 
@@ -443,7 +597,11 @@ const revokeAudioReview = async (audio) => {
 
 const editAudio = (audio) => {
     editingAudio.value = audio
-    editAudioForm.value.name = audio.name
+    editAudioForm.value = {
+        name: audio.name,
+        classification_id: audio.classification_id || '',
+        new_classification_name: ''
+    }
     editAudioDialog.value = true
 }
 
@@ -456,8 +614,13 @@ const editAudioCategory = (category) => {
 // 处理编辑分类提交
 const handleEditCategory = async () => {
     try {
+        // 表单验证
+        if (!editCategoryFormRef.value) return
+
+        await editCategoryFormRef.value.validate()
+
         await updateAudioClassification(editingCategory.value.id, {
-            name: editCategoryForm.value.name
+            name: editCategoryForm.value.name.trim()
         })
 
         ElMessage.success('音频分类更新成功')
@@ -466,43 +629,85 @@ const handleEditCategory = async () => {
         // 重新获取数据
         await fetchAudioCategories()
     } catch (error) {
-        console.error('更新音频分类失败:', error)
-        ElMessage.error('更新音频分类失败')
+        if (error !== 'cancel') {
+            console.error('更新音频分类失败:', error)
+            ElMessage.error('更新音频分类失败')
+        }
     }
 }
 
 // 处理编辑音频提交
 const handleEditAudio = async () => {
     try {
-        await updateAudio(editingAudio.value.id, {
-            name: editAudioForm.value.name
-        })
+        // 表单验证
+        if (!editAudioFormRef.value) return
 
-        // 立即更新本地数据
-        editingAudio.value.name = editAudioForm.value.name
+        await editAudioFormRef.value.validate()
+
+        const updateData = {}
+
+        // 音频名称
+        if (editAudioForm.value.name.trim()) {
+            updateData.name = editAudioForm.value.name.trim()
+        }
+
+        // 分类选择逻辑：优先使用新分类名称，如果没有则使用现有分类ID
+        if (editAudioForm.value.new_classification_name.trim()) {
+            updateData.new_classification_name = editAudioForm.value.new_classification_name.trim()
+        } else if (editAudioForm.value.classification_id) {
+            updateData.classification_id = editAudioForm.value.classification_id
+        }
+
+        // 至少需要提供一个字段
+        if (Object.keys(updateData).length === 0) {
+            ElMessage.warning('请至少填写音频名称或选择/创建分类')
+            return
+        }
+
+        await updateAudio(editingAudio.value.id, updateData)
 
         ElMessage.success('音频更新成功')
         editAudioDialog.value = false
 
         // 重新获取数据
         await fetchAudioCategories()
+
+        // 重新设置当前选中的分类，确保数据是最新的
+        if (selectedAudio.value) {
+            const updatedCategory = audioCategories.value.find(c => c.id === selectedAudio.value.id)
+            if (updatedCategory) {
+                selectedAudio.value = updatedCategory
+                audioPagination.value.total = updatedCategory.audios.length
+                console.log('🎵 音频编辑完成，当前分类音频数量:', updatedCategory.audios.length)
+            } else {
+                // 如果分类不存在了（比如被删除了），清空选择
+                selectedAudio.value = null
+            }
+        }
     } catch (error) {
-        console.error('更新音频失败:', error)
-        ElMessage.error('更新音频失败')
+        if (error !== 'cancel') {
+            console.error('更新音频失败:', error)
+            ElMessage.error('更新音频失败')
+        }
     }
 }
 
 // 处理编辑相册提交
 const handleEditAlbum = async () => {
     try {
+        // 表单验证
+        if (!editAlbumFormRef.value) return
+
+        await editAlbumFormRef.value.validate()
+
         await updateAlbum(editingAlbum.value.id, {
-            name: editAlbumForm.value.name,
-            introduction: editAlbumForm.value.introduction
+            name: editAlbumForm.value.name.trim(),
+            introduction: editAlbumForm.value.introduction.trim()
         })
 
         // 立即更新本地数据
-        editingAlbum.value.name = editAlbumForm.value.name
-        editingAlbum.value.introduction = editAlbumForm.value.introduction
+        editingAlbum.value.name = editAlbumForm.value.name.trim()
+        editingAlbum.value.introduction = editAlbumForm.value.introduction.trim()
 
         ElMessage.success('相册更新成功')
         editAlbumDialog.value = false
@@ -510,29 +715,69 @@ const handleEditAlbum = async () => {
         // 重新获取数据
         await fetchAlbumCategories()
     } catch (error) {
-        console.error('更新相册失败:', error)
-        ElMessage.error('更新相册失败')
+        if (error !== 'cancel') {
+            console.error('更新相册失败:', error)
+            ElMessage.error('更新相册失败')
+        }
     }
 }
 
 // 处理编辑照片提交
 const handleEditPhoto = async () => {
     try {
-        await updatePhoto(editingPhoto.value.id, {
-            name: editPhotoForm.value.name
-        })
+        // 表单验证
+        if (!editPhotoFormRef.value) return
 
-        // 立即更新本地数据
-        editingPhoto.value.name = editPhotoForm.value.name
+        await editPhotoFormRef.value.validate()
+
+        const updateData = {}
+
+        // 照片名称
+        if (editPhotoForm.value.name.trim()) {
+            updateData.name = editPhotoForm.value.name.trim()
+        }
+
+        // 相册选择逻辑：优先使用新相册名称，如果没有则使用现有相册ID
+        if (editPhotoForm.value.new_album_name.trim()) {
+            updateData.new_album_name = editPhotoForm.value.new_album_name.trim()
+            if (editPhotoForm.value.new_album_introduction.trim()) {
+                updateData.new_album_introduction = editPhotoForm.value.new_album_introduction.trim()
+            }
+        } else if (editPhotoForm.value.album_id) {
+            updateData.album_id = editPhotoForm.value.album_id
+        }
+
+        // 至少需要提供一个字段
+        if (Object.keys(updateData).length === 0) {
+            ElMessage.warning('请至少填写照片名称或选择/创建相册')
+            return
+        }
+
+        await updatePhoto(editingPhoto.value.id, updateData)
 
         ElMessage.success('照片更新成功')
         editPhotoDialog.value = false
 
         // 重新获取数据
         await fetchAlbumCategories()
+
+        // 重新设置当前选中的相册，确保数据是最新的
+        if (selectedAlbum.value) {
+            const updatedAlbum = albumTags.value.find(a => a.id === selectedAlbum.value.id)
+            if (updatedAlbum) {
+                selectedAlbum.value = updatedAlbum
+                albumPagination.value.total = updatedAlbum.photos.length
+                console.log('📸 照片编辑完成，当前相册照片数量:', updatedAlbum.photos.length)
+            } else {
+                // 如果相册不存在了（比如被删除了），清空选择
+                selectedAlbum.value = null
+            }
+        }
     } catch (error) {
-        console.error('更新照片失败:', error)
-        ElMessage.error('更新照片失败')
+        if (error !== 'cancel') {
+            console.error('更新照片失败:', error)
+            ElMessage.error('更新照片失败')
+        }
     }
 }
 
@@ -592,23 +837,60 @@ const handleDeleteAudio = async (audio, category) => {
 
 const editPhoto = (photo) => {
     editingPhoto.value = photo
-    editPhotoForm.value.name = photo.name
+    editPhotoForm.value = {
+        name: photo.name,
+        album_id: photo.album_id || '',
+        new_album_name: '',
+        new_album_introduction: ''
+    }
     editPhotoDialog.value = true
 }
 
 // 选择逻辑
-const selectAudioCategory = (category) => {
+const selectAudioCategory = async (category) => {
+    console.log('🎵 选择音频分类:', category.name, category.id)
     selectedAudio.value = category
     selectedAlbum.value = null
     selectedUser.value = null
     activeTab.value = 'audio'
+    resetAudioFilters()
+
+    // 强制重新获取音频数据以确保数据是最新的
+    await fetchAudioCategories()
+
+    // 重新设置选中的分类（因为数据可能已经更新）
+    const updatedCategory = audioCategories.value.find(c => c.id === category.id)
+    if (updatedCategory) {
+        selectedAudio.value = updatedCategory
+        audioPagination.value.total = updatedCategory.audios.length
+        console.log('🎵 选中分类更新完成，音频数量:', updatedCategory.audios.length)
+    } else {
+        console.warn('🎵 未找到更新的分类，可能已被删除')
+        selectedAudio.value = null
+    }
 }
 
-const selectAlbum = (album) => {
+const selectAlbum = async (album) => {
+    console.log('📸 选择相册:', album.name, album.id)
     selectedAlbum.value = album
     selectedAudio.value = null
     selectedUser.value = null
     activeTab.value = 'albums'
+    resetAlbumFilters()
+
+    // 强制重新获取相册数据以确保数据是最新的
+    await fetchAlbumCategories()
+
+    // 重新设置选中的相册（因为数据可能已经更新）
+    const updatedAlbum = albumTags.value.find(a => a.id === album.id)
+    if (updatedAlbum) {
+        selectedAlbum.value = updatedAlbum
+        albumPagination.value.total = updatedAlbum.photos.length
+        console.log('📸 选中相册更新完成，照片数量:', updatedAlbum.photos.length)
+    } else {
+        console.warn('📸 未找到更新的相册，可能已被删除')
+        selectedAlbum.value = null
+    }
 }
 
 const selectUser = (user) => {
@@ -732,6 +1014,51 @@ const handleDeleteAlbum = async (album) => {
     }
 }
 
+// 筛选和分页方法
+const resetAudioFilters = () => {
+    audioFilters.value = {
+        name: '',
+        status: '',
+        uploader: '',
+        dateRange: []
+    }
+    audioPagination.value.currentPage = 1
+}
+
+const resetAlbumFilters = () => {
+    albumFilters.value = {
+        name: '',
+        status: '',
+        uploader: '',
+        dateRange: []
+    }
+    albumPagination.value.currentPage = 1
+}
+
+const handleAudioPageChange = (page) => {
+    audioPagination.value.currentPage = page
+}
+
+const handleAudioPageSizeChange = (size) => {
+    audioPagination.value.pageSize = size
+    audioPagination.value.currentPage = 1
+}
+
+const handleAlbumPageChange = (page) => {
+    albumPagination.value.currentPage = page
+}
+
+const handleAlbumPageSizeChange = (size) => {
+    albumPagination.value.pageSize = size
+    albumPagination.value.currentPage = 1
+}
+
+// 监听筛选变化时重置分页
+const onAudioFiltersChange = () => {
+    audioPagination.value.currentPage = 1
+    audioPagination.value.total = filteredAudios.value.length
+}
+
 // 组件挂载时获取数据
 onMounted(() => {
     fetchAllData()
@@ -808,13 +1135,7 @@ onMounted(() => {
                     <el-tabs v-model="activeTab" class="category-tabs">
                         <!-- 音频分类 -->
                         <el-tab-pane label="音频管理" name="audio">
-                            <div v-if="audioLoading" class="loading-state">
-                                <el-icon class="loading-icon">
-                                    <Loading />
-                                </el-icon>
-                                <p>加载音频分类中...</p>
-                            </div>
-                            <div v-else-if="audioCategories.length === 0" class="empty-state">
+                            <div v-if="audioCategories.length === 0" class="empty-state">
                                 <el-empty description="暂无音频分类" :image-size="60">
                                     <template #image>
                                         <el-icon size="60" class="empty-icon">
@@ -841,8 +1162,8 @@ onMounted(() => {
                                                 <Edit />
                                             </el-icon>
                                         </el-button>
-                                        <el-button size="small" @click.stop="deleteAudioCategory(category)" type="danger"
-                                            circle plain>
+                                        <el-button size="small" @click.stop="deleteAudioCategory(category)"
+                                            type="danger" circle plain>
                                             <el-icon>
                                                 <Delete />
                                             </el-icon>
@@ -854,13 +1175,7 @@ onMounted(() => {
 
                         <!-- 相册标签 -->
                         <el-tab-pane label="相册管理" name="albums">
-                            <div v-if="albumLoading" class="loading-state">
-                                <el-icon class="loading-icon">
-                                    <Loading />
-                                </el-icon>
-                                <p>加载相册分类中...</p>
-                            </div>
-                            <div v-else-if="albumTags.length === 0" class="empty-state">
+                            <div v-if="albumTags.length === 0" class="empty-state">
                                 <el-empty description="暂无相册分类" :image-size="60">
                                     <template #image>
                                         <el-icon size="60" class="empty-icon">
@@ -917,65 +1232,107 @@ onMounted(() => {
                 </div>
 
                 <!-- 编辑分类对话框 -->
-                <el-dialog v-model="editCategoryDialog" title="编辑音频分类" width="400px" class="responsive-dialog">
-                    <el-form :model="editCategoryForm" label-width="80px">
-                        <el-form-item label="分类名称">
-                            <el-input v-model="editCategoryForm.name" placeholder="请输入分类名称" />
+                <el-dialog v-model="editCategoryDialog" title="编辑音频分类" width="500px" :close-on-click-modal="false">
+                    <el-form :model="editCategoryForm" :rules="editCategoryFormRules" ref="editCategoryFormRef"
+                        label-width="100px">
+                        <el-form-item label="分类名称" prop="name">
+                            <el-input v-model="editCategoryForm.name" placeholder="请输入分类名称" maxlength="50"
+                                show-word-limit />
                         </el-form-item>
                     </el-form>
                     <template #footer>
                         <span class="dialog-footer">
                             <el-button @click="editCategoryDialog = false">取消</el-button>
-                            <el-button type="primary" @click="handleEditCategory">确定</el-button>
+                            <el-button type="primary" @click="handleEditCategory" :loading="false">
+                                确定编辑
+                            </el-button>
                         </span>
                     </template>
                 </el-dialog>
 
                 <!-- 编辑音频对话框 -->
-                <el-dialog v-model="editAudioDialog" title="编辑音频" width="400px" class="responsive-dialog">
-                    <el-form :model="editAudioForm" label-width="80px">
-                        <el-form-item label="音频名称">
-                            <el-input v-model="editAudioForm.name" placeholder="请输入音频名称" />
+                <el-dialog v-model="editAudioDialog" title="编辑音频" width="600px" :close-on-click-modal="false">
+                    <el-form :model="editAudioForm" :rules="editAudioFormRules" ref="editAudioFormRef"
+                        label-width="100px">
+                        <el-form-item label="音频名称" prop="name">
+                            <el-input v-model="editAudioForm.name" placeholder="请输入音频名称" maxlength="100"
+                                show-word-limit />
+                        </el-form-item>
+                        <el-form-item label="选择分类">
+                            <el-select v-model="editAudioForm.classification_id" placeholder="选择现有分类（可选）" clearable
+                                style="width: 100%" filterable>
+                                <el-option v-for="category in audioCategories" :key="category.id" :label="category.name"
+                                    :value="category.id" />
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="创建新分类">
+                            <el-input v-model="editAudioForm.new_classification_name" placeholder="输入新分类名称（可选）"
+                                maxlength="50" />
                         </el-form-item>
                     </el-form>
                     <template #footer>
                         <span class="dialog-footer">
                             <el-button @click="editAudioDialog = false">取消</el-button>
-                            <el-button type="primary" @click="handleEditAudio">确定</el-button>
+                            <el-button type="primary" @click="handleEditAudio" :loading="false">
+                                确定
+                            </el-button>
                         </span>
                     </template>
                 </el-dialog>
 
                 <!-- 编辑相册对话框 -->
-                <el-dialog v-model="editAlbumDialog" title="编辑相册" width="500px" class="responsive-dialog-large">
-                    <el-form :model="editAlbumForm" label-width="80px">
-                        <el-form-item label="相册名称">
-                            <el-input v-model="editAlbumForm.name" placeholder="请输入相册名称" />
+                <el-dialog v-model="editAlbumDialog" title="编辑相册" width="600px" :close-on-click-modal="false">
+                    <el-form :model="editAlbumForm" :rules="editAlbumFormRules" ref="editAlbumFormRef"
+                        label-width="100px">
+                        <el-form-item label="相册名称" prop="name">
+                            <el-input v-model="editAlbumForm.name" placeholder="请输入相册名称" maxlength="100"
+                                show-word-limit />
                         </el-form-item>
                         <el-form-item label="相册介绍">
                             <el-input v-model="editAlbumForm.introduction" type="textarea" :rows="3"
-                                placeholder="请输入相册介绍（可选）" />
+                                placeholder="请输入相册介绍（可选）" maxlength="500" show-word-limit />
                         </el-form-item>
                     </el-form>
                     <template #footer>
                         <span class="dialog-footer">
                             <el-button @click="editAlbumDialog = false">取消</el-button>
-                            <el-button type="primary" @click="handleEditAlbum">确定</el-button>
+                            <el-button type="primary" @click="handleEditAlbum" :loading="false">
+                                确定
+                            </el-button>
                         </span>
                     </template>
                 </el-dialog>
 
                 <!-- 编辑照片对话框 -->
-                <el-dialog v-model="editPhotoDialog" title="编辑照片" width="400px" class="responsive-dialog">
-                    <el-form :model="editPhotoForm" label-width="80px">
-                        <el-form-item label="照片名称">
-                            <el-input v-model="editPhotoForm.name" placeholder="请输入照片名称" />
+                <el-dialog v-model="editPhotoDialog" title="编辑照片" width="600px" :close-on-click-modal="false">
+                    <el-form :model="editPhotoForm" :rules="editPhotoFormRules" ref="editPhotoFormRef"
+                        label-width="100px">
+                        <el-form-item label="照片名称" prop="name">
+                            <el-input v-model="editPhotoForm.name" placeholder="请输入照片名称" maxlength="100"
+                                show-word-limit />
+                        </el-form-item>
+                        <el-form-item label="选择相册">
+                            <el-select v-model="editPhotoForm.album_id" placeholder="选择现有相册（可选）" clearable
+                                style="width: 100%" filterable>
+                                <el-option v-for="album in albumTags" :key="album.id" :label="album.name"
+                                    :value="album.id" />
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="创建新相册">
+                            <el-input v-model="editPhotoForm.new_album_name" placeholder="输入新相册名称（可选）"
+                                maxlength="100" />
+                        </el-form-item>
+                        <el-form-item label="新相册简介" v-if="editPhotoForm.new_album_name">
+                            <el-input v-model="editPhotoForm.new_album_introduction" type="textarea" :rows="3"
+                                placeholder="输入新相册简介（可选）" maxlength="500" show-word-limit />
                         </el-form-item>
                     </el-form>
                     <template #footer>
                         <span class="dialog-footer">
                             <el-button @click="editPhotoDialog = false">取消</el-button>
-                            <el-button type="primary" @click="handleEditPhoto">确定</el-button>
+                            <el-button type="primary" @click="handleEditPhoto" :loading="false">
+                                确定
+                            </el-button>
                         </span>
                     </template>
                 </el-dialog>
@@ -1010,7 +1367,26 @@ onMounted(() => {
                     <div class="content-body">
                         <!-- 音频表格 -->
                         <div v-if="selectedAudio && activeTab === 'audio'" class="table-content">
-                            <el-table :data="selectedAudio.audios || []" style="width: 100%" stripe>
+                            <!-- 音频筛选区域 -->
+                            <el-form :inline="true" :model="audioFilters" class="filters-form">
+                                <el-form-item label="音频名称">
+                                    <el-input v-model="audioFilters.name" placeholder="搜索音频名称" clearable
+                                        style="width: 150px" @input="onAudioFiltersChange" />
+                                </el-form-item>
+                                <el-form-item label="审核状态">
+                                    <el-select v-model="audioFilters.status" placeholder="选择状态" clearable
+                                        style="width: 120px" @change="onAudioFiltersChange">
+                                        <el-option label="待审核" :value="0" />
+                                        <el-option label="已审核" :value="1" />
+                                        <el-option label="不通过" :value="2" />
+                                    </el-select>
+                                </el-form-item>
+                                <el-form-item>
+                                    <el-button @click="resetAudioFilters" type="default">重置筛选</el-button>
+                                </el-form-item>
+                            </el-form>
+
+                            <el-table :data="paginatedAudios" style="width: 100%" stripe>
                                 <el-table-column prop="name" label="音频名称" min-width="200" />
                                 <el-table-column prop="user_name" label="上传者" width="120" />
                                 <el-table-column label="创建时间" width="120">
@@ -1060,11 +1436,38 @@ onMounted(() => {
                                     </template>
                                 </el-table-column>
                             </el-table>
+
+                            <!-- 音频分页 -->
+                            <div class="paging">
+                                <span>共 {{ audioPagination.total }} 条</span>
+                                <el-pagination background prev-text="上一页" next-text="下一页" layout="prev, pager, next"
+                                    :total="audioPagination.total" :pager-count="5"
+                                    @current-change="handleAudioPageChange" />
+                            </div>
                         </div>
 
                         <!-- 相册表格 -->
                         <div v-else-if="selectedAlbum && activeTab === 'albums'" class="table-content">
-                            <el-table :data="selectedAlbum.photos || []" style="width: 100%" stripe>
+                            <!-- 相册筛选区域 -->
+                            <el-form :inline="true" :model="albumFilters" class="filters-form">
+                                <el-form-item label="照片名称">
+                                    <el-input v-model="albumFilters.name" placeholder="搜索照片名称" clearable
+                                        style="width: 150px" @input="onAlbumFiltersChange" />
+                                </el-form-item>
+                                <el-form-item label="审核状态">
+                                    <el-select v-model="albumFilters.status" placeholder="选择状态" clearable
+                                        style="width: 120px" @change="onAlbumFiltersChange">
+                                        <el-option label="待审核" :value="0" />
+                                        <el-option label="已审核" :value="1" />
+                                        <el-option label="不通过" :value="2" />
+                                    </el-select>
+                                </el-form-item>
+                                <el-form-item>
+                                    <el-button @click="resetAlbumFilters" type="default">重置筛选</el-button>
+                                </el-form-item>
+                            </el-form>
+
+                            <el-table :data="paginatedPhotos" style="width: 100%" stripe>
                                 <el-table-column prop="name" label="照片名称" min-width="200" />
                                 <el-table-column prop="user_name" label="上传者" width="120" />
                                 <el-table-column label="创建时间" width="120">
@@ -1076,7 +1479,7 @@ onMounted(() => {
                                     <template #default="{ row }">
                                         <el-tag
                                             :type="row.is_review === 1 ? 'success' : row.is_review === 0 ? 'warning' : 'danger'">
-                                            {{ row.is_review === 1 ? '已审核' : row.is_review === 0 ? '待审核' : '审核不通过' }}
+                                            {{ row.is_review === 1 ? '已审核' : row.is_review === 0 ? '待审核' : '不通过' }}
                                         </el-tag>
                                     </template>
                                 </el-table-column>
@@ -1118,6 +1521,14 @@ onMounted(() => {
                                     </template>
                                 </el-table-column>
                             </el-table>
+
+                            <!-- 相册分页 -->
+                            <div class="paging">
+                                <span>共 {{ albumPagination.total }} 条</span>
+                                <el-pagination background prev-text="上一页" next-text="下一页" layout="prev, pager, next"
+                                    :total="albumPagination.total" :pager-count="5"
+                                    @current-change="handleAlbumPageChange" />
+                            </div>
                         </div>
 
                         <!-- 用户详情 -->
@@ -1136,7 +1547,7 @@ onMounted(() => {
                                 </template>
                                 <el-descriptions :column="2" border>
                                     <el-descriptions-item label="账号">{{ selectedUser.account_number
-                                    }}</el-descriptions-item>
+                                        }}</el-descriptions-item>
                                     <el-descriptions-item label="权限">
                                         <el-tag :type="getPermissionType(selectedUser.permission)">
                                             {{ getPermissionLabel(selectedUser.permission) }}
@@ -1148,13 +1559,13 @@ onMounted(() => {
                                         </el-tag>
                                     </el-descriptions-item>
                                     <el-descriptions-item label="注册时间">{{ formatTime(selectedUser.create_time)
-                                    }}</el-descriptions-item>
+                                        }}</el-descriptions-item>
                                 </el-descriptions>
                                 <template #footer v-if="selectedUser.permission !== 1">
                                     <div class="user-actions">
-                                        <el-button @click="changeUserPermission(selectedUser)"
-                                            type="primary">
-                                            {{ selectedUser.permission === 3 ? '授予管理员权限' : selectedUser.permission === 2 ? '撤销管理员权限' : '修改权限' }}
+                                        <el-button @click="changeUserPermission(selectedUser)" type="primary">
+                                            {{ selectedUser.permission === 3 ? '授予管理员权限' : selectedUser.permission === 2
+                                                ? '撤销管理员权限' : '修改权限' }}
                                         </el-button>
                                         <el-button @click="resetUserPassword(selectedUser)" type="info">重置密码</el-button>
                                         <el-button @click="toggleUserStatus(selectedUser)" type="warning"
@@ -1854,7 +2265,69 @@ onMounted(() => {
 }
 
 .table-content :deep(.el-table) {
-    min-width: 800px; /* 确保表格有最小宽度 */
+    min-width: 800px;
+    /* 确保表格有最小宽度 */
+}
+
+/* 响应式筛选区域 */
+@media (max-width: 1024px) {
+    .filters-section {
+        padding: 12px;
+    }
+
+    .filters-form .el-form-item {
+        margin-bottom: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .filters-section {
+        margin-bottom: 16px;
+        padding: 12px;
+    }
+
+    .filters-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .filters-form .el-form-item {
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    .filters-form .el-form-item .el-input,
+    .filters-form .el-form-item .el-select,
+    .filters-form .el-form-item .el-date-picker {
+        width: 100% !important;
+    }
+
+    .filters-info {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+    }
+
+    .paging {
+        justify-content: center;
+    }
+
+    .paging>span {
+        margin-right: 12px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .filters-section {
+        margin-bottom: 12px;
+        padding: 8px;
+    }
+
+    .filters-form {
+        gap: 8px;
+    }
 }
 
 /* 响应式表格 */
@@ -1936,6 +2409,54 @@ onMounted(() => {
 }
 
 
+/* 筛选区域 */
+.filters-section {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 8px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.filters-form {
+    margin-bottom: 12px;
+}
+
+.filters-form .el-form-item {
+    margin-bottom: 8px;
+}
+
+.filters-form .el-form-item__label {
+    font-weight: 500;
+    color: #374151;
+}
+
+.filters-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.filters-info span {
+    font-weight: 500;
+}
+
+.paging {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+}
+
+.paging>span {
+    font-size: 14px;
+    margin-right: 18px;
+    color: #484848;
+}
+
 /* 图片占位符 */
 .image-placeholder-small {
     display: flex;
@@ -1979,6 +2500,7 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
+
     .user-detail :deep(.el-card__header),
     .user-detail :deep(.el-card__body) {
         padding: 12px 16px;
@@ -2119,6 +2641,7 @@ onMounted(() => {
 
 /* 响应式按钮 */
 @media (max-width: 768px) {
+
     .review-buttons,
     .action-buttons {
         gap: 4px;
@@ -2133,6 +2656,7 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
+
     .review-buttons,
     .action-buttons {
         flex-direction: column;
@@ -2200,6 +2724,7 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
+
     .responsive-dialog,
     .responsive-dialog-large {
         --el-dialog-width: 95vw;

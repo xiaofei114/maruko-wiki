@@ -73,7 +73,7 @@ export async function getAlbumsWithLatestPhotos() {
             WHERE p.is_deleted = 0 AND p.is_review = 1
             AND pa.is_deleted = 0 AND pa.is_review = 1
             ORDER BY p.create_time DESC
-            LIMIT 10
+            LIMIT 24
         `);
 
         // 处理最新照片数据

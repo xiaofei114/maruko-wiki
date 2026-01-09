@@ -746,10 +746,6 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .module-card {
-    padding: 15px;
-  }
-
   .module-header {
     padding: 0 15px;
   }
@@ -849,11 +845,6 @@ onMounted(() => {
     gap: 12px;
   }
 
-  .module-card {
-    padding: 12px;
-    border-radius: 10px;
-  }
-
   .module-header {
     padding: 0 12px;
   }
@@ -913,10 +904,6 @@ onMounted(() => {
     font-size: 12px;
   }
 
-  .module-card {
-    padding: 10px;
-  }
-
   .module-header h2 {
     font-size: 14px;
   }
@@ -959,10 +946,6 @@ onMounted(() => {
 
   .anchor-name {
     font-size: 16px;
-  }
-
-  .module-card {
-    padding: 10px;
   }
 
   .module-header {

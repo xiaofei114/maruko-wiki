@@ -145,7 +145,6 @@ onMounted(() => {
 
 <template>
   <div class="photo-album-page">
-    <Top />
     <div class="content-wrapper">
       <div class="page-hero">
         <div class="hero-content">

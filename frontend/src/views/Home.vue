@@ -1,7 +1,5 @@
 <template>
   <div class="live-room-page">
-    <!-- 顶部导航栏 -->
-    <Top />
     <div class="body">
       <!-- 主播信息卡片 -->
       <div class="anchor-card">
@@ -218,7 +216,7 @@ const goToLiveRoom = () => {
 const fetchRoomInfo = async () => {
   const res = await getRoomInfo()
 
-  if (res.code === 0) {
+  if (res.code === 200) {
     roomInfo.value = res.data
     tags.value = res.data.tags ? res.data.tags.split(',') : []
   } else {

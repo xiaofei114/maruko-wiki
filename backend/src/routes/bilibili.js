@@ -1,51 +1,47 @@
 import express from 'express';
-import { proxyBilibiliRequest } from '../services/bilibili.js';
+import { getRoomInfo, getMasterInfo, getTopListNew } from '../services/bilibili.js';
+import { sendSuccess, sendError } from '../method/response.js';
 
 const router = express.Router();
 
-// 允许的代理路由列表
-const ALLOWED_ROUTES = [
-    '/room/v1/Room/get_info',
-    '/live_user/v1/Master/info',
-    '/xlive/app-room/v2/guardTab/topListNew',
-];
-
-// Bilibili API 代理路由
-// 支持所有 HTTP 方法和任意路径
-async function handleBilibiliProxy(req, res) {
+/**
+ * 获取房间信息
+ */
+router.get('/room/v1/Room/get_info', async (req, res) => {
     try {
-        // 检查请求路径是否在允许的路由列表中
-        const isAllowed = ALLOWED_ROUTES.some(route => req.path.startsWith(route));
-        if (!isAllowed) {
-            return res.status(403).json({
-                code: 403,
-                message: 'Forbidden: Route not allowed'
-            });
-        }
-
-        const result = await proxyBilibiliRequest(
-            req.method,
-            req.path,
-            req.query,
-            req.body,
-            req.headers
-        );
-
-        res.status(result.status).send(result.data);
+        const data = await getRoomInfo();
+        sendSuccess(res, data);
     } catch (error) {
-        res.status(500).json({
-            code: 1,
-            message: 'Internal Server Error'
-        });
+        logger.error('获取房间信息失败:', error);
+        sendError(res, '获取房间信息失败');
     }
-}
+});
 
-// 使用通配符路由匹配所有请求
-router.get('/*', handleBilibiliProxy);
-router.post('/*', handleBilibiliProxy);
-router.put('/*', handleBilibiliProxy);
-router.delete('/*', handleBilibiliProxy);
-router.patch('/*', handleBilibiliProxy);
-router.options('/*', handleBilibiliProxy);
+/**
+ * 获取主播信息
+ */
+router.get('/live_user/v1/Master/info', async (req, res) => {
+    try {
+        const data = await getMasterInfo();
+        sendSuccess(res, data);
+    } catch (error) {
+        logger.error('获取主播信息失败:', error);
+        sendError(res, '获取主播信息失败');
+    }
+});
+
+/**
+ * 获取排行榜数据
+ */
+router.get('/xlive/app-room/v2/guardTab/topListNew', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const data = await getTopListNew(page);
+        sendSuccess(res, data);
+    } catch (error) {
+        logger.error('获取排行榜数据失败:', error);
+        sendError(res, '获取排行榜数据失败');
+    }
+});
 
 export default router;

@@ -19,3 +19,6 @@ email:
     pass: # 请填写您的邮箱密码
   from: 用户名 <请填写您的邮箱地址>
   subject: # 邮件标题
+bilibili:
+  roomId: 1929354869
+  userId: 3546938511198692

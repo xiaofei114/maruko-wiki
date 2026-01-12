@@ -1,133 +1,163 @@
 import axios from 'axios';
 import crypto from 'crypto';
+import { read_json } from '../method/read.js';
 
 /**
  * 生成缓存key的函数
- * @param {string} method - 请求方法
  * @param {string} path - 请求路径
- * @param {object} query - 查询参数
- * @param {object} body - 请求体
+ * @param {object} params - 查询参数
  * @returns {string} 缓存key
  */
-function generateCacheKey(method, path, query, body) {
-    const cleanQuery = cleanObject(query);
-    const cleanBody = cleanObject(body);
-
+function generateCacheKey(path, params = {}) {
     // 创建按键排序的对象，确保相同请求生成相同key
-    const sortedKeyData = {
-        method: method.toUpperCase(),
+    const sortedParams = {};
+    Object.keys(params).sort().forEach(key => {
+        sortedParams[key] = params[key];
+    });
+
+    const keyData = {
         path: path,
-        query: cleanQuery,
-        body: cleanBody
+        params: sortedParams
     };
 
     // 序列化排序后的对象
-    const jsonString = JSON.stringify(sortedKeyData);
+    const jsonString = JSON.stringify(keyData);
     const hash = crypto.createHash('md5').update(jsonString).digest('hex');
 
     return `bilibili_api:${hash}`;
 }
 
 /**
- * 清理对象，只保留自有属性
- * @param {object} obj - 要清理的对象
- * @returns {object} 清理后的对象
+ * 获取缓存数据
+ * @param {string} cacheKey - 缓存key
+ * @returns {object|null} 缓存的数据
  */
-function cleanObject(obj) {
-    const cleaned = {};
-    if (obj) {
-        for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                cleaned[key] = obj[key];
-            }
-        }
-    }
-    return cleaned;
-}
-
-/**
- * 调试用：生成可读的缓存key描述
- * @param {string} method - 请求方法
- * @param {string} path - 请求路径
- * @param {object} query - 查询参数
- * @param {object} body - 请求体
- * @returns {string} 可读的key描述
- */
-function generateReadableCacheKey(method, path, query, body) {
-    const cleanQuery = cleanObject(query);
-    const cleanBody = cleanObject(body);
-
-    const queryStr = Object.keys(cleanQuery).length > 0
-        ? '?' + new URLSearchParams(cleanQuery).toString()
-        : '';
-    const bodyStr = Object.keys(cleanBody).length > 0
-        ? ` body:${JSON.stringify(cleanBody)}`
-        : '';
-    return `${method.toUpperCase()} ${path}${queryStr}${bodyStr}`;
-}
-
-/**
- * 代理 Bilibili API 请求
- * @param {string} method - 请求方法
- * @param {string} path - 请求路径
- * @param {object} query - 查询参数
- * @param {object} body - 请求体
- * @param {object} headers - 请求头
- * @returns {object} 代理结果
- */
-export async function proxyBilibiliRequest(method, path, query, body, headers) {
+async function getCachedData(cacheKey) {
     try {
-        const baseURL = 'https://api.live.bilibili.com';
-
-        const cacheKey = generateCacheKey(method, path, query, body);
-        const readableKey = generateReadableCacheKey(method, path, query, body);
-
-        // 尝试从缓存中获取数据
         const cachedData = await global.redis.get(cacheKey);
         if (cachedData) {
-            logger.debug(`${readableKey} - 命中缓存`);
+            logger.debug(`缓存命中: ${cacheKey}`);
             return JSON.parse(cachedData);
         }
-
-        logger.debug(`${readableKey} - 请求Bilibili API`);
-
-        // 构建目标URL
-        const targetURL = baseURL + path;
-
-        logger.info(`${method} ${targetURL}`);
-
-        // 转发请求
-        const response = await axios({
-            method: method,
-            url: targetURL,
-            params: query,
-            data: body,
-            headers: {
-                ...headers,
-                host: new URL(baseURL).host,
-                'content-length': undefined,
-                origin: baseURL,
-                referer: baseURL,
-            },
-            timeout: 10000,
-            validateStatus: () => true,
-        });
-
-        // 将响应数据缓存到Redis，过期时间1分钟
-        const cacheValue = JSON.stringify({
-            status: response.status,
-            data: response.data
-        });
-        await global.redis.setex(cacheKey, 60, cacheValue); // 60秒 = 1分钟
-        logger.debug(`${readableKey} - 已缓存到Redis (60秒)`);
-
-        return {
-            status: response.status,
-            data: response.data
-        };
-
     } catch (error) {
-        logger.error('Bilibili API 代理请求失败:', error);
-        throw error;
+        logger.warn('获取缓存失败:', error);
     }
+    return null;
+}
+
+/**
+ * 设置缓存数据
+ * @param {string} cacheKey - 缓存key
+ * @param {object} data - 要缓存的数据
+ * @param {number} ttl - 过期时间(秒)
+ */
+async function setCachedData(cacheKey, data, ttl = 60) {
+    try {
+        const cacheValue = JSON.stringify(data);
+        await global.redis.setex(cacheKey, ttl, cacheValue);
+        logger.debug(`已缓存到Redis (${ttl}秒): ${cacheKey}`);
+    } catch (error) {
+        logger.warn('设置缓存失败:', error);
+    }
+}
+
+/**
+ * 调用 Bilibili API
+ * @param {string} path - API路径
+ * @param {object} params - 查询参数
+ * @returns {Promise<object>} API响应数据
+ */
+async function callBilibiliAPI(path, params = {}) {
+    const baseURL = 'https://api.live.bilibili.com';
+    const targetURL = baseURL + path;
+
+    logger.info(`请求Bilibili API: ${targetURL}`, params);
+
+    const response = await axios({
+        method: 'GET',
+        url: targetURL,
+        params: params,
+        timeout: 10000,
+        validateStatus: () => true,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://live.bilibili.com'
+        }
+    });
+
+    if (response.status !== 200) {
+        throw new Error(`Bilibili API 请求失败: ${response.status} ${response.statusText}`);
+    }
+
+    return response.data;
+}
+
+/**
+ * 获取房间信息
+ * @returns {Promise<object>} 房间信息
+ */
+export async function getRoomInfo() {
+    const config = read_json('configs', 'config');
+    const path = '/room/v1/Room/get_info';
+    const params = {
+        room_id: config.bilibili.roomId
+    };
+
+    const cacheKey = generateCacheKey(path, params);
+    let data = await getCachedData(cacheKey);
+
+    if (!data) {
+        data = await callBilibiliAPI(path, params);
+        await setCachedData(cacheKey, data);
+    }
+
+    return data;
+}
+
+/**
+ * 获取主播信息
+ * @returns {Promise<object>} 主播信息
+ */
+export async function getMasterInfo() {
+    const config = read_json('configs', 'config');
+    const path = '/live_user/v1/Master/info';
+    const params = {
+        uid: config.bilibili.userId
+    };
+
+    const cacheKey = generateCacheKey(path, params);
+    let data = await getCachedData(cacheKey);
+
+    if (!data) {
+        data = await callBilibiliAPI(path, params);
+        await setCachedData(cacheKey, data);
+    }
+
+    return data;
+}
+
+/**
+ * 获取排行榜数据
+ * @param {number} page - 页码
+ * @returns {Promise<object>} 排行榜数据
+ */
+export async function getTopListNew(page = 1) {
+    const config = read_json('configs', 'config');
+    const path = '/xlive/app-room/v2/guardTab/topListNew';
+    const params = {
+        roomid: config.bilibili.roomId,
+        ruid: config.bilibili.userId,
+        page: page,
+        page_size: 30
+    };
+
+    const cacheKey = generateCacheKey(path, params);
+    let data = await getCachedData(cacheKey);
+
+    if (!data) {
+        data = await callBilibiliAPI(path, params);
+        await setCachedData(cacheKey, data);
+    }
+
+    return data;
 }

@@ -1,7 +1,5 @@
 <template>
   <div class="live-room-page">
-    <!-- 顶部导航栏 -->
-    <Top />
     <div class="body">
       <!-- 主播信息卡片 -->
       <div class="anchor-card">

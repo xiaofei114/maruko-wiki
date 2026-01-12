@@ -141,9 +141,6 @@ const sortedAnnouncements = computed(() => {
 
 <template>
     <div class="announcement-page">
-        <!-- 顶部导航栏 -->
-        <Top />
-
         <div class="content-wrapper">
             <!-- 页面头部 -->
             <div class="page-hero">

@@ -1068,9 +1068,6 @@ onMounted(() => {
 
 <template>
     <div class="admin-page">
-        <!-- 顶部导航栏 -->
-        <Top />
-
         <div class="content-wrapper">
             <!-- 页面头部 -->
             <section class="page-hero">

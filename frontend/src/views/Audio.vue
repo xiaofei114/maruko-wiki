@@ -693,7 +693,6 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="audio-page" @click="unlockAudio">
-        <Top />
         <div class="container">
             <section class="page-hero">
                 <div class="hero-content">

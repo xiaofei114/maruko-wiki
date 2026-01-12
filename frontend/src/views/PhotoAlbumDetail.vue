@@ -246,9 +246,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="photo-album-detail-page">
-    <!-- 顶部导航栏 -->
-    <Top />
-
     <div class="content-wrapper">
       <!-- 返回按钮和相册信息 -->
       <div class="album-header">

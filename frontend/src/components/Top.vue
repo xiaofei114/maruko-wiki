@@ -1,15 +1,28 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
+import { ElMessageBox } from 'element-plus'
 import img from '@/assets/猫玩伴.png'
 
 
 // 响应式数据
 const showDropdown = ref(false)
 const showMobileMenu = ref(false)
-const currentRoute = ref('')
+const isSidebarClosing = ref(false)
+const sidebarTimer = ref(null)
+
+// 友情链接数据
+const friendlyLinks = [
+  { name: '梨按钮', url: 'https://www.shanerubian.online/' },
+  { name: '虎按钮', url: 'https://zhaoshihu.shanerubian.online/' },
+  { name: '羽毛球按钮', url: 'https://xinggongyun.shanerubian.online/' },
+  { name: '虾按钮', url: 'https://xia.shanerubian.online/' },
+  { name: '龟按钮', url: 'https://kami.shanerubian.online/' },
+  { name: '浣熊按钮', url: 'https://huanxiong.shanerubian.online/' },
+  { name: '埋按钮', url: 'https://maibutton.yangdujun.top/' },
+]
 
 // 计算属性
 const router = useRouter()
@@ -44,18 +57,17 @@ const getPermissionName = () => {
 // 导航菜单项
 const navItems = computed(() => {
   const items = [
-    { name: '首页', path: '/', icon: 'fas fa-home' },
-    { name: '相簿', path: '/photo-album', icon: 'fas fa-images' },
-    { name: '音声', path: '/audio', icon: 'fas fa-music' },
-    { name: '公告', path: '/announcement', icon: 'fas fa-bullhorn' }
+    { name: '首页', path: '/' },
+    { name: '相簿', path: '/photo-album' },
+    { name: '音声', path: '/audio' },
+    { name: '公告', path: '/announcement' },
   ]
 
   // 下载页面 - 需要登录
   // if (isAuthenticated.value) {
   //   items.splice(3, 0, {
   //     name: '下载',
-  //     path: '/download',
-  //     icon: 'fas fa-download'
+  //     path: '/download'
   //   })
   // }
 
@@ -63,26 +75,30 @@ const navItems = computed(() => {
   if (isAuthenticated.value && (permission.value === 1 || permission.value === 2)) {
     items.push({
       name: '管理',
-      path: '/admin',
-      icon: 'fas fa-cog'
+      path: '/admin'
     })
   }
+
+  items.push({ name: '友情链接', path: '#', isDropdown: true })
 
   return items
 })
 
-// 当前激活的导航项
-const activeNav = computed(() => {
+// 当前激活的菜单项索引（用于 el-menu）
+const activeNavIndex = computed(() => {
   const currentPath = router.currentRoute.value.path
-
-  // 检查动态路由
-  if (currentPath.startsWith('/photo-album')) {
-    return '相簿'
-  }
-
-  // 检查所有导航项
-  return navItems.value.find(item => item.path === currentPath)?.name || '首页'
+  const item = navItems.value.find(item => item.path === currentPath)
+  return item ? item.path : '/'
 })
+
+// 处理菜单选择
+const handleMenuSelect = (index) => {
+  // 如果是友情链接的URL，直接打开外部链接
+  if (index.startsWith('http')) return
+
+  // 否则进行路由跳转
+  navigateTo(index)
+}
 
 // 导航方法
 const navigateTo = (path) => {
@@ -93,9 +109,9 @@ const navigateTo = (path) => {
 
 // 用户菜单项
 const userMenuItems = [
-  // { name: '个人中心', icon: 'fas fa-user', action: 'profile' },
-  // { name: '设置', icon: 'fas fa-cog', action: 'settings' },
-  { name: '退出登录', icon: 'fas fa-sign-out-alt', action: 'logout' }
+  // { name: '个人中心', action: 'profile' },
+  // { name: '设置', action: 'settings' },
+  { name: '退出登录', action: 'logout' }
 ]
 
 
@@ -122,9 +138,41 @@ const closeDropdown = () => {
 
 // 切换移动菜单
 const toggleMobileMenu = () => {
-  showMobileMenu.value = !showMobileMenu.value
+  if (showMobileMenu.value && !isSidebarClosing.value) {
+    // 当前是打开状态，关闭菜单
+    closeMobileMenu()
+  } else if (!showMobileMenu.value && !isSidebarClosing.value) {
+    // 当前是关闭状态，打开菜单
+    openMobileMenu()
+  }
+  // 如果正在关闭动画中，忽略点击
   showDropdown.value = false // 关闭用户下拉菜单
 }
+
+// 打开移动菜单
+const openMobileMenu = () => {
+  // 清除之前的定时器
+  if (sidebarTimer.value) {
+    clearTimeout(sidebarTimer.value)
+    sidebarTimer.value = null
+  }
+
+  showMobileMenu.value = true
+  isSidebarClosing.value = false
+}
+
+// 清理定时器
+const cleanupTimer = () => {
+  if (sidebarTimer.value) {
+    clearTimeout(sidebarTimer.value)
+    sidebarTimer.value = null
+  }
+}
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  cleanupTimer()
+})
 
 // 点击品牌：桌面端导航，移动端打开菜单
 const onBrandClick = (e) => {
@@ -147,11 +195,25 @@ const onBrandKeydown = (e) => {
 
 // 关闭移动菜单
 const closeMobileMenu = () => {
-  showMobileMenu.value = false
+  // 如果已经在关闭中，直接返回
+  if (isSidebarClosing.value) return
+
+  // 清除之前的定时器
+  if (sidebarTimer.value) {
+    clearTimeout(sidebarTimer.value)
+  }
+
+  isSidebarClosing.value = true
+
+  sidebarTimer.value = setTimeout(() => {
+    showMobileMenu.value = false
+    isSidebarClosing.value = false
+    sidebarTimer.value = null
+  }, 250) // 与动画时间匹配
 }
 
 // 处理用户菜单点击时关闭移动菜单
-const handleUserMenuClick = (action) => {
+const handleUserMenuClick = async (action) => {
   switch (action) {
     case 'profile':
       console.log('跳转到个人中心')
@@ -160,11 +222,24 @@ const handleUserMenuClick = (action) => {
       console.log('跳转到设置页面')
       break
     case 'logout':
-      handleLogout()
-      break
+      try {
+        await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+          confirmButtonClass: 'el-button--danger'
+        })
+        // 用户确认退出
+        handleLogout()
+      } catch { }
   }
   showDropdown.value = false
   showMobileMenu.value = false // 关闭移动菜单
+}
+
+// 友情链接相关方法
+const openLink = (url) => {
+  window.open(url, '_blank')
 }
 </script>
 
@@ -177,21 +252,25 @@ const handleUserMenuClick = (action) => {
         <router-link to="/" class="brand-link" @keydown="onBrandKeydown">
           <span class="brand-text">小猫丸子Wiki</span>
         </router-link>
-        <!-- 移动端菜单触发器已移除，保留品牌头像和文字 -->
       </div>
 
       <!-- 桌面端导航栏 -->
-      <nav class="navigation desktop-nav" role="navigation" aria-label="主导航">
-        <ul class="nav-list">
-          <li v-for="item in navItems" :key="item.path" class="nav-item"
-            :class="{ active: activeNav === item.name, 'conditional-nav': item.path === '/admin' || item.path === '/download' }"
-            @click="navigateTo(item.path)">
+      <el-menu :default-active="activeNavIndex" class="navigation-menu" mode="horizontal" :ellipsis="false"
+        @select="handleMenuSelect">
+        <template v-for="item in navItems" :key="item.path">
+          <el-sub-menu v-if="item.isDropdown" :index="item.name" :show-timeout="100" :hide-timeout="100">
+            <template #title>
+              <span>{{ item.name }}</span>
+            </template>
+            <el-menu-item v-for="link in friendlyLinks" :key="link.url" :index="link.url" @click="openLink(link.url)">
+              <span>{{ link.name }}</span>
+            </el-menu-item>
+          </el-sub-menu>
+          <el-menu-item v-else :index="item.path">
             <span>{{ item.name }}</span>
-          </li>
-        </ul>
-      </nav>
-
-      <!-- (已移除右侧汉堡按钮，左侧品牌图标现在充当触发器) -->
+          </el-menu-item>
+        </template>
+      </el-menu>
 
       <!-- 右侧用户区域 -->
       <div class="user-area">
@@ -228,22 +307,28 @@ const handleUserMenuClick = (action) => {
         </div>
       </div>
 
-      <!-- 移动端菜单 -->
-      <div v-if="showMobileMenu" class="mobile-menu-overlay" @click="closeMobileMenu">
-        <div class="mobile-menu" @click.stop>
-          <div class="mobile-menu-header">
-            <h3>导航菜单</h3>
-            <button class="close-menu-btn" @click="closeMobileMenu">
-              <i class="fas fa-times"></i>
-            </button>
+      <!-- 移动端侧边栏菜单 -->
+      <div v-show="showMobileMenu || isSidebarClosing" class="mobile-sidebar-overlay" @click="closeMobileMenu">
+        <div class="mobile-sidebar" :class="{ 'sidebar-closing': isSidebarClosing }" @click.stop>
+          <div class="mobile-sidebar-header">
+            <h3>小猫丸子Wiki</h3>
           </div>
-          <ul class="mobile-nav-list">
-            <li v-for="item in navItems" :key="item.path" class="mobile-nav-item"
-              :class="{ active: activeNav === item.name }" @click="navigateTo(item.path)">
-              <i :class="item.icon"></i>
-              <span>{{ item.name }}</span>
-            </li>
-          </ul>
+          <el-menu :default-active="activeNavIndex" class="mobile-sidebar-menu" @select="handleMenuSelect">
+            <template v-for="item in navItems" :key="item.path">
+              <el-sub-menu v-if="item.isDropdown" :index="item.name">
+                <template #title>
+                  <span>{{ item.name }}</span>
+                </template>
+                <el-menu-item v-for="link in friendlyLinks" :key="link.url" :index="link.url"
+                  @click="openLink(link.url)">
+                  <span>{{ link.name }}</span>
+                </el-menu-item>
+              </el-sub-menu>
+              <el-menu-item v-else :index="item.path">
+                <span>{{ item.name }}</span>
+              </el-menu-item>
+            </template>
+          </el-menu>
         </div>
       </div>
     </div>
@@ -324,43 +409,28 @@ const handleUserMenuClick = (action) => {
   letter-spacing: 1px;
 }
 
-/* 导航栏 */
-.navigation {
+/* 导航栏菜单 */
+.navigation-menu {
   flex: 1;
   display: flex;
   justify-content: center;
   position: absolute;
   left: 50vw;
   transform: translateX(-50%);
+  border-bottom: none;
+  height: 70%;
 }
 
-/* 可见的移动端标签，提示这是导航栏 */
-.nav-label {
-  display: none;
-  font-size: 11px;
-  color: #1976d2;
-  margin-left: 6px;
+.el-menu--horizontal {
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: #fff;
+  --el-menu-active-color: #fff;
+  --el-menu-hover-bg-color: #ffffff48;
+  --el-menu-hover-text-color: #fff;
 }
 
-@media (max-width: 768px) {
-  .nav-label {
-    display: inline-block;
-    margin-left: 6px;
-    font-weight: 600;
-  }
-}
-
-/* 屏幕阅读器文本 */
-.sr-only {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
+:deep(.el-menu--horizontal>.el-menu-item.is-active) {
+  border-bottom: 2px solid #3040e7;
 }
 
 /* 移动端显示品牌图标，隐藏文字 */
@@ -379,49 +449,6 @@ const handleUserMenuClick = (action) => {
   }
 }
 
-.nav-list {
-  display: flex;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  gap: 10px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
-}
-
-.nav-icon {
-  font-size: 14px;
-  opacity: 0.8;
-  transition: opacity 0.3s ease;
-}
-
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  transform: translateY(-1px);
-}
-
-.nav-item.active {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* 条件导航项样式 */
-.conditional-nav {
-  position: relative;
-}
-
 .nav-item i {
   font-size: 14px;
 }
@@ -438,7 +465,7 @@ const handleUserMenuClick = (action) => {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  border-radius: 20px;
+  border-radius: 10px;
   cursor: pointer;
   position: relative;
   transition: background-color 0.3s ease;
@@ -490,7 +517,7 @@ const handleUserMenuClick = (action) => {
 }
 
 .dropdown-header {
-  padding: 16px;
+  padding: 5px 16px;
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   display: flex;
   align-items: center;
@@ -543,6 +570,57 @@ const handleUserMenuClick = (action) => {
   color: #666;
 }
 
+/* 退出登录项特殊样式 */
+.dropdown-item:last-child {
+  color: #F56C6C;
+  border-top: 1px solid #999;
+  background: #fef0f0;
+}
+
+.dropdown-item:last-child:hover {
+  background: rgb(252, 211, 211);
+}
+
+/* 退出登录确认对话框样式 */
+.logout-confirm-dialog {
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.logout-confirm-dialog .el-messagebox__header {
+  padding: 20px 20px 10px;
+}
+
+.logout-confirm-dialog .el-messagebox__title {
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.logout-confirm-dialog .el-messagebox__content {
+  padding: 10px 20px 20px;
+  color: #606266;
+}
+
+.logout-confirm-dialog .el-messagebox__message {
+  color: #606266;
+  font-size: 14px;
+}
+
+.logout-confirm-dialog .el-messagebox__btns {
+  padding: 10px 20px 20px;
+}
+
+.logout-confirm-dialog .el-button--danger {
+  background-color: #f56c6c;
+  border-color: #f56c6c;
+}
+
+.logout-confirm-dialog .el-button--danger:hover {
+  background-color: #f78989;
+  border-color: #f78989;
+}
+
 /* 响应式设计 */
 
 /* 大屏幕优化 (>1200px) */
@@ -559,11 +637,6 @@ const handleUserMenuClick = (action) => {
     font-size: 28px;
   }
 
-  .nav-item {
-    padding: 12px 20px;
-    font-size: 16px;
-  }
-
   .user-info {
     padding: 10px 14px;
   }
@@ -576,24 +649,16 @@ const handleUserMenuClick = (action) => {
 
 /* 中等屏幕 (769px-1199px) */
 @media (min-width: 769px) and (max-width: 1199px) {
-  .nav-list {
+  .navigation-menu {
     gap: 25px;
   }
 
-  .nav-item {
-    padding: 10px 16px;
-    font-size: 15px;
-  }
 }
 
 /* 平板端 (481px-768px) */
 @media (min-width: 481px) and (max-width: 768px) {
-  .nav-item {
-    padding: 8px 12px;
-    font-size: 14px;
-  }
 
-  .nav-list {
+  .navigation-menu {
     gap: 8px;
   }
 
@@ -621,9 +686,8 @@ const handleUserMenuClick = (action) => {
     font-size: 18px;
   }
 
-  .navigation {
+  .navigation-menu {
     display: none;
-    /* 在移动端隐藏桌面导航 */
   }
 
   .user-area {
@@ -694,20 +758,6 @@ const handleUserMenuClick = (action) => {
     font-size: 16px;
   }
 
-  .navigation {
-    margin: 0 3px;
-  }
-
-  .nav-list {
-    gap: 4px;
-  }
-
-  .nav-item {
-    width: 32px;
-    height: 32px;
-    padding: 4px;
-  }
-
   .user-info {
     padding: 4px 6px;
   }
@@ -717,146 +767,63 @@ const handleUserMenuClick = (action) => {
   }
 }
 
-/* 移动端汉堡菜单 */
-.hamburger-menu {
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.hamburger-menu:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.hamburger-line {
-  width: 20px;
-  height: 2px;
-  background: white;
-  margin: 2px 0;
-  transition: all 0.3s ease;
-  transform-origin: center;
-}
-
-.hamburger-menu.active .hamburger-line:nth-child(1) {
-  transform: rotate(45deg) translate(5px, 5px);
-}
-
-.hamburger-menu.active .hamburger-line:nth-child(2) {
-  opacity: 0;
-}
-
-.hamburger-menu.active .hamburger-line:nth-child(3) {
-  transform: rotate(-45deg) translate(7px, -6px);
-}
-
-/* 移动端菜单遮罩 */
-.mobile-menu-overlay {
+/* 移动端侧边栏遮罩 */
+.mobile-sidebar-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 60px;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
   animation: fadeIn 0.3s ease;
 }
 
-.mobile-menu {
+.mobile-sidebar-overlay:has(.sidebar-closing) {
+  animation: fadeOut 0.3s ease;
+}
+
+.mobile-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100vh;
   background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 320px;
-  max-height: 70vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  animation: slideDown 0.3s ease;
-}
-
-.mobile-menu-header {
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.15);
+  animation: slideInLeft 0.3s ease;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e9ecef;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  flex-direction: column;
 }
 
-.mobile-menu-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+.mobile-sidebar.sidebar-closing {
+  animation: slideOutLeft 0.3s ease;
 }
 
-.close-menu-btn {
-  background: none;
+/* 移动端侧边栏菜单 */
+.mobile-sidebar-menu {
+  flex: 1;
+  background: transparent;
   border: none;
-  font-size: 18px;
-  color: #666;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.close-menu-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: #333;
-}
-
-.mobile-nav-list {
-  list-style: none;
-  margin: 0;
   padding: 0;
 }
 
-.mobile-nav-item {
+.mobile-sidebar-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-bottom: 1px solid #f8f9fa;
-  color: #333;
+  padding: 3px 24px;
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  color: white;
+  height: 60px;
 }
 
-.mobile-nav-item:hover {
-  background: #f8f9fa;
+.mobile-sidebar-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
 }
 
-.mobile-nav-item.active {
-  background: #e3f2fd;
-  color: #1976d2;
-  border-left: 4px solid #1976d2;
-}
-
-.mobile-nav-item i {
-  width: 20px;
-  font-size: 16px;
-  color: #666;
-}
-
-.mobile-nav-item.active i {
-  color: #1976d2;
-}
-
-.mobile-nav-item:last-child {
-  border-bottom: none;
-}
 
 /* 动画 */
 @keyframes fadeIn {
@@ -866,6 +833,16 @@ const handleUserMenuClick = (action) => {
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 
@@ -881,57 +858,33 @@ const handleUserMenuClick = (action) => {
   }
 }
 
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
+}
+
 /* 平板端优化 */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .navigation {
+  .navigation-menu {
     position: static;
     transform: none;
     flex: 1;
     margin: 0 20px;
-  }
-
-  .nav-list {
-    justify-content: center;
-  }
-}
-
-/* 移动端显示控制 */
-@media (max-width: 768px) {
-  .hamburger-menu {
-    display: flex;
-  }
-
-  .desktop-nav {
-    display: none;
-  }
-
-  .mobile-only {
-    display: block !important;
-  }
-
-  /* 将汉堡按钮固定到右上角，避免位于中间 */
-  .hamburger-menu {
-    position: absolute;
-    right: 12px;
-    top: 12px;
-    z-index: 1001;
-  }
-
-  /* 移动端隐藏导航图标，只显示文字 */
-  .nav-icon {
-    display: none;
-  }
-
-  /* 移动端优化导航项间距 */
-  .nav-item {
-    gap: 4px;
-  }
-}
-
-/* 平板端显示图标 */
-@media (min-width: 769px) {
-  .nav-icon {
-    display: inline-block;
   }
 }
 </style>

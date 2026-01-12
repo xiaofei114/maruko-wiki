@@ -773,7 +773,7 @@ onBeforeUnmount(() => {
                             <div class="track-info">
                                 <el-button
                                     :type="currentSectionIndex === sidx && currentTrackIndex === tidx ? 'danger' : 'primary'"
-                                    @click="playTrack(sidx, tidx)" class="audio-tag" plain>
+                                    @click="playTrack(sidx, tidx)" class="audio-tag" plain round>
                                     {{ item.name }}
                                 </el-button>
                             </div>
@@ -976,9 +976,9 @@ onBeforeUnmount(() => {
 
 
 .sections {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
+    column-count: 3;
+    column-gap: 20px;
+    column-rule: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .section-card {
@@ -989,6 +989,9 @@ onBeforeUnmount(() => {
     border: 1px solid rgba(255, 255, 255, 0.8);
     transition: all 0.3s ease;
     overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 20px;
 }
 
 .section-card:hover {
@@ -1115,18 +1118,29 @@ onBeforeUnmount(() => {
     }
 
     .sections {
-        grid-template-columns: 1fr;
-        gap: 16px;
+        column-count: 1;
+        column-gap: 16px;
+        column-rule: 1px solid rgba(0, 0, 0, 0.03);
     }
 
     .section-card {
         padding: 16px;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 
     .section-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;
+    }
+}
+
+/* 平板端列数设置 */
+@media (min-width: 769px) and (max-width: 1200px) {
+    .sections {
+        column-count: 2;
+        column-gap: 18px;
     }
 }
 

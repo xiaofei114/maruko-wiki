@@ -20,6 +20,7 @@
 		"multer": "^1.4.5-lts.1",
 		"node-cron": "^4.1.0",
 		"nodemailer": "^7.0.12",
+		"openai": "^6.16.0",
 		"path-to-regexp": "^8.3.0",
 		"uuid": "^11.1.0",
 		"yaml": "^2.8.2"

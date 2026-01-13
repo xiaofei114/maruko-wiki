@@ -8,6 +8,7 @@ import adminRoutes from '../routes/admin.js';
 import superAdminRoutes from '../routes/super-admin.js';
 import userRoutes from '../routes/user.js';
 import bilibiliRoutes from '../routes/bilibili.js';
+import aiRoutes from '../routes/ai.js';
 
 export default async () => {
     const appConfig = read_json("configs", "config")
@@ -40,6 +41,7 @@ export default async () => {
     App.use('/api/admin', adminRoutes);
     App.use('/api/super-admin', superAdminRoutes);
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由
+    App.use('/api/ai', aiRoutes); // AI相关路由
     App.use('/', userRoutes); // 用户相关路由（登录、注册等）
 
     // 通过url获取/data/document下的文件

@@ -22,3 +22,14 @@ email:
 bilibili:
   roomId: 1929354869
   userId: 3546938511198692
+deepseek:
+  apiKey: null
+ai:
+  limits:
+    authenticated: 100  # 已登录用户每日使用次数
+    guest: 5           # 未登录用户每日使用次数
+  security:
+    maxRequestsPerMinute: 10  # 每分钟最大请求次数（IP级别）
+    maxRequestsPerHour: 50    # 每小时最大请求次数（IP级别）
+    suspiciousThreshold: 20   # 可疑行为阈值（连续失败次数）
+    blockDuration: 3600       # 封禁时长（秒）

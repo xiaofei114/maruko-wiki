@@ -115,6 +115,7 @@ export async function getAudiosGrouped() {
             // 处理音声URL，确保文件存在
             const processedAudios = audios
                 .map(audio => ({
+                    id: audio.id,
                     name: audio.name,
                     url: `/api/file/${audio.url}` // 转换为API路径
                 }));

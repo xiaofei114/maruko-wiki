@@ -166,14 +166,24 @@ export function resourceBelongsToUser(tableName, resourceId, userId) {
 
 /**
  * 创建标准的成功响应
- * @param {string} message - 消息
- * @param {*} data - 数据
+ * @param {string|*} messageOrData - 消息字符串，或直接传入数据对象
+ * @param {*} data - 数据（当第一个参数是消息时）
  * @returns {object} 响应对象
  */
-export function createSuccessResponse(message, data = null) {
+export function createSuccessResponse(messageOrData, data = null) {
+    // 如果第一个参数不是字符串，则将其当作data，message使用默认值
+    if (typeof messageOrData !== 'string') {
+        return {
+            success: true,
+            message: '操作成功',
+            data: messageOrData
+        };
+    }
+
+    // 原来的调用方式：message, data
     return {
         success: true,
-        message,
+        message: messageOrData,
         data
     };
 }

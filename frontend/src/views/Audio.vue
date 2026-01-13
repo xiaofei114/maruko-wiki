@@ -5,7 +5,7 @@ import { UploadFilled, Loading, Warning, VideoPlay } from '@element-plus/icons-v
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import Top from '@/components/Top.vue'
-import { getAudioList, uploadAudio } from '@/api/audio'
+import { getAudioList, uploadAudio, matchAudiosByAI } from '@/api/audio'
 
 // 音声数据
 const audioSections = ref([])
@@ -63,6 +63,20 @@ const uploadForm = reactive({
     newTagName: '' // 保存新标签的原始名称
 })
 
+// AI音频匹配相关
+const aiMatchDialogVisible = ref(false)
+const aiMatchLoading = ref(false)
+const aiMatchForm = reactive({
+    description: ''
+})
+const aiMatchResults = ref([])
+const aiMatchMessage = ref('')
+const aiMatchReason = ref('') // AI匹配原因
+const aiMatchReasonDisplay = ref('') // 用于打字机效果的显示文本
+const isTypingReason = ref(false) // 是否正在打字
+const aiAutoPlayIndex = ref(-1) // AI自动播放的当前索引
+const isAiAutoPlaying = ref(false) // 是否正在AI自动播放模式
+
 // 音声标签选项（基于现有分类）
 const tagOptions = computed(() => {
     const tags = []
@@ -89,12 +103,26 @@ const uploadFormRules = {
     ]
 }
 
+// AI匹配表单验证规则
+const aiMatchFormRules = {
+    description: [
+        { required: true, message: '请输入音频描述', trigger: 'blur' },
+        { min: 1, max: 500, message: '描述长度应在1-500个字符', trigger: 'blur' }
+    ]
+}
+
 // 播放队列（基于 audioSections 展开为扁平索引），用于随机/顺序播放逻辑
 const flattened = computed(() => {
     const arr = []
     audioSections.value.forEach((sec, sidx) => {
         sec.items.forEach((it, tidx) => {
-            arr.push({ sidx, tidx, name: it.name, url: it.url })
+            arr.push({
+                sidx,
+                tidx,
+                id: it.id || it.audioId || tidx.toString(), // 尝试多种可能的id字段名
+                name: it.name,
+                url: it.url
+            })
         })
     })
     return arr
@@ -211,10 +239,15 @@ function playTrack(sectionIdx, trackIdx) {
     playCurrent()
 }
 
-function stopPlayback(resetModes = true) {
+function stopPlayback(resetModes = true, keepAiAutoPlay = false) {
     // 优先停止地狱绘卷模式
     if (isHellScrollMode.value) {
         stopHellScroll()
+    }
+
+    // 停止AI自动播放（除非明确要求保持）
+    if (isAiAutoPlaying.value && !keepAiAutoPlay) {
+        stopAiAutoPlay()
     }
 
     // 停止普通播放器
@@ -399,6 +432,13 @@ function onTrackEnded() {
         if (audio.value.loop) return
     }
 
+    // 如果正在AI自动播放模式，继续播放下一个
+    if (isAiAutoPlaying.value) {
+        aiAutoPlayIndex.value++
+        playAiAutoPlayCurrent()
+        return
+    }
+
     // 如果开启了随机播放，继续随机播放下一首
     if (shuffle.value) {
         const flatIndex = flattened.value.findIndex(e => e.sidx === currentSectionIndex.value && e.tidx === currentTrackIndex.value)
@@ -428,6 +468,10 @@ function onTrackEnded() {
 // 展示信息
 const currentTrackName = computed(() => {
     if (isHellScrollMode.value) return '🔥 地狱绘卷模式'
+    if (isAiAutoPlaying.value) {
+        const audioId = aiMatchResults.value[aiAutoPlayIndex.value]
+        return `AI播放中: ${getAudioNameById(audioId)} (${aiAutoPlayIndex.value + 1}/${aiMatchResults.value.length})`
+    }
     if (currentSectionIndex.value < 0 || currentTrackIndex.value < 0 ||
         currentSectionIndex.value >= audioSections.value.length ||
         currentTrackIndex.value >= audioSections.value[currentSectionIndex.value].items.length) return '— 未选择 —'
@@ -648,6 +692,219 @@ async function handleUpload() {
     }
 }
 
+// ============================================================================
+// AI音频匹配相关函数
+// ============================================================================
+
+/**
+ * 打字机效果显示AI匹配原因
+ */
+function startTypingReason() {
+    aiMatchReasonDisplay.value = ''
+    isTypingReason.value = true
+
+    const fullText = aiMatchReason.value
+    let currentIndex = 0
+
+    const typeInterval = setInterval(() => {
+        if (currentIndex < fullText.length) {
+            aiMatchReasonDisplay.value += fullText[currentIndex]
+            currentIndex++
+        } else {
+            clearInterval(typeInterval)
+            isTypingReason.value = false
+        }
+    }, 50) // 每个字符50ms
+}
+
+/**
+ * AI自动顺序播放匹配的音频
+ */
+function startAiAutoPlay() {
+    if (aiMatchResults.value.length === 0) return
+
+    isAiAutoPlaying.value = true
+    aiAutoPlayIndex.value = 0
+
+    // 停止当前播放，但不停止AI自动播放
+    stopPlayback(false, true)
+
+    // 开始播放第一个匹配的音频
+    playAiAutoPlayCurrent()
+}
+
+// 播放AI自动播放队列中的当前音频
+function playAiAutoPlayCurrent() {
+    if (!isAiAutoPlaying.value || aiAutoPlayIndex.value >= aiMatchResults.value.length) {
+        // 播放完毕
+        stopAiAutoPlay()
+        return
+    }
+
+    const audioId = aiMatchResults.value[aiAutoPlayIndex.value]
+    const audioIndex = flattened.value.findIndex(item => item.id == audioId)
+
+    if (audioIndex >= 0) {
+        // 使用现有的播放逻辑，但设置特殊的回调
+        const entry = flattened.value[audioIndex]
+        currentSectionIndex.value = entry.sidx
+        currentTrackIndex.value = entry.tidx
+
+        createAudioIfNeeded()
+
+        const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
+        const fullUrl = entry.url.startsWith('http') ? entry.url : baseUrl + entry.url
+
+        audio.value.src = fullUrl
+        audio.value.loop = false // AI自动播放不循环
+        audio.value.volume = volume.value
+
+        if (!audioUnlocked.value) {
+            unlockAudio()
+        }
+
+        audio.value.play().then(() => {
+            isPlaying.value = true
+        }).catch((error) => {
+            console.error('AI自动播放失败:', error)
+            // 播放失败时继续下一个
+            aiAutoPlayIndex.value++
+            playAiAutoPlayCurrent()
+        })
+    } else {
+        // 找不到音频，继续下一个
+        aiAutoPlayIndex.value++
+        playAiAutoPlayCurrent()
+    }
+}
+
+// 停止AI自动播放
+function stopAiAutoPlay() {
+    isAiAutoPlaying.value = false
+    aiAutoPlayIndex.value = -1
+}
+
+// AI音频匹配相关函数
+function openAIMatchDialog() {
+    aiMatchDialogVisible.value = true
+    // 重置表单
+    aiMatchForm.description = ''
+    aiMatchResults.value = []
+    aiMatchMessage.value = ''
+}
+
+function closeAIMatchDialog() {
+    aiMatchDialogVisible.value = false
+    // 停止AI自动播放
+    if (isAiAutoPlaying.value) {
+        stopAiAutoPlay()
+    }
+    // 清理状态
+    aiMatchResults.value = []
+    aiMatchMessage.value = ''
+    aiMatchReason.value = ''
+    aiMatchReasonDisplay.value = ''
+    isTypingReason.value = false
+}
+
+async function handleAIMatch() {
+    try {
+        // 表单验证
+        if (!aiMatchForm.description.trim()) {
+            ElMessage.error('请输入音频描述')
+            return
+        }
+
+        if (aiMatchForm.description.length > 500) {
+            ElMessage.error('描述长度不能超过500字符')
+            return
+        }
+
+        aiMatchLoading.value = true
+        aiMatchResults.value = []
+        aiMatchMessage.value = ''
+
+        const response = await matchAudiosByAI(aiMatchForm.description.trim())
+
+        if (response.code === 200) {
+            aiMatchResults.value = response.data.matched_audios || []
+            aiMatchMessage.value = response.data.message || `找到 ${response.data.count || 0} 个匹配的音频`
+            aiMatchReason.value = response.data.reason || ''
+
+            if (aiMatchResults.value.length === 0) {
+                ElMessage.info('未找到匹配的音频，请尝试其他描述')
+            } else {
+                ElMessage.success(`成功匹配到 ${aiMatchResults.value.length} 个音频！`)
+                // 启动打字机效果显示reason
+                if (aiMatchReason.value) {
+                    startTypingReason()
+                }
+                // 启动自动顺序播放
+                startAiAutoPlay()
+            }
+        } else {
+            ElMessage.error(response.message || '匹配失败，请稍后重试')
+        }
+    } catch (error) {
+        console.error('AI匹配失败:', error)
+        let errorMessage = '匹配过程中发生错误'
+
+        if (error.response) {
+            const { status, data } = error.response
+            switch (status) {
+                case 400:
+                    errorMessage = data.message || '请求参数错误'
+                    break
+                case 402:
+                    errorMessage = 'AI服务余额不足'
+                    break
+                case 429:
+                    errorMessage = '请求过于频繁，请稍后再试'
+                    break
+                case 500:
+                    errorMessage = '服务器内部错误'
+                    break
+                case 503:
+                    errorMessage = 'AI服务暂时不可用'
+                    break
+                default:
+                    errorMessage = `匹配失败: ${status}`
+            }
+        } else if (error.request) {
+            errorMessage = '网络错误，请检查网络连接'
+        }
+
+        ElMessage.error(errorMessage)
+        aiMatchResults.value = []
+        aiMatchMessage.value = ''
+    } finally {
+        aiMatchLoading.value = false
+    }
+}
+
+function getAudioNameById(audioId) {
+    // 从flattened数组中找到对应的音频
+    // 优先通过id字段匹配
+    const audio = flattened.value.find(item => {
+        return item.id == audioId
+    })
+    // 如果找到，返回音频名称；否则返回ID
+    return audio ? audio.name : `音频 ${audioId}`
+}
+
+function playMatchedAudio(audioId) {
+    // 找到对应的音频在flattened数组中的索引
+    // 通过id字段匹配
+    const audioIndex = flattened.value.findIndex(item => item.id == audioId)
+
+    if (audioIndex >= 0) {
+        playByFlatIndex(audioIndex)
+        ElMessage.success(`开始播放: ${getAudioNameById(audioId)}`)
+    } else {
+        ElMessage.warning(`未找到音频文件: ${audioId}`)
+    }
+}
+
 // 监听音量变化，同步更新所有活跃音频
 watch(volume, (newVolume) => {
     // 更新主音频音量
@@ -725,6 +982,9 @@ onBeforeUnmount(() => {
                         </el-button>
                         <el-button type="danger" @click="startHellScroll" :disabled="isHellScrollMode" plain>
                             🔥 地狱绘卷模式
+                        </el-button>
+                        <el-button @click="openAIMatchDialog" type="info" plain>
+                            AI智能匹配
                         </el-button>
                         <el-button v-if="isAuthenticated" @click="openUploadDialog" type="primary" plain>
                             上传音声
@@ -823,6 +1083,58 @@ onBeforeUnmount(() => {
                         <el-button @click="closeUploadDialog">取消</el-button>
                         <el-button type="primary" @click="handleUpload" :loading="false">
                             确定上传
+                        </el-button>
+                    </span>
+                </template>
+            </el-dialog>
+
+            <!-- AI音频匹配对话框 -->
+            <el-dialog v-model="aiMatchDialogVisible" title="AI智能音频匹配" width="700px" :close-on-click-modal="false">
+                <div class="ai-match-intro">
+                    <p>描述你想要的音频类型，AI将智能匹配最适合的音频文件</p>
+                    <p class="ai-match-tip">💡 例如：笨蛋小猫，奇妙小动静等</p>
+                </div>
+
+                <el-form :model="aiMatchForm" :rules="aiMatchFormRules" ref="aiMatchFormRef">
+                    <el-form-item label="" prop="description">
+                        <el-input v-model="aiMatchForm.description" type="textarea" :rows="4"
+                            placeholder="请描述你想要的音频类型、风格或用途..." maxlength="500" show-word-limit resize="none" />
+                    </el-form-item>
+                </el-form>
+
+                <!-- 匹配结果显示 -->
+                <div v-if="aiMatchResults.length > 0">
+                    <!-- AI匹配原因 -->
+                    <div v-if="aiMatchReason" class="ai-reason-section">
+                        <div class="reason-header">
+                            <span class="reason-title">AI分析结果</span>
+                            <span v-if="isTypingReason" class="typing-indicator">
+                                <span class="typing-dot">.</span>
+                                <span class="typing-dot">.</span>
+                                <span class="typing-dot">.</span>
+                            </span>
+                        </div>
+                        <div class="reason-content">
+                            {{ aiMatchReasonDisplay }}
+                            <span v-if="isTypingReason" class="cursor">|</span>
+                        </div>
+                    </div>
+
+                    <div class="matched-audios">
+                        <div v-for="audioId in aiMatchResults" :key="audioId" class="matched-audio-item">
+                            <el-button @click="playMatchedAudio(audioId)" type="success" plain round>
+                                {{ getAudioNameById(audioId) }}
+                            </el-button>
+                        </div>
+                    </div>
+                </div>
+
+                <template #footer>
+                    <span class="dialog-footer">
+                        <el-button @click="closeAIMatchDialog">取消</el-button>
+                        <el-button type="primary" @click="handleAIMatch" :loading="aiMatchLoading"
+                            :disabled="!aiMatchForm.description.trim()">
+                            开始匹配
                         </el-button>
                     </span>
                 </template>
@@ -1186,5 +1498,163 @@ onBeforeUnmount(() => {
     margin-top: 8px;
     color: #909399;
     font-size: 12px;
+}
+
+/* AI匹配对话框样式 */
+.ai-match-intro {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+    border-radius: 12px;
+    border-left: 4px solid #409eff;
+}
+
+.ai-match-intro p {
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.ai-match-tip {
+    color: #666;
+    font-size: 14px;
+    margin: 0 !important;
+}
+
+.ai-match-results {
+    margin-top: 20px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.results-header h4 {
+    margin: 0 0 16px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.matched-audios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.matched-audio-item {
+    flex: 0 0 auto;
+}
+
+/* AI匹配原因样式 */
+.ai-reason-section {
+    margin-top: 16px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 100%);
+    border-radius: 12px;
+    border: 1px solid #bae7ff;
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.reason-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ai-icon {
+    font-size: 18px;
+    animation: aiPulse 2s infinite;
+}
+
+.reason-title {
+    font-weight: 600;
+    color: #1890ff;
+    font-size: 14px;
+}
+
+.typing-indicator {
+    margin-left: auto;
+    display: flex;
+    gap: 2px;
+}
+
+.typing-dot {
+    width: 4px;
+    height: 4px;
+    background: #1890ff;
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0s;
+}
+
+.reason-content {
+    color: #2c3e50;
+    line-height: 1.6;
+    font-size: 14px;
+    min-height: 20px;
+    position: relative;
+}
+
+.cursor {
+    animation: blink 1s infinite;
+    color: #1890ff;
+    font-weight: bold;
+}
+
+/* 动画 */
+@keyframes aiPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+@keyframes typingBounce {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+        opacity: 0.5;
+    }
+
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes blink {
+
+    0%,
+    50% {
+        opacity: 1;
+    }
+
+    51%,
+    100% {
+        opacity: 0;
+    }
 }
 </style>

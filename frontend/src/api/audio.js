@@ -20,3 +20,14 @@ export function uploadAudio(formData) {
         }
     })
 }
+
+/**
+ * AI音频匹配
+ * @param {string} description - 用户对所需音频的描述文本
+ * @returns {Promise<Object>} 匹配结果
+ */
+export function matchAudiosByAI(description) {
+    return http.post('/api/ai/match-audios', {
+        description
+    })
+}

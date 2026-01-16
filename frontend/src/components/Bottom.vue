@@ -36,7 +36,7 @@ const currentYear = new Date().getFullYear()
                 <!-- 右侧：版权 -->
                 <div class="footer-copyright">
                     <div>&copy; {{ currentYear }} 小猫丸子Wiki</div>
-                    <div><a href="https://beian.miit.gov.cn" target="_blank" class="beian-link">辽ICP备2024032879号</a></div>
+                    <a href="https://beian.miit.gov.cn" target="_blank" class="beian-link">辽ICP备2024032879号</a>
                 </div>
             </div>
         </div>

@@ -138,16 +138,15 @@ export async function getMasterInfo() {
 
 /**
  * 获取排行榜数据
- * @param {number} page - 页码
  * @returns {Promise<object>} 排行榜数据
  */
-export async function getTopListNew(page = 1) {
+export async function getTopListNew() {
     const config = read_json('configs', 'config');
     const path = '/xlive/app-room/v2/guardTab/topListNew';
     const params = {
         roomid: config.bilibili.roomId,
         ruid: config.bilibili.userId,
-        page: page,
+        page: 1,
         page_size: 30
     };
 

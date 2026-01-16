@@ -1,7 +1,5 @@
 <script setup>
-import Top from '@/components/Top.vue'
 import { ref, computed } from 'vue'
-import { ElMessage } from 'element-plus'
 import { Bell, Clock, User, Star } from '@element-plus/icons-vue'
 
 // 展开的公告ID集合
@@ -185,12 +183,14 @@ const sortedAnnouncements = computed(() => {
                         <!-- 公告内容 -->
                         <div class="announcement-content">
                             <!-- 折叠状态显示内容 -->
-                            <div v-if="!isExpanded(announcement.id) && shouldCollapse(announcement.content)" class="content-collapsed">
-                                <p v-for="(paragraph, index) in getCollapsedContent(announcement.content)" :key="index" class="content-paragraph"
-                                   v-html="paragraph">
+                            <div v-if="!isExpanded(announcement.id) && shouldCollapse(announcement.content)"
+                                class="content-collapsed">
+                                <p v-for="(paragraph, index) in getCollapsedContent(announcement.content)" :key="index"
+                                    class="content-paragraph" v-html="paragraph">
                                 </p>
                                 <div class="expand-indicator">
-                                    <el-button size="small" type="text" @click="toggleExpanded(announcement.id)" class="expand-btn">
+                                    <el-button size="small" type="text" @click="toggleExpanded(announcement.id)"
+                                        class="expand-btn">
                                         展开全文
                                     </el-button>
                                 </div>
@@ -198,11 +198,12 @@ const sortedAnnouncements = computed(() => {
 
                             <!-- 展开状态显示全部内容 -->
                             <div v-else class="content-expanded">
-                                <p v-for="(paragraph, index) in announcement.content" :key="index" class="content-paragraph"
-                                   v-html="paragraph">
+                                <p v-for="(paragraph, index) in announcement.content" :key="index"
+                                    class="content-paragraph" v-html="paragraph">
                                 </p>
                                 <div v-if="shouldCollapse(announcement.content)" class="collapse-indicator">
-                                    <el-button size="small" type="text" @click="toggleExpanded(announcement.id)" class="collapse-btn">
+                                    <el-button size="small" type="text" @click="toggleExpanded(announcement.id)"
+                                        class="collapse-btn">
                                         收起内容
                                     </el-button>
                                 </div>

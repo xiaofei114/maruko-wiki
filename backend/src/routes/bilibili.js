@@ -35,8 +35,7 @@ router.get('/live_user/v1/Master/info', async (req, res) => {
  */
 router.get('/xlive/app-room/v2/guardTab/topListNew', async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const data = await getTopListNew(page);
+        const data = await getTopListNew();
         sendSuccess(res, data);
     } catch (error) {
         logger.error('获取排行榜数据失败:', error);

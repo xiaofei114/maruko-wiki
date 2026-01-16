@@ -1,50 +1,19 @@
 <script setup>
-import {ElButton} from 'element-plus';
-import {useRouter} from 'vue-router';
-import {ref, onMounted} from 'vue';
+import { ElButton } from 'element-plus';
+import { useRouter } from 'vue-router';
+import { ref } from 'vue';
 
 const router = useRouter();
 const isAnimating = ref(false);
-const particles = ref([]);
 
 function goHome() {
   isAnimating.value = true;
-  setTimeout(() => {
-    router.push('/');
-  }, 300);
+  setTimeout(() => router.push('/'), 300);
 }
-
-// 生成粒子效果
-function generateParticles() {
-  particles.value = Array.from({length: 50}, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 4 + 1,
-    speedX: (Math.random() - 0.5) * 2,
-    speedY: (Math.random() - 0.5) * 2,
-    opacity: Math.random() * 0.5 + 0.1
-  }));
-}
-
-onMounted(() => {
-  generateParticles();
-});
 </script>
 
 <template>
   <div class="error-page" :class="{ 'animating': isAnimating }">
-    <!-- 背景粒子效果 -->
-    <div class="particles">
-      <div v-for="particle in particles" :key="particle.id" class="particle" :style="{
-                left: particle.x + '%',
-                top: particle.y + '%',
-                width: particle.size + 'px',
-                height: particle.size + 'px',
-                opacity: particle.opacity,
-                animationDelay: particle.id * 0.1 + 's'
-            }"></div>
-    </div>
 
     <!-- 主要内容 -->
     <div class="error-container" role="main" aria-labelledby="error-title">
@@ -59,17 +28,16 @@ onMounted(() => {
 
       <div class="action-buttons">
         <el-button type="primary" @click="goHome" class="home-button" :loading="isAnimating" size="large"
-                   aria-label="返回首页">
+          aria-label="返回首页">
           <svg class="button-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 20V14H14V20H19V12H22L12 3L2 12H5V20H10Z" fill="currentColor"/>
+            <path d="M10 20V14H14V20H19V12H22L12 3L2 12H5V20H10Z" fill="currentColor" />
           </svg>
           返回首页
         </el-button>
 
         <el-button @click="router.go(-1)" class="back-button" size="large" aria-label="返回上一页">
           <svg class="button-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H20V11Z"
-                  fill="currentColor"/>
+            <path d="M20 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H20V11Z" fill="currentColor" />
           </svg>
           返回上一页
         </el-button>
@@ -99,41 +67,6 @@ onMounted(() => {
   transform: scale(0.98);
   opacity: 0.8;
 }
-
-/* 粒子效果 */
-.particles {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.particle {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  animation: float 20s infinite linear;
-}
-
-@keyframes float {
-  0% {
-    transform: translateY(0px) rotate(0deg);
-    opacity: 0.1;
-  }
-
-  50% {
-    opacity: 0.3;
-  }
-
-  100% {
-    transform: translateY(-100vh) rotate(360deg);
-    opacity: 0.1;
-  }
-}
-
 /* 主要容器 */
 .error-container {
   display: flex;
@@ -176,8 +109,8 @@ onMounted(() => {
   color: #ffffff;
   margin: 0 0 1rem 0;
   text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2),
-  2px 2px 0px rgba(135, 206, 235, 0.3),
-  -2px -2px 0px rgba(255, 255, 255, 0.1);
+    2px 2px 0px rgba(135, 206, 235, 0.3),
+    -2px -2px 0px rgba(255, 255, 255, 0.1);
   animation: slideInFromTop 0.8s ease-out;
   background: linear-gradient(45deg, #ffffff, #e6f3ff, #ffffff);
   -webkit-background-clip: text;
@@ -207,8 +140,8 @@ onMounted(() => {
   margin: 0 0 1.5rem 0;
   animation: slideInFromBottom 0.8s ease-out 0.2s both;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2),
-  1px 1px 0px rgba(135, 206, 235, 0.4),
-  -1px -1px 0px rgba(255, 255, 255, 0.2);
+    1px 1px 0px rgba(135, 206, 235, 0.4),
+    -1px -1px 0px rgba(255, 255, 255, 0.2);
   font-family: 'Comic Sans MS', 'Chalkduster', 'Bradley Hand', cursive, 'Segoe UI', sans-serif;
   letter-spacing: 1px;
 }

@@ -1,5 +1,4 @@
 <script setup>
-import Top from '@/components/Top.vue'
 import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
@@ -22,6 +21,7 @@ const createForm = ref({
   title: '',
   tip: ''
 })
+
 const createFormRules = {
   title: [
     { required: true, message: '请输入相册名称', trigger: 'blur' },
@@ -45,12 +45,9 @@ async function fetchAlbums() {
   try {
     loading.value = true
     error.value = null
-    console.log('🎴 正在获取相册数据...')
     const response = await getAlbums()
-    console.log('🎴 获取到的相册数据:', response.data)
     imgList.value = response.data
   } catch (err) {
-    console.error('🎴 获取相册数据失败:', err)
     error.value = '获取相册数据失败，请稍后重试'
     ElMessage.error('获取相册数据失败，请稍后重试')
     // 设置默认空数据
@@ -89,7 +86,6 @@ async function handleCreateAlbum() {
       introduction: createForm.value.tip.trim() || undefined
     }
 
-    console.log('🎴 创建相册:', albumData)
     const response = await createAlbum(albumData)
 
     ElMessage.success(`相册"${response.data.name}"创建成功！`)
@@ -99,7 +95,6 @@ async function handleCreateAlbum() {
 
     closeCreateDialog()
   } catch (err) {
-    console.error('🎴 创建相册失败:', err)
     let errorMessage = '创建相册失败，请稍后重试'
 
     if (err.response) {
@@ -130,10 +125,10 @@ function getFullImageUrl(relativeUrl) {
   if (!relativeUrl) return img
   if (relativeUrl.startsWith('http')) return relativeUrl
   if (relativeUrl.startsWith('/api/')) {
-    const serverUrl = import.meta.env.VITE_APP_BASE_URL?.replace('/api', '') || 'http://localhost:6660'
+    const serverUrl = import.meta.env.VITE_APP_BASE_URL?.replace('/api', '')
     return serverUrl + relativeUrl
   }
-  const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
+  const baseUrl = import.meta.env.VITE_APP_BASE_URL
   return baseUrl + relativeUrl
 }
 

@@ -1,3 +1,70 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { getRoomInfo, getMasterInfo, getTopListNew } from '@/api/bilibiliApis.js'
+
+const router = useRouter()
+
+// 响应式数据
+const loading = ref(true)
+const error = ref(null)
+const anchorName = ref('猫丸子Maruko') // 可以在这里修改为主播名字
+const defaultAvatar = ref("https://i2.hdslb.com/bfs/face/037080004e33990818de22a63394c7de53c0e92c.jpg")
+const roomInfo = ref({})
+const captain = ref(0)
+const tags = ref([])
+
+// 获取直播状态文本
+const getStatusText = (status) => {
+  const statusMap = {
+    0: '未开播',
+    1: '直播中',
+    2: '轮播中'
+  }
+  return statusMap[status] || '未知状态'
+}
+
+// 格式化数字（添加千位分隔符）
+const formatNumber = (num) => {
+  if (!num && num !== 0) return '---'
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+const goTo = (url, isRoute) => {
+  if (isRoute) router.push(url)
+  else window.open(url, '_blank')
+}
+
+// 获取直播间信息
+const fetchRoomInfo = async () => {
+  const res = await getRoomInfo()
+  const captainInfo = await getTopListNew()
+
+  if (res.code === 200) {
+    roomInfo.value = res.data
+    captain.value = captainInfo.data.info.num
+    tags.value = res.data.tags ? res.data.tags.split(',') : []
+  } else {
+    error.value = res.message || res.msg || '获取直播间信息失败'
+  }
+}
+
+const getUserInfo = async () => {
+  loading.value = true
+  const userInfo = await getMasterInfo()
+  defaultAvatar.value = userInfo.data.info.face
+  loading.value = false
+}
+
+// 组件挂载后获取直播间信息
+onMounted(() => {
+  //每分钟获取一次
+  setInterval(fetchRoomInfo, 60000)
+  fetchRoomInfo()
+  getUserInfo()
+})
+</script>
+
 <template>
   <div class="live-room-page">
     <div class="body">
@@ -12,7 +79,8 @@
             <p class="anchor-id">房间号: {{ roomInfo.short_id || roomInfo.room_id || '---' }}</p>
           </div>
         </div>
-        <el-button type="primary" plain @click="goToSpaceRoom">进入主页</el-button>
+        <el-button type="primary" plain
+          @click="goTo('https://space.bilibili.com/3546938511198692', false)">进入主页</el-button>
       </div>
 
       <!-- 加载状态 -->
@@ -58,7 +126,7 @@
           </div>
           <div class="module-body">
             <div class="fans-count">
-              <el-statistic :value="captain.length">
+              <el-statistic :value="captain">
                 <template #title>
                   <div class="stat-title">
                     今天又多了几个爹呢？
@@ -67,7 +135,7 @@
                 <template #suffix>位舰长大人</template>
               </el-statistic>
               <div style="font-size: 13px;color: #52c41a;">
-                距离千舰还差 {{ formatNumber(1000 - captain.length) }} 个舰长
+                距离千舰还差 {{ formatNumber(1000 - captain) }} 个舰长
               </div>
             </div>
           </div>
@@ -80,7 +148,7 @@
           <img class="module-img" :src="roomInfo.user_cover" alt="直播封面">
           <div class="module-body">
             <div class="status-content">
-              <div class="status-indicator clickable" @click="goToLiveRoom">
+              <div class="status-indicator clickable" @click="goTo('https://live.bilibili.com/1929354869', false)">
                 {{ getStatusText(roomInfo.live_status) }}
               </div>
               <div v-if="roomInfo.live_status === 1" class="online-count">
@@ -127,7 +195,7 @@
       <!-- 丸子专区 -->
       <div class="maruko-section">
         <div class="maruko-content">
-          <div class="module-card photo-album-module" @click="goToPhotoAlbum" style="cursor: pointer;">
+          <div class="module-card photo-album-module" @click="goTo('/photo-album', true)" style="cursor: pointer;">
             <div class="module-header">
               <h2>丸子相簿</h2>
             </div>
@@ -140,7 +208,7 @@
             </div>
           </div>
 
-          <div class="module-card message-module" @click="goToAudio" style="cursor: pointer;">
+          <div class="module-card message-module" @click="goTo('/audio', true)" style="cursor: pointer;">
             <div class="module-header">
               <h2>丸子音声</h2>
             </div>
@@ -157,104 +225,6 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import Top from '@/components/Top.vue'
-import { getRoomInfo, getMasterInfo, getTopListNew } from '@/api/bilibiliApis.js'
-
-const router = useRouter()
-
-// 响应式数据
-const loading = ref(true)
-const error = ref(null)
-const anchorName = ref('猫丸子Maruko') // 可以在这里修改为主播名字
-const defaultAvatar = ref("https://i2.hdslb.com/bfs/face/037080004e33990818de22a63394c7de53c0e92c.jpg")
-
-const roomInfo = ref({})
-const captain = ref([])
-const tags = ref([])
-
-// 获取直播状态文本
-const getStatusText = (status) => {
-  const statusMap = {
-    0: '未开播',
-    1: '直播中',
-    2: '轮播中'
-  }
-  return statusMap[status] || '未知状态'
-}
-
-// 格式化数字（添加千位分隔符）
-const formatNumber = (num) => {
-  if (!num && num !== 0) return '---'
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
-
-// 导航到相簿页面
-const goToPhotoAlbum = () => {
-  router.push('/photo-album')
-}
-
-// 导航到音频页面
-const goToAudio = () => {
-  router.push('/audio')
-}
-
-// 跳转到主页
-const goToSpaceRoom = () => {
-  window.open('https://space.bilibili.com/3546938511198692', '_blank')
-}
-
-// 跳转到直播间
-const goToLiveRoom = () => {
-  window.open('https://live.bilibili.com/1929354869', '_blank')
-}
-
-// 获取直播间信息
-const fetchRoomInfo = async () => {
-  const res = await getRoomInfo()
-
-  if (res.code === 200) {
-    roomInfo.value = res.data
-    tags.value = res.data.tags ? res.data.tags.split(',') : []
-  } else {
-    error.value = res.message || res.msg || '获取直播间信息失败'
-  }
-}
-
-const getUserInfo = async () => {
-  loading.value = true
-
-  const userInfo = await getMasterInfo()
-
-  defaultAvatar.value = userInfo.data.info.face
-
-  loading.value = false
-}
-
-const getCaptain = async (list = [], page = 1) => {
-  //防止死循环的熔断机制
-  if (page > 100) return
-
-  captain.value.push(...list)
-  const captainInfo = await getTopListNew(page)
-
-  if (page == 1) captain.value.push(...captainInfo.data.top3)
-
-  if (captainInfo.data.list.length > 0) await getCaptain(captainInfo.data.list, page + 1)
-}
-
-// 组件挂载后获取直播间信息
-onMounted(() => {
-  //每分钟获取一次
-  setInterval(fetchRoomInfo, 60000)
-  fetchRoomInfo()
-  getUserInfo()
-  getCaptain()
-})
-</script>
 
 <style scoped>
 .live-room-page {

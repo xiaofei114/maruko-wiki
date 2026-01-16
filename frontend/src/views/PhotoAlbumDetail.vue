@@ -3,9 +3,8 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import Top from '@/components/Top.vue'
-import { ArrowLeft, Plus, Picture, Delete, UploadFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, Plus, Picture, UploadFilled } from '@element-plus/icons-vue'
 import { getAlbumPhotos, uploadPhoto } from '@/api/album'
 
 // 路由和用户状态
@@ -140,10 +139,7 @@ async function handleFileChange(file, fileList) {
       // 再次强制更新
       await nextTick()
     } catch (error) {
-      console.error('🖼️ 创建预览URL失败:', error)
     }
-  } else {
-    console.log('🖼️ 没有选择文件，保持清理状态')
   }
 }
 
@@ -168,7 +164,6 @@ async function handleUploadPhotos() {
     formData.append('album_id', albumId.value)
     formData.append('name', uploadForm.value.name.trim())
 
-    const response = await uploadPhoto(formData)
     loading.value = false
 
     ElMessage.success('照片上传成功！')
@@ -190,7 +185,6 @@ async function handleUploadPhotos() {
 
   } catch (error) {
     loading.value = false
-    console.error('🖼️ 上传过程中发生错误:', error)
     let errorMessage = '上传过程中发生错误，请重试'
 
     if (error.response) {
@@ -238,9 +232,7 @@ onMounted(async () => {
 // 组件卸载时清理资源
 onBeforeUnmount(() => {
   // 清理图片预览URL
-  if (imagePreviewUrl.value) {
-    URL.revokeObjectURL(imagePreviewUrl.value)
-  }
+  if (imagePreviewUrl.value) URL.revokeObjectURL(imagePreviewUrl.value)
 })
 </script>
 

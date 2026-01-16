@@ -21,10 +21,6 @@ export function getMasterInfo() {
  * @param {number} page - 页码
  * @returns {Promise}
  */
-export function getTopListNew(page = 1) {
-    return http.get('/api/bilibili/xlive/app-room/v2/guardTab/topListNew', {
-        params: {
-            page
-        }
-    })
+export function getTopListNew() {
+    return http.get('/api/bilibili/xlive/app-room/v2/guardTab/topListNew')
 }

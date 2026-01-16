@@ -1,10 +1,9 @@
 <script setup>
 import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { ElMessageBox, ElMessage, ElLoading } from 'element-plus'
-import { UploadFilled, Loading, Warning, VideoPlay } from '@element-plus/icons-vue'
+import { UploadFilled, Warning, VideoPlay } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import Top from '@/components/Top.vue'
 import { getAudioList, uploadAudio, matchAudiosByAI } from '@/api/audio'
 
 // 音声数据

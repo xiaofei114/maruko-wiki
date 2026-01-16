@@ -1,10 +1,10 @@
 <script setup>
-import {ref, reactive, onMounted, nextTick} from 'vue'
-import {useRouter} from 'vue-router'
-import {ElMessage} from 'element-plus'
-import {User, Lock, ArrowRight, ArrowLeft, Message} from '@element-plus/icons-vue'
-import {sendVerification, verifyCode, register} from '@/api/auth'
-import {useUserStore} from '@/stores/user'
+import { ref, reactive, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { User, Lock, ArrowRight, ArrowLeft, Message } from '@element-plus/icons-vue'
+import { sendVerification, verifyCode, register } from '@/api/auth'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -37,7 +37,7 @@ const verificationSent = ref(false) // 标记是否已发送过验证码
 // 登录表单验证规则
 const loginRules = {
   email: [
-    {required: true, message: '请输入邮箱地址', trigger: 'blur'},
+    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
     {
       pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       message: '请输入正确的邮箱格式',
@@ -45,18 +45,18 @@ const loginRules = {
     }
   ],
   password: [
-    {required: true, message: '请输入密码', trigger: 'blur'},
-    {min: 8, message: '密码长度不能少于8位', trigger: 'blur'}
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 8, message: '密码长度不能少于8位', trigger: 'blur' }
   ]
 }
 
 // 注册表单验证规则
 const bindRules = {
   name: [
-    {required: true, message: '请输入用户名', trigger: 'blur'}
+    { required: true, message: '请输入用户名', trigger: 'blur' }
   ],
   email: [
-    {required: true, message: '请输入邮箱地址', trigger: 'blur'},
+    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
     {
       pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       message: '请输入正确的邮箱格式',
@@ -64,11 +64,11 @@ const bindRules = {
     }
   ],
   password: [
-    {required: true, message: '请输入密码', trigger: 'blur'},
-    {min: 8, message: '密码长度不能少于8位', trigger: 'blur'}
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 8, message: '密码长度不能少于8位', trigger: 'blur' }
   ],
   confirmPassword: [
-    {required: true, message: '请确认密码', trigger: 'blur'},
+    { required: true, message: '请确认密码', trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
         if (value !== bindForm.password) {
@@ -81,7 +81,7 @@ const bindRules = {
     }
   ],
   verificationCode: [
-    {required: true, message: '请输入验证码', trigger: 'blur'},
+    { required: true, message: '请输入验证码', trigger: 'blur' },
     {
       validator: async (rule, value, callback) => {
         // 只有当已经发送过验证码且用户输入了内容时才验证
@@ -138,10 +138,10 @@ const handleRegister = async () => {
 
     // 调用注册接口
     await register(
-        bindForm.name,
-        bindForm.password,
-        bindForm.email,
-        bindForm.verificationCode
+      bindForm.name,
+      bindForm.password,
+      bindForm.email,
+      bindForm.verificationCode
     )
 
     ElMessage.success('注册成功！快去登录吧~')
@@ -234,12 +234,12 @@ const goBack = () => {
 <template>
   <div class="login-container">
     <div class="login-box" :class="{ 'animate-in': true, 'hover': isHovered }" @mouseenter="isHovered = true"
-         @mouseleave="isHovered = false">
+      @mouseleave="isHovered = false">
 
       <div class="back-button-container">
         <el-button class="back-button" @click="goBack" type="text" size="small">
           <el-icon>
-            <ArrowLeft/>
+            <ArrowLeft />
           </el-icon>
           返回
         </el-button>
@@ -251,21 +251,21 @@ const goBack = () => {
       </div>
 
       <div class="form-container" :class="{ 'flipped': !isLoginMode }"
-           :style="{ height: isLoginMode ? '160px' : '310px' }">
+        :style="{ height: isLoginMode ? '160px' : '310px' }">
         <div class="form-card">
           <!-- 登录表单 -->
           <el-form class="login-form" ref="loginFormRef" :model="loginForm" :rules="loginRules">
             <el-form-item prop="email">
-              <el-input v-model="loginForm.email" placeholder="请输入邮箱" :prefix-icon="Message" clearable/>
+              <el-input v-model="loginForm.email" placeholder="请输入邮箱" :prefix-icon="Message" clearable />
             </el-form-item>
             <el-form-item prop="password">
-              <el-input v-model="loginForm.password" type="password" placeholder="请输入密码"
-                        :prefix-icon="Lock" show-password clearable/>
+              <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" :prefix-icon="Lock"
+                show-password clearable />
             </el-form-item>
             <el-button type="primary" class="login-button" :loading="loading" @click="handleLogin">
               登录
               <el-icon class="button-icon">
-                <ArrowRight/>
+                <ArrowRight />
               </el-icon>
             </el-button>
           </el-form>
@@ -274,37 +274,36 @@ const goBack = () => {
           <el-form class="register-form" ref="bindFormRef" :model="bindForm" :rules="bindRules">
             <!-- 验证码输入框 -->
             <el-form-item prop="name">
-              <el-input v-model="bindForm.name" placeholder="请输入用户名" :prefix-icon="User" clearable/>
+              <el-input v-model="bindForm.name" placeholder="请输入用户名" :prefix-icon="User" clearable />
             </el-form-item>
             <!-- 邮箱和验证码按钮行 -->
             <div class="email-row">
               <el-form-item prop="email" class="email-item">
-                <el-input v-model="bindForm.email" placeholder="请输入邮箱" :prefix-icon="Message" clearable/>
+                <el-input v-model="bindForm.email" placeholder="请输入邮箱" :prefix-icon="Message" clearable />
               </el-form-item>
               <el-button class="send-code-btn" :loading="sendingCode" :disabled="codeCountdown > 0"
-                         @click="sendVerificationCode">
+                @click="sendVerificationCode">
                 {{ codeButtonText }}
               </el-button>
             </div>
 
             <!-- 验证码输入框 -->
             <el-form-item prop="verificationCode">
-              <el-input v-model="bindForm.verificationCode" placeholder="请输入验证码" :prefix-icon="Lock"
-                        clearable/>
+              <el-input v-model="bindForm.verificationCode" placeholder="请输入验证码" :prefix-icon="Lock" clearable />
             </el-form-item>
 
             <el-form-item prop="password">
-              <el-input v-model="bindForm.password" type="password" placeholder="请输入密码"
-                        :prefix-icon="Lock" show-password clearable/>
+              <el-input v-model="bindForm.password" type="password" placeholder="请输入密码" :prefix-icon="Lock"
+                show-password clearable />
             </el-form-item>
             <el-form-item prop="confirmPassword">
-              <el-input v-model="bindForm.confirmPassword" type="password" placeholder="确认密码"
-                        :prefix-icon="Lock" show-password clearable/>
+              <el-input v-model="bindForm.confirmPassword" type="password" placeholder="确认密码" :prefix-icon="Lock"
+                show-password clearable />
             </el-form-item>
             <el-button type="primary" class="register-button" :loading="loading" @click="handleRegister">
               注册
               <el-icon class="button-icon">
-                <ArrowRight/>
+                <ArrowRight />
               </el-icon>
             </el-button>
           </el-form>
@@ -340,8 +339,8 @@ const goBack = () => {
   right: 0;
   bottom: 0;
   background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-  radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-  radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.3) 0%, transparent 50%);
+    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.3) 0%, transparent 50%);
   animation: float 20s ease-in-out infinite;
 }
 
@@ -352,7 +351,7 @@ const goBack = () => {
   background: rgba(255, 255, 255, 0.98);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1),
-  0 0 0 1px rgba(255, 255, 255, 0.1);
+    0 0 0 1px rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(20px);
   position: relative;
   z-index: 1;
@@ -370,7 +369,7 @@ const goBack = () => {
 
 .login-box.hover {
   box-shadow: 0 25px 70px rgba(0, 0, 0, 0.15),
-  0 0 0 1px rgba(255, 255, 255, 0.2);
+    0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .login-header {
@@ -518,5 +517,4 @@ const goBack = () => {
 .back-button:hover {
   color: #764ba2;
 }
-
 </style>

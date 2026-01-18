@@ -53,6 +53,7 @@ const getUserInfo = async () => {
   loading.value = true
   const userInfo = await getMasterInfo()
   defaultAvatar.value = userInfo.data.info.face
+  await fetchRoomInfo()
   loading.value = false
 }
 
@@ -60,7 +61,6 @@ const getUserInfo = async () => {
 onMounted(() => {
   //每分钟获取一次
   setInterval(fetchRoomInfo, 60000)
-  fetchRoomInfo()
   getUserInfo()
 })
 </script>

@@ -164,6 +164,8 @@ async function handleUploadPhotos() {
     formData.append('album_id', albumId.value)
     formData.append('name', uploadForm.value.name.trim())
 
+    await uploadPhoto(formData)
+
     loading.value = false
 
     ElMessage.success('照片上传成功！')

@@ -1,10 +1,10 @@
 <script setup>
 import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { ElMessageBox, ElMessage, ElLoading } from 'element-plus'
-import { UploadFilled, Warning, VideoPlay } from '@element-plus/icons-vue'
+import { UploadFilled, Warning, VideoPlay, Download } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { getAudioList, uploadAudio, matchAudiosByAI } from '@/api/audio'
+import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios } from '@/api/audio'
 
 // 音声数据
 const audioSections = ref([])
@@ -927,6 +927,70 @@ onMounted(() => {
     fetchAudioList()
 })
 
+// 下载全部音声
+async function downloadAllAudios() {
+    try {
+        await ElMessageBox.confirm(
+            `确定要下载所有 ${flattened.value.length} 个音声吗？`,
+            '下载全部音声确认',
+            {
+                confirmButtonText: '确定下载',
+                cancelButtonText: '取消',
+                type: 'warning',
+            }
+        )
+
+        // 调用封装的API
+        const blob = await downloadAudios();
+
+        // 处理下载响应
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `全部音声_${Date.now()}.zip`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        ElMessage.success(`正在下载全部 ${flattened.value.length} 个音声...`)
+    } catch (error) {
+    }
+}
+
+// 按标签下载音声
+async function downloadAudiosByTag(section) {
+    try {
+        await ElMessageBox.confirm(
+            `确定要下载标签 "${section.title}" 的所有 ${section.items.length} 个音声吗？`,
+            '下载标签音声确认',
+            {
+                confirmButtonText: '确定下载',
+                cancelButtonText: '取消',
+                type: 'info',
+            }
+        )
+
+        // 调用封装的API
+        const blob = await downloadAudios(section.id);
+
+        // 处理下载响应
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${section.title}_${Date.now()}.zip`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        ElMessage.success(`正在下载标签 "${section.title}" 的所有音声...`)
+    } catch (error) {
+    }
+}
+
 // 清理
 onBeforeUnmount(() => {
     if (audio.value) {
@@ -985,6 +1049,9 @@ onBeforeUnmount(() => {
                         <el-button @click="openAIMatchDialog" type="info" plain>
                             AI智能匹配
                         </el-button>
+                        <el-button v-if="isAuthenticated" @click="downloadAllAudios" type="success" plain>
+                            下载音声
+                        </el-button>
                         <el-button v-if="isAuthenticated" @click="openUploadDialog" type="primary" plain>
                             上传音声
                         </el-button>
@@ -1024,7 +1091,15 @@ onBeforeUnmount(() => {
                 <div v-for="(section, sidx) in audioSections" :key="section.id" class="section-card">
                     <div class="section-header">
                         <h3>{{ section.title }}</h3>
-                        <div class="section-count">{{ section.items.length }} 个</div>
+                        <div class="section-actions">
+                            <div class="section-count">{{ section.items.length }} 个</div>
+                            <el-button v-if="isAuthenticated" @click="downloadAudiosByTag(section)" type="primary"
+                                size="small" plain>
+                                <el-icon>
+                                    <Download />
+                                </el-icon>
+                            </el-button>
+                        </div>
                     </div>
                     <div class="section-body">
                         <div v-for="(item, tidx) in section.items" :key="item.url" class="track-row">
@@ -1324,6 +1399,12 @@ onBeforeUnmount(() => {
     font-size: 18px;
     font-weight: 600;
     flex: 1;
+}
+
+.section-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .section-count {

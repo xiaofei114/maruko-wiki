@@ -63,14 +63,6 @@ const navItems = computed(() => {
     { name: '公告', path: '/announcement' },
   ]
 
-  // 下载页面 - 需要登录
-  // if (isAuthenticated.value) {
-  //   items.splice(3, 0, {
-  //     name: '下载',
-  //     path: '/download'
-  //   })
-  // }
-
   // 管理页面 - 需要登录且权限为0或1
   if (isAuthenticated.value && (permission.value === 1 || permission.value === 2)) {
     items.push({

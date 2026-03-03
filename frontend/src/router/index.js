@@ -3,6 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 // import { api_Login } from '@/api/index.js'
 // import { ElMessage } from 'element-plus'
 
+window.history.replaceState = () => { return }
+
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
@@ -10,7 +12,6 @@ const router = createRouter({
             path: '/',
             name: 'home',
             component: () => import('../views/Home.vue'),
-            //   meta: { needLogin: false }
         },
         {
             path: '/photo-album',
@@ -33,11 +34,6 @@ const router = createRouter({
             component: () => import('../views/Login.vue'),
         },
         {
-            path: '/download',
-            name: 'download',
-            component: () => import('../views/Download.vue'),
-        },
-        {
             path: '/announcement',
             name: 'announcement',
             component: () => import('../views/Announcement.vue'),
@@ -51,7 +47,6 @@ const router = createRouter({
             path: '/:catchAll(.*)',
             name: "404",
             component: () => import('../views/Error.vue'),
-            //   meta: { needLogin: true }
         }
     ],
 })

@@ -31,3 +31,13 @@ export function matchAudiosByAI(description) {
         description
     })
 }
+
+/**
+ * 下载全部音声
+ * @returns {Promise<Blob>} 音声ZIP文件
+ */
+export function downloadAudios(classificationId) {
+    return http.get('/api/audios/download', classificationId, {
+        responseType: 'blob'
+    })
+}

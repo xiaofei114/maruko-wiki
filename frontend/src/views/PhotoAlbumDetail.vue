@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Plus, Picture, UploadFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Picture, UploadFilled, Download } from '@element-plus/icons-vue'
 import { getAlbumPhotos, uploadPhoto } from '@/api/album'
 
 // 路由和用户状态
@@ -222,6 +222,39 @@ function getFullImageUrl(relativeUrl) {
   return baseUrl + relativeUrl
 }
 
+// 下载照片
+async function downloadPhoto(photo) {
+  try {
+    const token = localStorage.getItem('token')
+    const imageUrl = getFullImageUrl(photo.url)
+    
+    const response = await fetch(imageUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('下载失败')
+    }
+    
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${photo.name}.jpg`
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('下载成功')
+  } catch (error) {
+    ElMessage.error('下载失败，请稍后重试')
+  }
+}
+
 // 组件挂载时获取相册数据
 onMounted(async () => {
   await fetchAlbumPhotos()
@@ -291,6 +324,11 @@ onBeforeUnmount(() => {
             <div class="photo-overlay">
               <div class="photo-overlay-content">
                 <h4>{{ photo.name }}</h4>
+              </div>
+              <div class="photo-actions">
+                <el-button v-if="isAuthenticated" @click.stop="downloadPhoto(photo)" type="primary" size="small" circle>
+                  <el-icon><Download /></el-icon>
+                </el-button>
               </div>
             </div>
           </div>
@@ -455,9 +493,8 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease;
   min-height: 150px;
-  /* 最小高度 */
-  max-height: 200px;
-  /* 最大高度 */
+  height: 150px;
+  width: 150px;
   position: relative;
   /* 为遮罩定位 */
 }
@@ -477,14 +514,15 @@ onBeforeUnmount(() => {
       rgba(0, 0, 0, 0.4) 50%,
       transparent 100%);
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
   padding: 15px;
   opacity: 0;
   transition: opacity 0.3s ease;
   border-radius: 12px;
   box-sizing: border-box;
   pointer-events: none;
-  /* 不拦截点击事件 */
 }
 
 .photo-item:not(.upload-card):hover .photo-overlay {
@@ -493,7 +531,7 @@ onBeforeUnmount(() => {
 
 .photo-overlay-content {
   color: white;
-  width: 100%;
+  width: 75%;
 }
 
 .photo-overlay-content h4 {
@@ -504,6 +542,28 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.photo-actions {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.photo-actions .el-button {
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-actions .el-button .el-icon {
+  font-size: 16px;
+  margin-right: 0;
 }
 
 /* 上传卡片样式 */

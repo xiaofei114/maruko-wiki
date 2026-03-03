@@ -538,10 +538,8 @@ onMounted(() => {
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease;
-  min-height: 150px;
-  /* 最小高度 */
-  max-height: 200px;
-  /* 最大高度 */
+  height: 150px;
+  width: 150px;
 }
 
 .photo-item:hover {

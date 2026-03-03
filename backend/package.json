@@ -8,6 +8,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"adm-zip": "^0.5.16",
 		"axios": "^1.13.2",
 		"bcrypt": "^5.1.1",
 		"better-sqlite3": "^11.9.0",

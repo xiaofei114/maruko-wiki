@@ -723,3 +723,42 @@ export async function deleteAudioClassification(classificationId, adminId) {
     }
 }
 
+/**
+ * 获取音声数据（按标签或全部）
+ * @param {number|null} classificationId - 分类ID，null表示全部
+ * @returns {array} 音声数据数组
+ */
+export async function getAudiosForDownload(classificationId) {
+    try {
+        let query = `
+            SELECT
+                a.id,
+                a.name,
+                a.url,
+                a.user_id,
+                u.name as user_name,
+                ac.name as classification_name
+            FROM audio a
+            LEFT JOIN user u ON a.user_id = u.id
+            LEFT JOIN audio_classification ac ON a.classification_id = ac.id
+            WHERE a.is_deleted = 0 AND a.is_review = 1
+        `;
+        const params = [];
+
+        if (classificationId) {
+            query += ' AND a.classification_id = ?';
+            params.push(classificationId);
+        }
+
+        query += ' ORDER BY a.classification_id, a.create_time DESC';
+
+        const audios = queryAll(query, params);
+        return audios;
+    } catch (error) {
+        logger.error('获取音声数据失败:', error);
+        throw error;
+    }
+}
+
+
+

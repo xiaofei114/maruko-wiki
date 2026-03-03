@@ -33,3 +33,5 @@ ai:
     maxRequestsPerHour: 50    # 每小时最大请求次数（IP级别）
     suspiciousThreshold: 20   # 可疑行为阈值（连续失败次数）
     blockDuration: 3600       # 封禁时长（秒）
+download: 
+  audio: 200

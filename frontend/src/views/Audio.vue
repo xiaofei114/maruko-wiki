@@ -940,24 +940,13 @@ async function downloadAllAudios() {
             }
         )
 
-        // 调用封装的API
-        const blob = await downloadAudios();
-
-        // 处理下载响应
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `全部音声_${Date.now()}.zip`;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        // 调用封装的API，直接触发浏览器下载
+        downloadAudios(null);
 
         ElMessage.success(`正在下载全部 ${flattened.value.length} 个音声...`)
     } catch (error) {
         if (error !== 'cancel') {
-            ElMessage.error(error.message || '下载失败，请稍后重试');
+            ElMessage.error('下载失败，请稍后重试');
         }
         // 用户取消下载
     }
@@ -976,24 +965,13 @@ async function downloadAudiosByTag(section) {
             }
         )
 
-        // 调用封装的API
-        const blob = await downloadAudios(section.id);
-
-        // 处理下载响应
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${section.title}_${Date.now()}.zip`;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        // 调用封装的API，直接触发浏览器下载
+        downloadAudios(section.id);
 
         ElMessage.success(`正在下载标签 "${section.title}" 的所有音声...`)
     } catch (error) {
         if (error !== 'cancel') {
-            ElMessage.error(error.message || '下载失败，请稍后重试');
+            ElMessage.error('下载失败，请稍后重试');
         }
         // 用户取消下载
     }

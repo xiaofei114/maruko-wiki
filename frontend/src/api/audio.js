@@ -31,24 +31,21 @@ export function matchAudiosByAI(description) {
         description
     })
 }
-export async function downloadAudios(classificationId) {
-    const params = classificationId ? `?classification_id=${classificationId}` : '';
-    const url = `${import.meta.env.VITE_APP_BASE_URL}/api/audios/download${params}`;
+
+/**
+ * 下载音声（直接触发浏览器下载）
+ * @param {number} classificationId - 分类ID，为null时下载全部
+ */
+export function downloadAudios(classificationId) {
+    const params = classificationId ? `classification_id=${classificationId}` : '';
+    const token = localStorage.getItem('maruko_token');
+    const url = `${import.meta.env.VITE_APP_BASE_URL}/api/audios/download/${token}?${params}`;
     
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('maruko_token')}`
-            // 移除错误的 Content-Type
-        }
-    });
-    
-    if (!response.ok) {
-        // 增强错误处理
-        const errorText = await response.text().catch(() => "未知错误");
-        throw new Error(`下载失败: ${response.status} - ${errorText}`);
-    }
-    
-    // 直接获取 Blob（自动处理流）
-    return await response.blob();
+    // 创建隐藏的链接并触发下载
+    const link = document.createElement('a');
+    link.href = url;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }

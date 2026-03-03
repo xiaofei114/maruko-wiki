@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import jwt from 'jsonwebtoken';
 import { queryOne } from '../method/database.js';
 import { createPublicRoute, createAdminUploadRouteHandler } from '../method/route-helpers.js';
 import { authenticateToken } from '../method/auth.js';
@@ -64,13 +65,27 @@ router.post('/audios', ...createAdminUploadRouteHandler({
 }));
 
 // 下载音声 (需要登录)
-router.get('/audios/download', authenticateToken, async (req, res) => {
+router.get('/audios/download/:token', async (req, res) => {
     try {
+        const { token } = req.params;
         const { classification_id } = req.query;
+
+        // 验证token
+        let userId;
+        try {
+            const config = read_json('configs', 'config');
+            const jwtSecret = config.token;
+            const decoded = jwt.verify(token, jwtSecret);
+            userId = decoded.id;
+        } catch (error) {
+            logger.warn('Token验证失败:', error.message);
+            return res.status(401).json({ success: false, message: 'Token无效或已过期', code: 401 });
+        }
+
         let classificationId = null;
         let classificationName = '全部音声';
 
-        logger.debug(`收到下载请求，分类ID: ${classification_id}`);
+        logger.debug(`收到下载请求，用户ID: ${userId}, 分类ID: ${classification_id}`);
 
         // 如果提供了分类ID，验证分类是否存在
         if (classification_id) {
@@ -115,7 +130,6 @@ router.get('/audios/download', authenticateToken, async (req, res) => {
         }
 
         // 检查用户每天下载量限制（200MB）
-        const userId = req.user.id;
         const today = new Date().toISOString().split('T')[0];
         const downloadLimitKey = `download:limit:${userId}:${today}`;
 

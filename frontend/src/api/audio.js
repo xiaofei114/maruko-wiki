@@ -33,11 +33,41 @@ export function matchAudiosByAI(description) {
 }
 
 /**
- * 下载全部音声
+ * 下载音声
+ * @param {number} classificationId - 分类ID，为null时下载全部
  * @returns {Promise<Blob>} 音声ZIP文件
  */
-export function downloadAudios(classificationId) {
-    return http.get('/api/audios/download', classificationId, {
-        responseType: 'blob'
-    })
+export async function downloadAudios(classificationId) {
+    const params = classificationId ? `?classification_id=${classificationId}` : '';
+    const url = `${import.meta.env.VITE_APP_BASE_URL}/api/audios/download${params}`;
+
+    const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('maruko_token')}`,
+            'Content-Type': 'application/json'
+        }
+    });
+
+    // 检查响应状态
+    if (!response.ok) {
+        // 尝试解析为JSON错误信息
+        try {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '下载失败');
+        } catch (e) {
+            throw new Error('下载失败，请稍后重试');
+        }
+    }
+
+    // 检查响应类型
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/zip')) {
+        // 是ZIP文件，返回Blob
+        return await response.blob();
+    } else {
+        // 不是ZIP文件，尝试解析为JSON
+        const data = await response.json();
+        throw new Error(data.message || '下载失败');
+    }
 }

@@ -5,7 +5,7 @@ import { queryOne } from '../method/database.js';
 import { createPublicRoute, createAdminUploadRouteHandler } from '../method/route-helpers.js';
 import { authenticateToken } from '../method/auth.js';
 import { uploadAudio, getAudiosGrouped, createAudioClassification, getAudiosForDownload } from '../services/audio.js';
-import { packAudios, cleanupTempFile } from '../method/pack.js';
+import { packAudios } from '../method/pack.js';
 import { read_json } from "../method/read.js"
 
 const router = express.Router();
@@ -129,7 +129,6 @@ router.get('/audios/download', authenticateToken, async (req, res) => {
 
                 if (totalDownloadSize > dailyLimit) {
                     logger.warn(`用户 ${userId} 超过每日下载限制，当前: ${(totalDownloadSize / 1024 / 1024).toFixed(2)}MB，限制: 200MB`);
-                    cleanupTempFile(packResult.zipFilePath);
                     return res.status(429).json({
                         success: false,
                         message: `每日下载量不能超过${appConfig.download.audio}MB，当前已下载 ${(parseInt(todayDownloaded) / 1024 / 1024).toFixed(2)}MB`
@@ -159,7 +158,6 @@ router.get('/audios/download', authenticateToken, async (req, res) => {
         // 错误处理
         fileStream.on('error', (error) => {
             logger.error('发送文件失败:', error);
-            cleanupTempFile(packResult.zipFilePath);
             res.status(500).json({ success: false, message: '发送文件失败', code: 500 });
         });
 

@@ -956,6 +956,10 @@ async function downloadAllAudios() {
 
         ElMessage.success(`正在下载全部 ${flattened.value.length} 个音声...`)
     } catch (error) {
+        if (error !== 'cancel') {
+            ElMessage.error(error.message || '下载失败，请稍后重试');
+        }
+        // 用户取消下载
     }
 }
 
@@ -988,6 +992,10 @@ async function downloadAudiosByTag(section) {
 
         ElMessage.success(`正在下载标签 "${section.title}" 的所有音声...`)
     } catch (error) {
+        if (error !== 'cancel') {
+            ElMessage.error(error.message || '下载失败，请稍后重试');
+        }
+        // 用户取消下载
     }
 }
 

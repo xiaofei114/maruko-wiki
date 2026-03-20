@@ -44,6 +44,11 @@ const router = createRouter({
             component: () => import('../views/Admin.vue'),
         },
         {
+            path: '/profile',
+            name: 'profile',
+            component: () => import('../views/Profile.vue'),
+        },
+        {
             path: '/:catchAll(.*)',
             name: "404",
             component: () => import('../views/Error.vue'),

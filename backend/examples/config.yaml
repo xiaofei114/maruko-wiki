@@ -22,6 +22,7 @@ email:
 bilibili:
   roomId: 1929354869
   userId: 3546938511198692
+  ttl: 60
 deepseek:
   apiKey: null
 ai:

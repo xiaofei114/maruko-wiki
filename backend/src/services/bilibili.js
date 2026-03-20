@@ -51,11 +51,12 @@ async function getCachedData(cacheKey) {
  * @param {object} data - 要缓存的数据
  * @param {number} ttl - 过期时间(秒)
  */
-async function setCachedData(cacheKey, data, ttl = 60) {
+async function setCachedData(cacheKey, data) {
     try {
         const cacheValue = JSON.stringify(data);
-        await global.redis.setex(cacheKey, ttl, cacheValue);
-        logger.debug(`已缓存到Redis (${ttl}秒): ${cacheKey}`);
+        const config = read_json('configs', 'config');
+        await global.redis.setex(cacheKey, config.bilibili.ttl, cacheValue);
+        logger.debug(`已缓存到Redis (${config.bilibili.ttl}秒): ${cacheKey}`);
     } catch (error) {
         logger.warn('设置缓存失败:', error);
     }

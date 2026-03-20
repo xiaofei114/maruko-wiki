@@ -12,7 +12,14 @@ const anchorName = ref('猫丸子Maruko') // 可以在这里修改为主播名�
 const defaultAvatar = ref("https://i2.hdslb.com/bfs/face/037080004e33990818de22a63394c7de53c0e92c.jpg")
 const roomInfo = ref({})
 const captain = ref(0)
-const tags = ref([])
+
+// 上一次的数据（用于比较变化）
+const prevAttention = ref(null)
+const prevCaptain = ref(null)
+
+// 飘动动画数据
+const attentionChange = ref({ show: false, value: 0, type: '' })
+const captainChange = ref({ show: false, value: 0, type: '' })
 
 // 获取直播状态文本
 const getStatusText = (status) => {
@@ -35,25 +42,60 @@ const goTo = (url, isRoute) => {
   else window.open(url, '_blank')
 }
 
+// 显示飘动动画
+const showFloatAnimation = (changeRef, diff) => {
+  changeRef.value = {
+    show: true,
+    value: Math.abs(diff),
+    type: diff > 0 ? 'increase' : 'decrease'
+  }
+  setTimeout(() => {
+    changeRef.value.show = false
+  }, 1000)
+}
+
 // 获取直播间信息
-const fetchRoomInfo = async () => {
+const fetchRoomInfo = async (firstTime = false) => {
   const res = await getRoomInfo()
   const captainInfo = await getTopListNew()
 
   if (res.code === 200) {
+    const newAttention = res.data.attention
+    const newCaptain = captainInfo.data.info.num
+
+    // 非第一次获取时，检查变化并显示动画
+    if (!firstTime) {
+      if (prevAttention.value !== null && newAttention !== prevAttention.value) {
+        const diff = newAttention - prevAttention.value
+        showFloatAnimation(attentionChange, diff)
+      }
+      if (prevCaptain.value !== null && newCaptain !== prevCaptain.value) {
+        const diff = newCaptain - prevCaptain.value
+        showFloatAnimation(captainChange, diff)
+      }
+    }
+
+    // 更新数据
     roomInfo.value = res.data
-    captain.value = captainInfo.data.info.num
-    tags.value = res.data.tags ? res.data.tags.split(',') : []
+    captain.value = newCaptain
+    prevAttention.value = newAttention
+    prevCaptain.value = newCaptain
+
+    console.log({
+      roomInfo: roomInfo.value,
+      captain: captain.value,
+    });
+
   } else {
     error.value = res.message || res.msg || '获取直播间信息失败'
   }
 }
 
-const getUserInfo = async () => {
+const getUserInfo = async (firstTime = false) => {
   loading.value = true
   const userInfo = await getMasterInfo()
   defaultAvatar.value = userInfo.data.info.face
-  await fetchRoomInfo()
+  await fetchRoomInfo(firstTime)
   loading.value = false
 }
 
@@ -61,7 +103,7 @@ const getUserInfo = async () => {
 onMounted(() => {
   //每分钟获取一次
   setInterval(fetchRoomInfo, 60000)
-  getUserInfo()
+  getUserInfo(true)
 })
 </script>
 
@@ -116,6 +158,11 @@ onMounted(() => {
               <div style="font-size: 13px;color: #52c41a;">
                 距离10w粉还差 {{ formatNumber(100000 - roomInfo.attention) }} 粉丝
               </div>
+              <transition :name="attentionChange.type === 'increase' ? 'float-up' : 'float-down'">
+                <div v-if="attentionChange.show" class="float-change" :class="attentionChange.type">
+                  {{ attentionChange.type === 'increase' ? '+' : '-' }}{{ attentionChange.value }}
+                </div>
+              </transition>
             </div>
           </div>
         </div>
@@ -137,6 +184,11 @@ onMounted(() => {
               <div style="font-size: 13px;color: #52c41a;">
                 距离千舰还差 {{ formatNumber(1000 - captain) }} 个舰长
               </div>
+              <transition :name="captainChange.type === 'increase' ? 'float-up' : 'float-down'">
+                <div v-if="captainChange.show" class="float-change" :class="captainChange.type">
+                  {{ captainChange.type === 'increase' ? '+' : '-' }}{{ captainChange.value }}
+                </div>
+              </transition>
             </div>
           </div>
         </div>
@@ -537,6 +589,88 @@ onMounted(() => {
   justify-content: center;
   gap: 10px;
   flex-direction: column;
+  position: relative;
+}
+
+/* 飘动数字样式 */
+.float-change {
+  width: 20px;
+  height: 20px;
+  position: absolute;
+  right: 10%;
+  top: 50%;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 6px 6px;
+  border-radius: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.float-change.increase {
+  color: #ff4d4f;
+  background: rgba(255, 77, 79, 0.1);
+}
+
+.float-change.decrease {
+  color: #52c41a;
+  background: rgba(82, 196, 26, 0.1);
+}
+
+/* 往上飘动画（增加） */
+.float-up-enter-active {
+  animation: float-up-anim 1.5s ease-out forwards;
+}
+
+.float-up-leave-active {
+  animation: float-up-anim 1.5s ease-out forwards;
+}
+
+@keyframes float-up-anim {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+}
+
+/* 往下飘动画（减少） */
+.float-down-enter-active {
+  animation: float-down-anim 1.5s ease-out forwards;
+}
+
+.float-down-leave-active {
+  animation: float-down-anim 1.5s ease-out forwards;
+}
+
+@keyframes float-down-anim {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
 }
 
 .stat-title {

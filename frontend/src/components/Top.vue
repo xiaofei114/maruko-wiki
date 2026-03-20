@@ -79,8 +79,21 @@ const navItems = computed(() => {
 // 当前激活的菜单项索引（用于 el-menu）
 const activeNavIndex = computed(() => {
   const currentPath = router.currentRoute.value.path
-  const item = navItems.value.find(item => item.path === currentPath)
-  return item ? item.path : '/'
+  // 首先查找完全匹配的项
+  const exactMatch = navItems.value.find(item => item.path === currentPath)
+  if (exactMatch) return exactMatch.path
+  
+  // 然后查找路径前缀匹配的项（处理子路径情况，如 /photo-album/1）
+  const prefixMatch = navItems.value.find(item => {
+    // 排除友情链接（path为'#'）和根路径
+    if (item.path === '#' || item.path === '/') return false
+    // 检查当前路径是否以导航项路径开头且后面跟着'/'或结束
+    return currentPath.startsWith(item.path) && 
+           (currentPath.length === item.path.length || 
+            currentPath[item.path.length] === '/')
+  })
+  
+  return prefixMatch ? prefixMatch.path : '/'
 })
 
 // 处理菜单选择
@@ -101,7 +114,7 @@ const navigateTo = (path) => {
 
 // 用户菜单项
 const userMenuItems = [
-  // { name: '个人中心', action: 'profile' },
+  { name: '个人中心', action: 'profile' },
   // { name: '设置', action: 'settings' },
   { name: '退出登录', action: 'logout' }
 ]
@@ -208,7 +221,7 @@ const closeMobileMenu = () => {
 const handleUserMenuClick = async (action) => {
   switch (action) {
     case 'profile':
-      console.log('跳转到个人中心')
+      router.push('/profile')
       break
     case 'settings':
       console.log('跳转到设置页面')

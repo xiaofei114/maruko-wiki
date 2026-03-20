@@ -114,7 +114,7 @@ const navigateTo = (path) => {
 
 // 用户菜单项
 const userMenuItems = [
-  { name: '个人中心', action: 'profile' },
+  // { name: '个人中心', action: 'profile' },
   // { name: '设置', action: 'settings' },
   { name: '退出登录', action: 'logout' }
 ]

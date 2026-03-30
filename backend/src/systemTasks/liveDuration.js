@@ -197,28 +197,20 @@ async function task() {
 }
 
 /**
- * 动态计算cron表达式
- * 未开播时每30分钟执行一次，开播后每3分钟执行一次
- */
-function getCronExpression() {
-    // 默认每3分钟执行一次，实际执行频率由任务内部控制
-    // 未开播时会跳过部分执行
-    return '*/3 * * * *';
-}
-
-/**
  * 带频率控制的包装任务
  */
 let lastCheckTime = 0;
 const OFFLINE_INTERVAL = 30 * 60 * 1000; // 未开播时30分钟
 const ONLINE_INTERVAL = 3 * 60 * 1000;   // 开播后3分钟
+const TOLERANCE = 5000;                  // 允许5秒误差
 
 async function controlledTask() {
     const now = Date.now();
     const interval = lastLiveStatus === 1 ? ONLINE_INTERVAL : OFFLINE_INTERVAL;
 
-    // 检查是否到了执行时间
-    if (now - lastCheckTime < interval) {
+    // 检查是否到了执行时间（允许5秒误差）
+    if (now - lastCheckTime < interval - TOLERANCE) {
+        logger.debug(`跳过本次检查，距离上次检查还有 ${Math.ceil((interval - (now - lastCheckTime)) / 1000)} 秒`);
         return;
     }
 
@@ -227,7 +219,7 @@ async function controlledTask() {
 }
 
 export default {
-    cron: '*/3 * * * *', // 每3分钟检查一次，但会根据状态控制实际执行频率
+    cron: '*/1 * * * *', // 每分钟检查一次，由 controlledTask 控制实际执行频率
     async task() {
         await controlledTask();
     }

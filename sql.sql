@@ -65,6 +65,16 @@ CREATE TABLE audio (
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
+-- 直播时长
+CREATE TABLE live_duration (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    start_time INTEGER NOT NULL,        -- 直播开始时间（毫秒时间戳）
+    end_time INTEGER,                   -- 直播结束时间（毫秒时间戳），NULL表示正在直播
+    title TEXT,                         -- 直播标题
+    create_time INTEGER NOT NULL,       -- 记录创建时间（毫秒时间戳）
+    update_time INTEGER                 -- 记录更新时间（毫秒时间戳）
+);
+
 -- ==================== 时间戳触发器 ====================
 
 -- 用户表的触发器
@@ -194,3 +204,8 @@ CREATE INDEX idx_audio_user ON audio(user_id);
 CREATE INDEX idx_audio_deleted ON audio(is_deleted);
 CREATE INDEX idx_audio_review ON audio(is_review);
 CREATE INDEX idx_audio_create_time ON audio(create_time);
+
+-- 直播时长索引
+CREATE INDEX idx_live_duration_start_time ON live_duration(start_time);
+CREATE INDEX idx_live_duration_end_time ON live_duration(end_time);
+CREATE INDEX idx_live_duration_status ON live_duration(end_time IS NULL);

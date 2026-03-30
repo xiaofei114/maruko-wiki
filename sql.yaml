@@ -49,3 +49,11 @@ audio:
   is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
   create_time: 创建时间
   update_time: 更新时间
+# 直播时长
+live_duration:
+  id: 主键
+  start_time: 开始时间
+  end_time: 结束时间
+  title: 标题
+  create_time: 创建时间
+  update_time: 更新时间

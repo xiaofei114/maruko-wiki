@@ -210,7 +210,7 @@ async function controlledTask() {
 
     // 检查是否到了执行时间（允许5秒误差）
     if (now - lastCheckTime < interval - TOLERANCE) {
-        logger.debug(`跳过本次检查，距离上次检查还有 ${Math.ceil((interval - (now - lastCheckTime)) / 1000)} 秒`);
+        logger.debug(`跳过本次检查，距离下次检查还有 ${Math.ceil((interval - (now - lastCheckTime)) / 1000)} 秒`);
         return;
     }
 

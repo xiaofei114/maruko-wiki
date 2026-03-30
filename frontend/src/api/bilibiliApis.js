@@ -24,3 +24,13 @@ export function getMasterInfo() {
 export function getTopListNew() {
     return http.get('/api/bilibili/xlive/app-room/v2/guardTab/topListNew')
 }
+
+/**
+ * 获取直播记录列表
+ * @param {string} month - 查询月份，格式：YYYY-MM。不传则默认查询当前月
+ * @returns {Promise}
+ */
+export function getLiveDuration(month) {
+    const params = month ? { month } : {}
+    return http.get('/api/bilibili/live/duration', { params })
+}

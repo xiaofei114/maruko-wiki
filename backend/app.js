@@ -9,4 +9,5 @@ import chalk from 'chalk';
     await import('./src/components/redis.js').then(module => module.default());
     await import('./src/components/email.js').then(module => module.default());
     await import('./src/components/http.js').then(module => module.default());
+    await import('./src/components/initialize.js').then(module => module.default()); //定时任务，可选
 })();

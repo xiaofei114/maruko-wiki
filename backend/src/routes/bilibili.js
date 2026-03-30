@@ -1,5 +1,6 @@
 import express from 'express';
 import { getRoomInfo, getMasterInfo, getTopListNew } from '../services/bilibili.js';
+import { getLiveDurationByMonth } from '../services/liveDuration.js';
 import { sendSuccess, sendError } from '../method/response.js';
 
 const router = express.Router();
@@ -40,6 +41,21 @@ router.get('/xlive/app-room/v2/guardTab/topListNew', async (req, res) => {
     } catch (error) {
         logger.error('获取排行榜数据失败:', error);
         sendError(res, '获取排行榜数据失败');
+    }
+});
+
+/**
+ * 获取直播记录
+ * @param {string} month - 月份，格式：YYYY-MM，不传则获取当前月
+ */
+router.get('/live/duration', async (req, res) => {
+    try {
+        const { month } = req.query;
+        const result = await getLiveDurationByMonth(month);
+        sendSuccess(res, result);
+    } catch (error) {
+        logger.error('获取直播记录失败:', error);
+        sendError(res, '获取直播记录失败');
     }
 });
 

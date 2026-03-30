@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getRoomInfo, getMasterInfo, getTopListNew } from '@/api/bilibiliApis.js'
+import { getRoomInfo, getMasterInfo, getTopListNew, getLiveDuration } from '@/api/bilibiliApis.js'
 
 const router = useRouter()
 
@@ -12,6 +12,409 @@ const anchorName = ref('猫丸子Maruko') // 可以在这里修改为主播名�
 const defaultAvatar = ref("https://i2.hdslb.com/bfs/face/037080004e33990818de22a63394c7de53c0e92c.jpg")
 const roomInfo = ref({})
 const captain = ref(0)
+const requiredEffectiveDays = 22 // 每月需要的有效天数
+
+// 计算本月总直播时长（精确到分钟）
+const liveHours = computed(() => {
+  let totalMinutes = 0
+  liveRecords.value.forEach(session => {
+    // 处理正在直播的情况（endTime为null）
+    const endTime = session.endTime || Date.now()
+    const duration = calculateSessionDuration(session.startTime, endTime)
+    totalMinutes += duration
+  })
+  
+  // 转换为小时（保留两位小数，精确到分钟）
+  return Math.round(totalMinutes / 60 * 100) / 100
+})
+
+// 直播详情弹窗相关
+const showLiveDetailDialog = ref(false)
+const currentYear = ref(new Date().getFullYear())
+const currentMonth = ref(new Date().getMonth() + 1)
+const selectedDate = ref(null)
+const weekDays = ['日', '一', '二', '三', '四', '五', '六']
+const calendarDays = ref([])
+
+// 计算直播时长（分钟）
+const calculateSessionDuration = (startTime, endTime) => {
+  // 处理时间戳格式（毫秒）
+  if (typeof startTime === 'number' && typeof endTime === 'number') {
+    return Math.floor((endTime - startTime) / (1000 * 60))
+  }
+  
+  // 处理字符串格式（HH:MM）
+  const [startHour, startMin] = startTime.split(':').map(Number)
+  const [endHour, endMin] = endTime.split(':').map(Number)
+  
+  let duration = (endHour - startHour) * 60 + (endMin - startMin)
+  // 处理跨天的情况
+  if (duration < 0) {
+    duration += 24 * 60
+  }
+  return duration
+}
+
+// 将时间戳转换为日期对象
+const timestampToDate = (timestamp) => {
+  return new Date(timestamp)
+}
+
+// 将时间戳转换为时间字符串（HH:MM）
+const timestampToTimeString = (timestamp) => {
+  const date = new Date(timestamp)
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+// 直播记录数据（从API获取）
+const liveRecords = ref([])
+const liveRecordsLoading = ref(false)
+
+// 获取直播记录数据
+const fetchLiveRecords = async (month) => {
+  liveRecordsLoading.value = true
+  try {
+    const res = await getLiveDuration(month)
+    if (res.code === 200) {
+      liveRecords.value = res.data || []
+    } else {
+      console.error('获取直播记录失败:', res.message)
+      liveRecords.value = []
+    }
+  } catch (error) {
+    console.error('获取直播记录失败:', error)
+    liveRecords.value = []
+  } finally {
+    liveRecordsLoading.value = false
+  }
+}
+
+// 获取指定日期的直播数据
+const generateFakeLiveData = (year, month, day) => {
+  // 从API数据中获取指定日期的直播场次
+  const sessions = liveRecords.value.filter(session => {
+    // 处理正在直播的情况（endTime为null）
+    const endTime = session.endTime || Date.now()
+    const startDate = timestampToDate(session.startTime)
+    const endDate = timestampToDate(endTime)
+    const currentDate = new Date(year, month - 1, day)
+    const currentDateStart = new Date(year, month - 1, day, 0, 0, 0).getTime()
+    const currentDateEnd = new Date(year, month - 1, day, 23, 59, 59).getTime()
+    
+    // 检查当天是否在直播时间段内（包括开播当天、结束当天和中间的所有天）
+    // 直播在当天有内容当且仅当：直播开始时间 <= 当天结束时间 且 直播结束时间 >= 当天开始时间
+    const isLiveOnCurrentDay = session.startTime <= currentDateEnd && endTime >= currentDateStart
+    
+    return isLiveOnCurrentDay
+  })
+  
+  // 计算当天总直播时长（小时）
+  let totalHours = 0
+  sessions.forEach(session => {
+    // 处理正在直播的情况（endTime为null）
+    const endTime = session.endTime || Date.now()
+    const startDate = timestampToDate(session.startTime)
+    const endDate = timestampToDate(endTime)
+    const currentDate = new Date(year, month - 1, day)
+    
+    // 判断当天在直播中的位置
+    const isStartDay = startDate.getFullYear() === currentDate.getFullYear() &&
+                       startDate.getMonth() === currentDate.getMonth() &&
+                       startDate.getDate() === currentDate.getDate()
+    const isEndDay = endDate.getFullYear() === currentDate.getFullYear() &&
+                     endDate.getMonth() === currentDate.getMonth() &&
+                     endDate.getDate() === currentDate.getDate()
+    
+    if (isStartDay && isEndDay) {
+      // 同一天直播：计算完整时长
+      const duration = calculateSessionDuration(session.startTime, endTime)
+      totalHours += duration / 60
+    } else if (isStartDay) {
+      // 开播当天：从开播时间到24:00
+      const minutesToMidnight = (24 - startDate.getHours()) * 60 - startDate.getMinutes()
+      totalHours += minutesToMidnight / 60
+    } else if (isEndDay) {
+      // 结束当天：从00:00到结束时间
+      const minutesFromMidnight = endDate.getHours() * 60 + endDate.getMinutes()
+      totalHours += minutesFromMidnight / 60
+    } else {
+      // 中间天：全天24小时
+      totalHours += 24
+    }
+  })
+  
+  // 判断是否为有效天：当天只要有一场直播超过2小时就算有效天
+  let isEffective = false
+  if (sessions.length > 0) {
+    for (const session of sessions) {
+      // 处理正在直播的情况（endTime为null）
+      const endTime = session.endTime || Date.now()
+      const startDate = timestampToDate(session.startTime)
+      const endDate = timestampToDate(endTime)
+      const currentDate = new Date(year, month - 1, day)
+      
+      // 判断当天在直播中的位置
+      const isStartDay = startDate.getFullYear() === currentDate.getFullYear() &&
+                         startDate.getMonth() === currentDate.getMonth() &&
+                         startDate.getDate() === currentDate.getDate()
+      const isEndDay = endDate.getFullYear() === currentDate.getFullYear() &&
+                       endDate.getMonth() === currentDate.getMonth() &&
+                       endDate.getDate() === currentDate.getDate()
+      
+      let dayDuration = 0
+      if (isStartDay && isEndDay) {
+        // 同一天直播：计算完整时长
+        dayDuration = calculateSessionDuration(session.startTime, endTime)
+      } else if (isStartDay) {
+        // 开播当天：从开播时间到24:00
+        dayDuration = (24 - startDate.getHours()) * 60 - startDate.getMinutes()
+      } else if (isEndDay) {
+        // 结束当天：从00:00到结束时间
+        dayDuration = endDate.getHours() * 60 + endDate.getMinutes()
+      } else {
+        // 中间天：全天24小时
+        dayDuration = 24 * 60
+      }
+      
+      // 如果当天直播时长超过2小时（120分钟），则为有效天
+      if (dayDuration >= 120) {
+        isEffective = true
+        break
+      }
+    }
+  }
+  
+  // 转换时间戳为时间字符串，便于显示
+  const formattedSessions = sessions.map(session => {
+    // 处理正在直播的情况（endTime为null）
+    const endTime = session.endTime || Date.now()
+    const startDate = timestampToDate(session.startTime)
+    const endDate = timestampToDate(endTime)
+    const currentDate = new Date(year, month - 1, day)
+    
+    // 判断当天在直播中的位置
+    const isStartDay = startDate.getFullYear() === currentDate.getFullYear() &&
+                       startDate.getMonth() === currentDate.getMonth() &&
+                       startDate.getDate() === currentDate.getDate()
+    const isEndDay = endDate.getFullYear() === currentDate.getFullYear() &&
+                     endDate.getMonth() === currentDate.getMonth() &&
+                     endDate.getDate() === currentDate.getDate()
+    
+    let startTimeStr = timestampToTimeString(session.startTime)
+    let endTimeStr = session.endTime ? timestampToTimeString(session.endTime) : '直播中'
+    
+    // 为跨天直播添加标注
+    if (isStartDay && !isEndDay) {
+      // 开播当天（跨天）：显示实际开播时间，下播时间标注接后一天
+      endTimeStr = '24:00（接后一天）'
+    } else if (!isStartDay && isEndDay) {
+      // 结束当天：标注接前一天
+      startTimeStr = '00:00（接前一天）'
+    } else if (!isStartDay && !isEndDay) {
+      // 中间天：标注全天跨天
+      startTimeStr = '00:00（接前一天）'
+      endTimeStr = '24:00（接后一天）'
+    }
+    
+    return {
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+      title: session.title
+    }
+  })
+  
+  return { 
+    hours: totalHours, 
+    isEffective,
+    sessions: formattedSessions
+  }
+}
+
+// 计算本月总时长
+const calculateMonthTotal = () => {
+  let totalHours = 0
+  calendarDays.value.forEach(day => {
+    if (day.month === currentMonth.value) {
+      totalHours += day.liveHours
+    }
+  })
+  return totalHours
+}
+
+// 计算本月有效天数
+const calculateEffectiveDays = () => {
+  let effectiveDays = 0
+  calendarDays.value.forEach(day => {
+    if (day.month === currentMonth.value && day.isEffective) {
+      effectiveDays++
+    }
+  })
+  return effectiveDays
+}
+
+// 计算跨天直播在指定日期的时长
+const calculateCrossDayLiveHours = (sessions, year, month, day) => {
+  let totalMinutes = 0
+  
+  sessions.forEach(session => {
+    const [startHour, startMin] = session.startTime.split(':').map(Number)
+    const [endHour, endMin] = session.endTime.split(':').map(Number)
+    
+    // 判断是否为跨天直播
+    const isCrossDay = endHour < startHour || (endHour === startHour && endMin < startMin)
+    
+    if (isCrossDay) {
+      // 跨天直播：计算当天的时间（从开播到24:00）
+      const minutesToMidnight = (24 - startHour) * 60 - startMin
+      totalMinutes += minutesToMidnight
+    } else {
+      // 非跨天直播：计算完整时长
+      const duration = (endHour - startHour) * 60 + (endMin - startMin)
+      totalMinutes += duration
+    }
+  })
+  
+  return totalMinutes / 60
+}
+
+// 格式化直播时长（用于显示）
+const formatSessionDuration = (startTime, endTime) => {
+  // 提取实际时间（去掉标注）
+  const extractTime = (timeStr) => {
+    if (timeStr.includes('（')) {
+      return timeStr.split('（')[0]
+    }
+    return timeStr
+  }
+  
+  const actualStartTime = extractTime(startTime)
+  const actualEndTime = extractTime(endTime)
+  
+  // 处理正在直播的情况
+  if (endTime === '直播中') {
+    // 从时间字符串计算到当前时间的时长
+    const [startHour, startMin] = actualStartTime.split(':').map(Number)
+    const now = new Date()
+    const currentHour = now.getHours()
+    const currentMin = now.getMinutes()
+    
+    let durationMinutes = (currentHour - startHour) * 60 + (currentMin - startMin)
+    if (durationMinutes < 0) {
+      durationMinutes += 24 * 60
+    }
+    
+    const hours = Math.floor(durationMinutes / 60)
+    const minutes = durationMinutes % 60
+    
+    if (hours > 0 && minutes > 0) {
+      return `${hours}小时${minutes}分钟（进行中）`
+    } else if (hours > 0) {
+      return `${hours}小时（进行中）`
+    } else {
+      return `${minutes}分钟（进行中）`
+    }
+  }
+  
+  // 处理24:00特殊情况
+  let durationMinutes
+  if (actualEndTime === '24:00') {
+    const [startHour, startMin] = actualStartTime.split(':').map(Number)
+    durationMinutes = (24 - startHour) * 60 - startMin
+  } else {
+    durationMinutes = calculateSessionDuration(actualStartTime, actualEndTime)
+  }
+  
+  const hours = Math.floor(durationMinutes / 60)
+  const minutes = durationMinutes % 60
+  
+  if (hours > 0 && minutes > 0) {
+    return `${hours}小时${minutes}分钟`
+  } else if (hours > 0) {
+    return `${hours}小时`
+  } else {
+    return `${minutes}分钟`
+  }
+}
+
+// 计算还差多少有效天
+const calculateRemainingEffectiveDays = () => {
+  const effectiveDays = calculateEffectiveDays()
+  return Math.max(0, requiredEffectiveDays - effectiveDays)
+}
+
+// 生成日历数据
+const generateCalendar = () => {
+  const days = []
+  const firstDay = new Date(currentYear.value, currentMonth.value - 1, 1)
+  const lastDay = new Date(currentYear.value, currentMonth.value, 0)
+  const startDate = new Date(firstDay)
+  startDate.setDate(startDate.getDate() - firstDay.getDay())
+  
+  // 生成日历数据
+  for (let i = 0; i < 42; i++) { // 6行7列
+    const date = new Date(startDate)
+    date.setDate(startDate.getDate() + i)
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    
+    // 获取当天的直播数据（包括跨天直播）
+    const dayData = generateFakeLiveData(year, month, day)
+    
+    // 判断是否为有效天
+    const isEffective = dayData.isEffective
+    
+    // 计算当天实际直播时长
+    let liveHours = dayData.hours
+    
+    days.push({
+      day: day,
+      month: month,
+      year: year,
+      isOtherMonth: month !== currentMonth.value,
+      isCurrentDay: day === new Date().getDate() && 
+                    date.getMonth() === new Date().getMonth() && 
+                    year === new Date().getFullYear(),
+      liveHours: liveHours,
+      isEffective: isEffective,
+      liveSessions: dayData.sessions
+    })
+  }
+  
+  calendarDays.value = days
+}
+
+// 格式化直播时间
+const formatLiveTime = (hours) => {
+  const totalMinutes = Math.round(hours * 60)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return `${h}h${m}m`
+}
+
+// 切换月份
+const changeMonth = async (delta) => {
+  currentMonth.value += delta
+  if (currentMonth.value > 12) {
+    currentMonth.value = 1
+    currentYear.value++
+  } else if (currentMonth.value < 1) {
+    currentMonth.value = 12
+    currentYear.value--
+  }
+  // 获取新月份的直播记录
+  const monthStr = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}`
+  await fetchLiveRecords(monthStr)
+  generateCalendar()
+  selectedDate.value = null
+}
+
+// 选择日期
+const selectDate = (day) => {
+  selectedDate.value = day
+}
 
 // 上一次的数据（用于比较变化）
 const prevAttention = ref(null)
@@ -100,10 +503,17 @@ const getUserInfo = async (firstTime = false) => {
 }
 
 // 组件挂载后获取直播间信息
-onMounted(() => {
+onMounted(async () => {
+  // 获取当前月份的直播记录
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+  const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
+  await fetchLiveRecords(monthStr)
+  
   //每分钟获取一次
   setInterval(fetchRoomInfo, 60000)
   getUserInfo(true)
+  generateCalendar()
 })
 </script>
 
@@ -193,6 +603,118 @@ onMounted(() => {
           </div>
         </div>
 
+        <div class="module-card hours-module">
+          <div class="module-header">
+            <h2>直播时长</h2>
+            <el-button type="text" size="small" @click="showLiveDetailDialog = true" style="color: #409eff;">查看详细</el-button>
+          </div>
+          <div class="module-body">
+            <div class="fans-count">
+              <el-statistic :value="liveHours">
+                <template #title>
+                  <div class="stat-title">
+                    月末又要补时长了吗？
+                  </div>
+                </template>
+                <template #suffix>小时/90小时</template>
+              </el-statistic>
+              <!-- 四种状态显示 -->
+              <div v-if="90 - liveHours > 0 && calculateRemainingEffectiveDays() > 0" style="font-size: 13px;color: #f56c6c;">
+                本月还差 {{ formatNumber(90 - liveHours) }} 小时，还差 {{ calculateRemainingEffectiveDays() }} 天有效天，猫猫加油哦~
+              </div>
+              <div v-else-if="90 - liveHours <= 0 && calculateRemainingEffectiveDays() > 0" style="font-size: 13px;color: #e6a23c;">
+                本月时长达标辣！但是还差 {{ calculateRemainingEffectiveDays() }} 天有效天
+              </div>
+              <div v-else-if="90 - liveHours > 0 && calculateRemainingEffectiveDays() <= 0" style="font-size: 13px;color: #409eff;">
+                本月还差 {{ formatNumber(90 - liveHours) }} 小时，但是有效天达标辣！
+              </div>
+              <div v-else style="font-size: 13px;color: #67c23a;">
+                本月时长和有效天都达标辣！撒花撒花~
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 直播详细信息弹窗 -->
+        <el-dialog
+          v-model="showLiveDetailDialog"
+          title="直播时长详细"
+          width="600px"
+          :close-on-click-modal="false"
+          custom-class="live-detail-dialog"
+          align-center
+        >
+          <div class="live-detail-container">
+            <!-- 月份和总时长信息 -->
+            <div class="month-info">
+              <div class="month-selector">
+                <el-button @click="changeMonth(-1)">上一月</el-button>
+                <span class="current-month">{{ currentYear }}年{{ currentMonth }}月</span>
+                <el-button @click="changeMonth(1)">下一月</el-button>
+              </div>
+              <div class="month-stats">
+                <div class="month-total">本月总时长：{{ formatLiveTime(calculateMonthTotal()) }}</div>
+                <div class="month-effective">有效天数：{{ calculateEffectiveDays() }}/{{ requiredEffectiveDays }}</div>
+                <div class="month-remaining">还差：{{ calculateRemainingEffectiveDays() }} 天有效天</div>
+              </div>
+            </div>
+            
+            <!-- 日历 -->
+            <div class="calendar">
+              <div class="calendar-header">
+                <div v-for="day in weekDays" :key="day" class="week-day">{{ day }}</div>
+              </div>
+              <div class="calendar-body">
+                <div 
+                  v-for="(day, index) in calendarDays" 
+                  :key="index"
+                  class="calendar-day"
+                  :class="{
+                    'other-month': day.isOtherMonth, 
+                    'current-day': day.isCurrentDay, 
+                    'has-live': day.liveHours > 0,
+                    'effective': day.liveHours > 0 && day.isEffective,
+                    'ineffective': day.liveHours > 0 && !day.isEffective,
+                    'no-live': day.liveHours === 0
+                  }"
+                  @click="selectDate(day)"
+                >
+                  <div class="day-number">{{ day.day }}</div>
+                  <div v-if="day.liveHours > 0" class="live-hours">{{ formatLiveTime(day.liveHours) }}</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 详细信息 -->
+            <div v-if="selectedDate" class="live-detail-info">
+              <h3>{{ selectedDate.year }}年{{ selectedDate.month }}月{{ selectedDate.day }}日 直播详情</h3>
+              <div v-if="selectedDate.liveSessions.length > 0" class="live-sessions">
+                <div v-for="(session, index) in selectedDate.liveSessions" :key="index" class="live-session">
+                  <div class="session-item">
+                    <span class="label">开播时间：</span>
+                    <span class="value">{{ session.startTime }}</span>
+                  </div>
+                  <div class="session-item">
+                    <span class="label">下播时间：</span>
+                    <span class="value">{{ session.endTime }}</span>
+                  </div>
+                  <div class="session-item">
+                    <span class="label">直播时长：</span>
+                    <span class="value" style="color: #409eff; font-weight: 600;">{{ formatSessionDuration(session.startTime, session.endTime) }}</span>
+                  </div>
+                  <div class="session-item">
+                    <span class="label">直播标题：</span>
+                    <span class="value">{{ session.title }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="no-live-tag">
+                当天无直播记录
+              </div>
+            </div>
+          </div>
+        </el-dialog>
+
         <div class="module-card status-module">
           <div class="module-header">
             <h2>直播状态</h2>
@@ -208,32 +730,6 @@ onMounted(() => {
               </div>
               <div v-else class="offline-notice">
                 主播当前未开播
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="module-card info-module" v-if="roomInfo.live_status !== 0">
-          <div class="module-header">
-            <h2>直播信息</h2>
-          </div>
-          <div class="module-body">
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="label">分区:</span>
-                <span class="value">{{ roomInfo.parent_area_name || '---' }} - {{ roomInfo.area_name || '---' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">开始时间:</span>
-                <span class="value">{{ roomInfo.live_time || '---' }}</span>
-              </div>
-              <div class="info-item full-width">
-                <span class="label">直播标题:</span>
-                <span class="value">{{ roomInfo.title || '---' }}</span>
-              </div>
-              <div class="info-item full-width" v-if="roomInfo.description">
-                <span class="label">直播间描述:</span>
-                <span class="value">{{ roomInfo.description }}</span>
               </div>
             </div>
           </div>
@@ -475,6 +971,455 @@ onMounted(() => {
   font-size: 18px;
   color: #333;
   font-weight: 600;
+  flex: 1;
+}
+
+.module-header .el-button {
+  margin-left: 10px;
+}
+
+/* 直播详情弹窗样式 */
+.live-detail-dialog {
+  max-width: 500px !important;
+  max-height: 40vh !important;
+}
+
+.live-detail-dialog .el-dialog__body {
+  padding: 12px;
+  overflow: auto;
+  max-height: calc(40vh - 100px);
+}
+
+.live-detail-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 月份和总时长信息 */
+.month-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.month-selector {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.current-month {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  min-width: 120px;
+  text-align: center;
+}
+
+.month-total {
+  font-size: 16px;
+  color: #409eff;
+  font-weight: 600;
+}
+
+/* 日历样式 */
+.calendar {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.calendar-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.week-day {
+  text-align: center;
+  font-weight: 600;
+  color: #666;
+  padding: 8px 6px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.calendar-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.calendar-day {
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  padding: 6px;
+  background: white;
+}
+
+.calendar-day:hover {
+  background: #ecf5ff;
+  border-color: #409eff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+}
+
+.calendar-day.other-month {
+  color: #c0c4cc;
+  background: #fafafa;
+}
+
+.calendar-day.current-day {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  color: #000;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.calendar-day.no-live {
+  /* 无直播，默认样式 */
+}
+
+.calendar-day.has-live {
+  position: relative;
+}
+
+.calendar-day.has-live.effective {
+  border-color: #67c23a;
+  background: #f0f9eb;
+}
+
+.calendar-day.has-live.ineffective {
+  border-color: #f56c6c;
+  background: #fef0f0;
+}
+
+.calendar-day.has-live::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  background: #67c23a;
+  border-radius: 50%;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.live-hours {
+  font-size: 10px;
+  color: #67c23a;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.1;
+}
+
+/* 详细信息样式 */
+.live-detail-info {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.live-detail-info h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.live-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.live-session {
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #409eff;
+}
+
+.session-item {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.session-item:last-child {
+  margin-bottom: 0;
+}
+
+.session-item .label {
+  font-weight: 600;
+  color: #666;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.session-item .value {
+  color: #333;
+  flex: 1;
+  word-break: break-word;
+}
+
+.no-live-tag {
+  text-align: center;
+  color: #909399;
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 20px 10px;
+}
+
+.no-live {
+  text-align: center;
+  color: #909399;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .live-detail-dialog {
+    width: 98vw !important;
+    height: 85vh !important;
+    margin: 5px auto !important;
+  }
+  
+  .live-detail-dialog .el-dialog__header {
+    padding: 15px;
+  }
+  
+  .live-detail-dialog .el-dialog__title {
+    font-size: 16px;
+  }
+  
+  .live-detail-dialog .el-dialog__body {
+    padding: 10px;
+    max-height: calc(85vh - 60px);
+  }
+  
+  .live-detail-container {
+    gap: 10px;
+  }
+  
+  .month-info {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+  }
+  
+  .month-selector {
+    gap: 8px;
+  }
+  
+  .month-selector .el-button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .current-month {
+    font-size: 14px;
+    min-width: 100px;
+  }
+  
+  .month-total {
+    font-size: 13px;
+  }
+  
+  .calendar {
+    padding: 10px;
+    border-radius: 8px;
+  }
+  
+  .calendar-header {
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  
+  .week-day {
+    padding: 6px 4px;
+    font-size: 11px;
+    border-radius: 3px;
+  }
+  
+  .calendar-body {
+    gap: 4px;
+  }
+  
+  .calendar-day {
+    min-height: 40px;
+    padding: 3px 2px;
+    border-radius: 4px;
+  }
+  
+  .calendar-day:hover {
+    transform: none;
+  }
+  
+  .day-number {
+    font-size: 12px;
+    margin-bottom: 1px;
+  }
+  
+  .live-hours {
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  
+  .calendar-day.has-live::before {
+    top: 2px;
+    right: 2px;
+    width: 4px;
+    height: 4px;
+  }
+  
+  .live-detail-info {
+    padding: 12px;
+    border-radius: 8px;
+  }
+  
+  .live-detail-info h3 {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  
+  .live-sessions {
+    gap: 10px;
+  }
+  
+  .live-session {
+    padding: 12px;
+    border-radius: 6px;
+  }
+  
+  .session-item {
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+  
+  .session-item .label {
+    font-size: 13px;
+    min-width: 70px;
+  }
+  
+  .session-item .value {
+    font-size: 13px;
+  }
+}
+
+/* 小屏幕手机适配（iPhone SE等） */
+@media (max-width: 375px) {
+  .live-detail-dialog {
+    width: 100vw !important;
+    height: 80vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  .live-detail-dialog .el-dialog__body {
+    padding: 8px;
+    max-height: calc(80vh - 50px);
+  }
+  
+  .calendar {
+    padding: 8px;
+  }
+  
+  .week-day {
+    padding: 4px 2px;
+    font-size: 10px;
+  }
+  
+  .calendar-day {
+    min-height: 32px;
+    padding: 2px 1px;
+  }
+  
+  .day-number {
+    font-size: 11px;
+  }
+  
+  .live-hours {
+    font-size: 8px;
+  }
+  
+  .month-selector .el-button {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  
+  .current-month {
+    font-size: 12px;
+    min-width: 80px;
+  }
+  
+  .month-total {
+    font-size: 11px;
+  }
+}
+
+/* 横屏手机适配 */
+@media screen and (max-width: 896px) and (orientation: landscape) {
+  .live-detail-dialog {
+    height: 90vh !important;
+  }
+  
+  .live-detail-dialog .el-dialog__body {
+    max-height: calc(90vh - 60px);
+  }
+  
+  .live-detail-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+  }
+  
+  .calendar {
+    padding: 10px;
+  }
+  
+  .calendar-day {
+    min-height: 35px;
+    padding: 3px;
+  }
+  
+  .day-number {
+    font-size: 11px;
+  }
+  
+  .live-hours {
+    font-size: 8px;
+  }
+  
+  .live-detail-info {
+    margin-top: 0;
+  }
 }
 
 .module-img {

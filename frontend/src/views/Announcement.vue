@@ -1,6 +1,47 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { Bell, Clock, User, Star } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { Bell, Clock, User, Star, Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from '@/api/announcement.js'
+import { useUserStore } from '@/stores/user'
+import { storeToRefs } from 'pinia'
+import { ElMessage, ElMessageBox } from 'element-plus'
+
+// 用户状态
+const userStore = useUserStore()
+const { permission } = storeToRefs(userStore)
+
+// 判断是否为管理员
+const isAdmin = computed(() => {
+    return permission.value === 1 || permission.value === 2
+})
+
+// 公告数据
+const announcements = ref([])
+const loading = ref(false)
+
+// 获取公告列表
+const fetchAnnouncements = async () => {
+    loading.value = true
+    try {
+        const result = await getAnnouncements()
+        // 后端格式: {code: 200, message: "...", data: [...]}
+        if (result && result.code === 200 && Array.isArray(result.data)) {
+            announcements.value = result.data
+        } else {
+            ElMessage.error(result?.message || '获取公告列表失败')
+        }
+    } catch (error) {
+        console.error('获取公告列表失败:', error)
+        ElMessage.error('获取公告列表失败，请稍后重试')
+    } finally {
+        loading.value = false
+    }
+}
+
+// 页面加载时获取公告列表
+onMounted(() => {
+    fetchAnnouncements()
+})
 
 // 展开的公告ID集合
 const expandedAnnouncements = ref(new Set())
@@ -19,89 +60,17 @@ const isExpanded = (announcementId) => {
     return expandedAnnouncements.value.has(announcementId)
 }
 
-// 判断公告内容是否需要折叠（超过2个段落或总字符数超过150）
+// 判断公告内容是否需要折叠（HTML字符数超过300）
 const shouldCollapse = (content) => {
-    const totalChars = content.join('').length
-    return content.length > 2 || totalChars > 150
+    if (!content) return false
+    return content.length > 300
 }
 
-// 获取折叠显示的内容（前1-2个段落，根据内容长度智能判断）
+// 获取折叠显示的内容（截取前200个字符）
 const getCollapsedContent = (content) => {
-    if (content.length <= 1) return content
-
-    // 如果只有一个段落但很长，则截取前120个字符
-    if (content.length === 1 && content[0].length > 120) {
-        return [content[0].substring(0, 120) + '...']
-    }
-
-    // 如果有两个段落，检查总长度
-    if (content.length >= 2) {
-        const firstTwo = content.slice(0, 2)
-        const combined = firstTwo.join('')
-        if (combined.length <= 120) return firstTwo
-
-        // 如果太长，只显示第一个段落
-        return [content[0].substring(0, 120) + '...']
-    }
-
-    return content
+    if (!content) return ''
+    return content.substring(0, 200) + '...'
 }
-
-// 模拟公告数据 TODO 暂时写死，后面接后端
-const announcements = ref([
-    {
-        id: 1,
-        title: '【小猫丸子Wiki】社区公告与上传规范',
-        content: [
-            '<strong>各位喜爱猫丸伴，大家好！</strong>',
-            '欢迎来到这个由粉丝自发创建的Wiki。为了维护这个属于我们的小天地，确保网站能够长久、安全、健康地运行，并充分尊重与保护主播猫丸子及所有支持者的权益，请务必仔细阅读并遵守以下社区规则。',
-            '<h4>一、关于内容上传的核心规定</h4>',
-            '所有登录用户均可上传公开的音声与图片，但所有内容都必须先通过<strong>人工审核</strong>才会公开显示。审核时间通常为<strong>1-3个工作日</strong>，请耐心等待。请注意，以下内容<strong style="color: #f56c6c;">严格禁止</strong>上传：',
-            '<strong>1. 严禁上传与传播任何"舰长"专属的未公开内容。</strong>',
-            '包括舰长群内发布的专属动态壁纸、专属音声、专属图片、未公开的直播录像/剪辑，以及任何明确标识为仅限舰长福利的资源，这些内容是猫丸子对舰长们真诚支持的<strong>专属回馈</strong>，是彼此间的信任与约定。擅自对外传播会严重损害舰长们的权益，也违背了主播与粉丝之间宝贵的情谊。请让我们一起守护这份特别的<strong>"契约"</strong>。',
-            '<strong>2. 严禁上传任何违法违规及敏感内容。</strong>',
-            '一切涉及<strong>R18/色情</strong>、<strong>成人内容</strong>、<strong>血腥暴力</strong>、<strong>政治敏感</strong>的内容，以及任何违反中国法律法规和社会主义核心价值观的内容。同时，也严禁上传任何形式的<strong>盗版</strong>、<strong>侵权材料</strong>，<span style="color: #e6a23c;">请注意：本网站受中国法律管辖，审核将以此为标准严格执行。违规内容将直接删除，并可能导致账号被禁用。</span>',
-            '<strong>3. 严禁泄露任何与舰长群相关的隐私信息。</strong>',
-            '禁止以任何形式公开舰长群的群聊名称、群号、加群方式等。同时，也请勿详细描述或公开舰长福利的具体获取渠道、未公开的福利细节等，<span style="color: #e6a23c;">请注意：讨论群内趣事或"内部梗"时，也请务必进行脱敏处理，避免因细节泄露而间接暴露隐私。</span>',
-            '<strong>4. 严禁上传通过AI（人工智能）工具生成的、深度修改的或合成的猫丸子相关图片、音声等衍生内容。</strong>',
-            '为保护主播形象和作品版权的完整性、真实性，禁止使用AI技术对猫丸子的公开或非公开素材（包括但不限于立绘、截图、音声）进行修改、重绘、合成或生成新的衍生内容（如换脸、声线克隆、虚构场景等）。',
-            '<strong>5. 严禁将本网站的任何内容（包括图片、音声、文字等）及猫丸子的官方素材用于AI训练。</strong>',
-            '无论免费或付费，严格禁止以任何形式抓取、复制或使用本Wiki站内内容、猫丸子官方发布的立绘、音声、直播录像等任何素材，用作人工智能（包括但不限于AI绘画、AI语音合成等模型）的训练数据。这是对创作者劳动成果和知识产权的基本尊重。',
-            '<h4>二、审核、反馈与共同监督</h4>',
-            '审核并非刁难，而是为了确保网站安全和<strong>内容合规</strong>的必要流程。如果您的上传长时间未通过，可能是因为内容涉及上述禁止事项，或属于非公开内容。',
-            '如果对审核结果有疑问，或认为内容被误判，可以进行<strong>反馈申诉</strong>，我们会进行复核。',
-            '我们鼓励大家共同维护社区环境。如果您在浏览时发现任何违规内容，请及时举报，帮助我们及时发现和处理。',
-            '<h4>三、一些心里话</h4>',
-            '创建这个Wiki的初衷，是为了集中保存那些关于猫丸子的美好、有趣的<strong>公开瞬间</strong>，是一个<strong>用爱发电</strong>的存档站。它不是一个资源下载站，更不是内部福利的传播渠道。',
-            '我们每一位用户，都是这个小小花园的<strong>园丁</strong>。只有大家都遵守规则，尊重主播，尊重彼此，这个角落才能持续成为干净、温暖、值得信赖的应援之地。',
-            '<em>感谢你的理解、支持与配合。让我们继续猫猫祟祟地，一起记录更多快乐吧！</em>',
-            '<div style="text-align: right; margin-top: 16px; color: #666; font-style: italic;">—— 晓飞 谨上</div>'
-        ],
-        author: '晓飞吖',
-        publishTime: '2025-12-31 11:00',
-        isPinned: true,
-        category: 'system'
-    },
-    {
-        id: 2,
-        title: '公告系统上线！',
-        content: [
-            '为了更好地与大家沟通，我们全新打造了<strong>公告中心</strong>！',
-            '<h4>主要功能：</h4>',
-            '<strong>• 智能内容展示：</strong>支持长文本自动折叠，点击"展开全文"查看完整内容',
-            '<strong>• 富文本格式：</strong>支持<strong>加粗</strong>、<em>斜体</em>、标题分层等多种格式，让公告更易阅读',
-            '<strong>• 置顶功能：</strong>重要公告会以⭐星标显示，并自动排在最前面',
-            '<strong>• 分类标签：</strong>不同类型的公告有专属颜色标识，一目了然',
-            '<strong>• 移动端优化：</strong>完美适配手机和平板，触摸体验流畅',
-            '现在就来<strong>公告中心</strong>看看吧！我们会在这里发布重要通知、新功能介绍、活动预告等各种信息。',
-            '<em>感谢大家的支持与反馈！让我们一起建设更好的小猫丸子Wiki社区~</em>'
-        ],
-        author: '晓飞吖',
-        publishTime: '2025-12-31 11:00',
-        isPinned: false,
-        category: 'feature'
-    },
-])
 
 // 获取公告类型标签
 const getCategoryLabel = (category) => {
@@ -135,6 +104,133 @@ const sortedAnnouncements = computed(() => {
         return new Date(b.publishTime) - new Date(a.publishTime)
     })
 })
+
+// 公告表单对话框
+const dialogVisible = ref(false)
+const dialogTitle = ref('创建公告')
+const isEdit = ref(false)
+const editingId = ref(null)
+const formRef = ref(null)
+const form = ref({
+    title: '',
+    content: '',
+    author: '',
+    isPinned: false,
+    category: 'system'
+})
+
+// 表单验证规则
+const formRules = {
+    title: [
+        { required: true, message: '请输入公告标题', trigger: 'blur' },
+        { min: 1, max: 100, message: '标题长度应在1-100个字符', trigger: 'blur' }
+    ],
+    content: [
+        { required: true, message: '请输入公告内容', trigger: 'blur' }
+    ]
+}
+
+// 分类选项
+const categoryOptions = [
+    { label: '系统通知', value: 'system' },
+    { label: '新功能', value: 'feature' },
+    { label: '功能更新', value: 'update' },
+    { label: 'Bug修复', value: 'holiday' }
+]
+
+// 打开创建对话框
+const openCreateDialog = () => {
+    isEdit.value = false
+    editingId.value = null
+    dialogTitle.value = '创建公告'
+    form.value = {
+        title: '',
+        content: '',
+        author: userStore.username || '管理员',
+        isPinned: false,
+        category: 'system'
+    }
+    dialogVisible.value = true
+}
+
+// 打开编辑对话框
+const openEditDialog = (announcement) => {
+    isEdit.value = true
+    editingId.value = announcement.id
+    dialogTitle.value = '编辑公告'
+    form.value = {
+        title: announcement.title,
+        content: announcement.content,
+        author: announcement.author,
+        isPinned: announcement.isPinned,
+        category: announcement.category
+    }
+    dialogVisible.value = true
+}
+
+// 提交表单
+const submitForm = async () => {
+    if (!formRef.value) return
+
+    await formRef.value.validate(async (valid) => {
+        if (valid) {
+            try {
+                if (isEdit.value) {
+                    // 编辑公告
+                    const result = await updateAnnouncement(editingId.value, form.value)
+                    if (result && result.code === 200) {
+                        ElMessage.success('公告更新成功')
+                        dialogVisible.value = false
+                        fetchAnnouncements()
+                    } else {
+                        ElMessage.error(result?.message || '更新失败')
+                    }
+                } else {
+                    // 创建公告
+                    const result = await createAnnouncement(form.value)
+                    if (result && result.code === 200) {
+                        ElMessage.success('公告创建成功')
+                        dialogVisible.value = false
+                        fetchAnnouncements()
+                    } else {
+                        ElMessage.error(result?.message || '创建失败')
+                    }
+                }
+            } catch (error) {
+                console.error('提交失败:', error)
+                ElMessage.error('操作失败，请稍后重试')
+            }
+        }
+    })
+}
+
+// 删除公告
+const handleDelete = (announcement) => {
+    ElMessageBox.confirm(
+        `确定要删除公告 "${announcement.title}" 吗？`,
+        '确认删除',
+        {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+        }
+    ).then(async () => {
+        try {
+            const result = await deleteAnnouncement(announcement.id)
+            if (result && result.code === 200) {
+                ElMessage.success('公告删除成功')
+                fetchAnnouncements()
+            } else {
+                ElMessage.error(result?.message || '删除失败')
+            }
+        } catch (error) {
+            console.error('删除失败:', error)
+            ElMessage.error('删除失败，请稍后重试')
+        }
+    }).catch(() => {
+        // 取消删除
+    })
+}
 </script>
 
 <template>
@@ -150,7 +246,20 @@ const sortedAnnouncements = computed(() => {
 
             <!-- 公告列表 -->
             <div class="announcement-section">
-                <div class="announcement-list">
+                <!-- 管理员工具栏 -->
+                <div v-if="isAdmin" class="admin-toolbar">
+                    <el-button type="primary" :icon="Plus" @click="openCreateDialog">
+                        创建公告
+                    </el-button>
+                </div>
+
+                <!-- 加载状态 -->
+                <div v-if="loading" class="loading-state">
+                    <el-skeleton :rows="6" animated />
+                </div>
+
+                <!-- 公告列表 -->
+                <div v-else class="announcement-list">
                     <div v-for="announcement in sortedAnnouncements" :key="announcement.id" class="announcement-card"
                         :class="{ 'pinned': announcement.isPinned }">
 
@@ -185,9 +294,7 @@ const sortedAnnouncements = computed(() => {
                             <!-- 折叠状态显示内容 -->
                             <div v-if="!isExpanded(announcement.id) && shouldCollapse(announcement.content)"
                                 class="content-collapsed">
-                                <p v-for="(paragraph, index) in getCollapsedContent(announcement.content)" :key="index"
-                                    class="content-paragraph" v-html="paragraph">
-                                </p>
+                                <div class="content-html" v-html="getCollapsedContent(announcement.content)"></div>
                                 <div class="expand-indicator">
                                     <el-button size="small" type="text" @click="toggleExpanded(announcement.id)"
                                         class="expand-btn">
@@ -198,9 +305,7 @@ const sortedAnnouncements = computed(() => {
 
                             <!-- 展开状态显示全部内容 -->
                             <div v-else class="content-expanded">
-                                <p v-for="(paragraph, index) in announcement.content" :key="index"
-                                    class="content-paragraph" v-html="paragraph">
-                                </p>
+                                <div class="content-html" v-html="announcement.content"></div>
                                 <div v-if="shouldCollapse(announcement.content)" class="collapse-indicator">
                                     <el-button size="small" type="text" @click="toggleExpanded(announcement.id)"
                                         class="collapse-btn">
@@ -218,12 +323,21 @@ const sortedAnnouncements = computed(() => {
                                 </el-icon>
                                 <span>{{ announcement.author }}</span>
                             </div>
+                            <!-- 管理员操作按钮 -->
+                            <div v-if="isAdmin" class="admin-actions">
+                                <el-button size="small" type="primary" :icon="Edit" @click="openEditDialog(announcement)">
+                                    编辑
+                                </el-button>
+                                <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(announcement)">
+                                    删除
+                                </el-button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- 空状态 -->
-                <div v-if="announcements.length === 0" class="empty-state">
+                <div v-if="!loading && announcements.length === 0" class="empty-state">
                     <el-empty description="暂无公告" :image-size="80">
                         <template #image>
                             <el-icon size="80" class="empty-icon">
@@ -234,6 +348,34 @@ const sortedAnnouncements = computed(() => {
                 </div>
             </div>
         </div>
+
+        <!-- 创建/编辑公告对话框 -->
+        <el-dialog v-model="dialogVisible" :title="dialogTitle" width="700px" destroy-on-close>
+            <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
+                <el-form-item label="标题" prop="title">
+                    <el-input v-model="form.title" placeholder="请输入公告标题" maxlength="100" show-word-limit />
+                </el-form-item>
+                <el-form-item label="作者">
+                    <el-input v-model="form.author" placeholder="请输入作者名称" />
+                </el-form-item>
+                <el-form-item label="分类">
+                    <el-select v-model="form.category" placeholder="请选择分类" style="width: 100%">
+                        <el-option v-for="item in categoryOptions" :key="item.value" :label="item.label"
+                            :value="item.value" />
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="置顶">
+                    <el-switch v-model="form.isPinned" />
+                </el-form-item>
+                <el-form-item label="内容" prop="content">
+                    <el-input v-model="form.content" type="textarea" :rows="10" placeholder="请输入公告内容，支持HTML格式" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="dialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitForm">确定</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -303,6 +445,18 @@ const sortedAnnouncements = computed(() => {
     border-radius: 12px;
     padding: 30px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 管理员工具栏 */
+.admin-toolbar {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+/* 加载状态 */
+.loading-state {
+    padding: 20px;
 }
 
 .announcement-list {
@@ -407,16 +561,11 @@ const sortedAnnouncements = computed(() => {
     margin-bottom: 20px;
 }
 
-.content-paragraph {
-    margin: 0 0 12px 0;
+.content-html {
     line-height: 1.6;
 }
 
-.content-paragraph:last-child {
-    margin-bottom: 0;
-}
-
-.content-paragraph h4 {
+.content-html h4 {
     color: #409eff;
     font-size: 16px;
     font-weight: 600;
@@ -425,12 +574,12 @@ const sortedAnnouncements = computed(() => {
     border-bottom: 2px solid #409eff;
 }
 
-.content-paragraph strong {
+.content-html strong {
     color: #333;
     font-weight: 600;
 }
 
-.content-paragraph em {
+.content-html em {
     color: #666;
     font-style: italic;
 }
@@ -446,7 +595,6 @@ const sortedAnnouncements = computed(() => {
     margin-top: 8px;
     text-align: center;
 }
-
 
 .expand-btn,
 .collapse-btn {
@@ -482,6 +630,11 @@ const sortedAnnouncements = computed(() => {
     color: #999;
 }
 
+/* 管理员操作按钮 */
+.admin-actions {
+    display: flex;
+    gap: 8px;
+}
 
 /* 空状态 */
 .empty-state {
@@ -552,12 +705,7 @@ const sortedAnnouncements = computed(() => {
         font-size: 14px;
     }
 
-    .content-paragraph {
-        margin-bottom: 10px;
-        line-height: 1.5;
-    }
-
-    .content-paragraph h4 {
+    .content-html h4 {
         font-size: 15px;
         margin: 16px 0 10px 0;
     }
@@ -572,6 +720,11 @@ const sortedAnnouncements = computed(() => {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
+    }
+
+    .admin-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 
     .pinned-badge {
@@ -644,13 +797,7 @@ const sortedAnnouncements = computed(() => {
         margin-bottom: 16px;
     }
 
-    .content-paragraph {
-        margin-bottom: 8px;
-        line-height: 1.4;
-        font-size: 13px;
-    }
-
-    .content-paragraph h4 {
+    .content-html h4 {
         font-size: 14px;
         margin: 14px 0 8px 0;
     }
@@ -666,6 +813,11 @@ const sortedAnnouncements = computed(() => {
         gap: 8px;
     }
 
+    .admin-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
     .author-info {
         font-size: 13px;
     }
@@ -673,12 +825,10 @@ const sortedAnnouncements = computed(() => {
     .pinned-badge {
         font-size: 10px;
         padding: 2px 5px;
-        gap: 3px;
     }
 
     .publish-time {
         font-size: 12px;
-        gap: 3px;
     }
 }
 
@@ -717,13 +867,7 @@ const sortedAnnouncements = computed(() => {
         font-size: 12px;
     }
 
-    .content-paragraph {
-        margin-bottom: 6px;
-        line-height: 1.3;
-        font-size: 12px;
-    }
-
-    .content-paragraph h4 {
+    .content-html h4 {
         font-size: 13px;
         margin: 12px 0 6px 0;
     }
@@ -735,6 +879,16 @@ const sortedAnnouncements = computed(() => {
     }
 
     .author-info {
+        font-size: 12px;
+    }
+
+    .admin-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .admin-actions .el-button {
+        padding: 6px 12px;
         font-size: 12px;
     }
 

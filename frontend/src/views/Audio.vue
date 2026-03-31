@@ -1,10 +1,10 @@
 <script setup>
 import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { ElMessageBox, ElMessage, ElLoading } from 'element-plus'
-import { UploadFilled, Warning, VideoPlay, Download } from '@element-plus/icons-vue'
+import { UploadFilled, Warning, VideoPlay, Download, TrendCharts } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios } from '@/api/audio'
+import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios, recordAudioPlay, getWeeklyPopularAudios, getTotalPopularAudios } from '@/api/audio'
 
 // 音声数据
 const audioSections = ref([])
@@ -75,6 +75,140 @@ const aiMatchReasonDisplay = ref('') // 用于打字机效果的显示文本
 const isTypingReason = ref(false) // 是否正在打字
 const aiAutoPlayIndex = ref(-1) // AI自动播放的当前索引
 const isAiAutoPlaying = ref(false) // 是否正在AI自动播放模式
+
+// 最热音声相关
+const hotAudioSortType = ref('week') // 'week' | 'total'
+const hotAudioLimit = ref(10)
+const hotAudioList = ref([])
+const hotAudioLoading = ref(false)
+
+// 获取最热音声列表
+async function fetchHotAudios() {
+    try {
+        hotAudioLoading.value = true
+        let response
+        if (hotAudioSortType.value === 'week') {
+            response = await getWeeklyPopularAudios(hotAudioLimit.value)
+        } else {
+            response = await getTotalPopularAudios(hotAudioLimit.value)
+        }
+        
+        if (response.data && response.data.audios) {
+            hotAudioList.value = response.data.audios.map((item, index) => ({
+                id: item.id,
+                name: item.name,
+                url: item.url,
+                tagName: item.classification?.name || '未知分类',
+                classificationId: item.classification?.id,
+                playCount: hotAudioSortType.value === 'week' ? (item.weeklyPlays || 0) : (item.totalPlayCount || 0)
+            }))
+        } else {
+            hotAudioList.value = []
+        }
+    } catch (err) {
+        console.error('获取热门音频失败:', err)
+        hotAudioList.value = []
+    } finally {
+        hotAudioLoading.value = false
+    }
+}
+
+// 监听排序类型和数量变化，自动重新获取
+watch([hotAudioSortType, hotAudioLimit], () => {
+    fetchHotAudios()
+}, { immediate: true })
+
+// 格式化播放量数字
+function formatCount(count) {
+    if (count >= 10000) {
+        return (count / 10000).toFixed(1) + '万'
+    }
+    return count.toString()
+}
+
+// 播放最热音声
+async function playHotAudio(item) {
+    // 根据分类ID找到对应的section
+    const sectionIndex = audioSections.value.findIndex(s => s.id === item.classificationId)
+    if (sectionIndex === -1) {
+        // 如果本地没有该分类，直接播放URL
+        playByUrl(item.url, item.name)
+        // 记录播放量
+        try {
+            await recordAudioPlay(item.id)
+        } catch (e) {
+            // 忽略记录失败
+        }
+        return
+    }
+    
+    const trackIndex = audioSections.value[sectionIndex].items.findIndex(
+        t => (t.id || t.audioId) === item.id
+    )
+    if (trackIndex === -1) {
+        // 如果本地列表中没有该音频，直接播放URL
+        playByUrl(item.url, item.name)
+        // 记录播放量
+        try {
+            await recordAudioPlay(item.id)
+        } catch (e) {
+            // 忽略记录失败
+        }
+        return
+    }
+    
+    currentSectionIndex.value = sectionIndex
+    currentTrackIndex.value = trackIndex
+    playCurrent()
+}
+
+// 通过URL直接播放
+function playByUrl(url, name) {
+    createAudioIfNeeded()
+    
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
+    const fullUrl = url.startsWith('http') ? url : baseUrl + url
+    
+    if (autoStopOnSwitch.value) {
+        audio.value.pause()
+        audio.value.currentTime = 0
+        isPlaying.value = false
+        
+        audio.value.src = fullUrl
+        audio.value.loop = !!brainwash.value
+        audio.value.volume = volume.value
+        
+        if (!audioUnlocked.value) {
+            unlockAudio()
+        }
+        
+        // 设置当前播放信息
+        currentSectionIndex.value = -1
+        currentTrackIndex.value = -1
+        
+        audio.value.play().then(() => {
+            isPlaying.value = true
+        }).catch((error) => {
+            console.error('播放失败:', error)
+            ElMessage.error('播放失败，请联系管理员')
+            isPlaying.value = false
+        })
+    } else {
+        // 不自动停止模式：创建新音频实例
+        const newAudio = new Audio(fullUrl)
+        newAudio.volume = volume.value
+        newAudio.loop = !!brainwash.value
+        backgroundAudios.value.push(newAudio)
+        
+        if (!audioUnlocked.value) {
+            unlockAudio()
+        }
+        
+        newAudio.play().catch((error) => {
+            console.error('后台播放失败:', error)
+        })
+    }
+}
 
 // 音声标签选项（基于现有分类）
 const tagOptions = computed(() => {
@@ -162,7 +296,7 @@ function playByFlatIndex(flatIndex) {
     playCurrent()
 }
 
-function playCurrent() {
+async function playCurrent() {
     const secIdx = currentSectionIndex.value
     const trIdx = currentTrackIndex.value
     if (secIdx < 0 || trIdx < 0 || secIdx >= audioSections.value.length ||
@@ -173,6 +307,16 @@ function playCurrent() {
     // 将相对路径转换为完整的URL
     const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
     const fullUrl = track.url.startsWith('http') ? track.url : baseUrl + track.url
+
+    // 记录播放量
+    const audioId = track.id || track.audioId
+    if (audioId) {
+        try {
+            await recordAudioPlay(audioId)
+        } catch (e) {
+            // 忽略记录失败
+        }
+    }
 
     if (autoStopOnSwitch.value) {
         // 自动停止模式：停止当前播放并播放新音频
@@ -1050,6 +1194,49 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
+            <div class="controls-card hot-audio-card">
+                <div class="hot-audio-header">
+                    <h3 class="hot-audio-title">
+                        <el-icon><TrendCharts /></el-icon>
+                        最热音声
+                    </h3>
+                    <div class="hot-audio-controls">
+                        <el-radio-group v-model="hotAudioSortType" size="small">
+                            <el-radio-button label="week">本周播放</el-radio-button>
+                            <el-radio-button label="total">总播放量</el-radio-button>
+                        </el-radio-group>
+                        <el-select v-model="hotAudioLimit" size="small" style="width: 80px; margin-left: 12px;">
+                            <el-option label="10条" :value="10" />
+                            <el-option label="20条" :value="20" />
+                            <el-option label="30条" :value="30" />
+                            <el-option label="40条" :value="40" />
+                            <el-option label="50条" :value="50" />
+                        </el-select>
+                    </div>
+                </div>
+                <el-scrollbar class="hot-audio-scrollbar" max-height="320px">
+                    <div class="hot-audio-grid">
+                        <div 
+                            v-for="(item, index) in hotAudioList" 
+                            :key="item.id" 
+                            class="hot-audio-item"
+                            @click="playHotAudio(item)"
+                        >
+                            <span class="hot-audio-rank" :class="{ 'top-three': index < 3 }">{{ index + 1 }}</span>
+                            <div class="hot-audio-info">
+                                <span class="hot-audio-name" :title="item.name">{{ item.name }}</span>
+                                <span class="hot-audio-tag">{{ item.tagName }}</span>
+                            </div>
+                            <span class="hot-audio-count">
+                                <el-icon><VideoPlay /></el-icon>
+                                {{ formatCount(item.playCount) }}
+                            </span>
+                        </div>
+                    </div>
+                    <el-empty v-if="hotAudioList.length === 0" description="暂无数据" :image-size="60" />
+                </el-scrollbar>
+            </div>
+
             <div v-if="loading" class="loading-container">
                 <div class="loading-spinner"></div>
                 <p>正在加载音声列表...</p>
@@ -1400,6 +1587,151 @@ onBeforeUnmount(() => {
     border-radius: 12px;
     font-size: 12px;
     font-weight: 500;
+}
+
+/* 最热音声栏样式 */
+.hot-audio-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 20px 24px;
+}
+
+.hot-audio-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #f5f7fa;
+}
+
+.hot-audio-title {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hot-audio-title .el-icon {
+    color: #e6a23c;
+    font-size: 20px;
+}
+
+.hot-audio-controls {
+    display: flex;
+    align-items: center;
+}
+
+.hot-audio-scrollbar {
+    width: 100%;
+}
+
+.hot-audio-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding-right: 8px;
+}
+
+.hot-audio-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #f8f9fa;
+    min-width: 0;
+}
+
+.hot-audio-item:hover {
+    background: #ecf5ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.hot-audio-rank {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #606266;
+    background: #e4e7ed;
+    flex-shrink: 0;
+}
+
+.hot-audio-rank.top-three {
+    background: linear-gradient(135deg, #ffd700, #ffaa00);
+    color: white;
+}
+
+.hot-audio-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.hot-audio-name {
+    font-size: 13px;
+    color: #303133;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hot-audio-tag {
+    font-size: 11px;
+    color: #909399;
+    background: #f4f4f5;
+    padding: 1px 6px;
+    border-radius: 4px;
+    align-self: flex-start;
+}
+
+.hot-audio-count {
+    font-size: 12px;
+    color: #606266;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.hot-audio-count .el-icon {
+    color: #409eff;
+    font-size: 12px;
+}
+
+/* 响应式：平板显示2列 */
+@media (max-width: 1200px) {
+    .hot-audio-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* 响应式：手机显示1列 */
+@media (max-width: 768px) {
+    .hot-audio-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .hot-audio-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
 }
 
 .section-body {

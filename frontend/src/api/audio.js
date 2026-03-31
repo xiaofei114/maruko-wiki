@@ -49,3 +49,34 @@ export function downloadAudios(classificationId) {
     link.click();
     document.body.removeChild(link);
 }
+
+/**
+ * 记录音频播放量
+ * @param {number} id - 音频ID
+ * @returns {Promise<Object>} 记录结果
+ */
+export function recordAudioPlay(id) {
+    return http.post(`/api/audios/${id}/play`)
+}
+
+/**
+ * 获取7天热门音频（Redis）
+ * @param {number} limit - 返回数量，默认10，最大50
+ * @returns {Promise<Object>} 热门音频列表
+ */
+export function getWeeklyPopularAudios(limit = 10) {
+    return http.get('/api/audios/popular/weekly', {
+        params: { limit }
+    })
+}
+
+/**
+ * 获取总播放量排行（SQLite）
+ * @param {number} limit - 返回数量，默认10，最大50
+ * @returns {Promise<Object>} 热门音频列表
+ */
+export function getTotalPopularAudios(limit = 10) {
+    return http.get('/api/audios/popular/total', {
+        params: { limit }
+    })
+}

@@ -9,6 +9,7 @@ import superAdminRoutes from '../routes/super-admin.js';
 import userRoutes from '../routes/user.js';
 import bilibiliRoutes from '../routes/bilibili.js';
 import aiRoutes from '../routes/ai.js';
+import announcementRoutes from '../routes/announcement.js';
 
 export default async () => {
     const appConfig = read_json("configs", "config")
@@ -38,6 +39,7 @@ export default async () => {
     // 集成路由
     App.use('/api', audioRoutes);
     App.use('/api', albumRoutes);
+    App.use('/api', announcementRoutes); // 公告相关路由
     App.use('/api/admin', adminRoutes);
     App.use('/api/super-admin', superAdminRoutes);
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由

@@ -29,6 +29,7 @@ http.interceptors.request.use(
 http.interceptors.response.use(
     response => {
         // 直接返回数据部分，简化调用
+        // 注意：304 Not Modified 浏览器会自动从缓存返回数据，axios 会正常处理
         return response.data
     },
     error => {

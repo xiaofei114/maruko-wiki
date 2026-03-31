@@ -3,9 +3,10 @@ import path from 'path';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import { queryOne } from '../method/database.js';
-import { createPublicRoute, createAdminUploadRouteHandler } from '../method/route-helpers.js';
-import { authenticateToken } from '../method/auth.js';
+import { createPublicRoute, createAdminUploadRouteHandler, createRouteHandler } from '../method/route-helpers.js';
+import { authenticateToken, optionalAuth } from '../method/auth.js';
 import { uploadAudio, getAudiosGrouped, createAudioClassification, getAudiosForDownload } from '../services/audio.js';
+import { recordPlayCount, getWeeklyPopularAudios, getTotalPopularAudios } from '../services/audioPlayCount.js';
 import { packAudios } from '../method/pack.js';
 import { read_json } from "../method/read.js"
 
@@ -180,5 +181,54 @@ router.get('/audios/download/:token', async (req, res) => {
         return res.status(500).json({ success: false, message: '下载音声失败', code: 500 });
     }
 });
+
+/**
+ * 记录音频播放量
+ * POST /api/audios/:id/play
+ * 支持游客和登录用户，有频率限制
+ */
+router.post('/audios/:id/play', optionalAuth, createRouteHandler(async (req) => {
+    const audioId = parseInt(req.params.id);
+    
+    if (!audioId || audioId <= 0) {
+        return {
+            success: false,
+            message: '无效的音频ID',
+            code: 400
+        };
+    }
+    
+    return await recordPlayCount(audioId, req, req.user || null);
+}));
+
+/**
+ * 获取7天内热门音频（Redis数据）
+ * GET /api/audios/popular/weekly
+ * 支持可选的limit参数，默认10个
+ */
+router.get('/audios/popular/weekly', createRouteHandler(async (req) => {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // 限制最大返回数量
+    const maxLimit = 50;
+    const finalLimit = Math.min(limit, maxLimit);
+    
+    return await getWeeklyPopularAudios(finalLimit);
+}));
+
+/**
+ * 获取总播放量排行（SQLite数据）
+ * GET /api/audios/popular/total
+ * 支持可选的limit参数，默认10个
+ */
+router.get('/audios/popular/total', createRouteHandler(async (req) => {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // 限制最大返回数量
+    const maxLimit = 50;
+    const finalLimit = Math.min(limit, maxLimit);
+    
+    return await getTotalPopularAudios(finalLimit);
+}));
 
 export default router;

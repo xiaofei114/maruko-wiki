@@ -47,6 +47,7 @@ audio:
   url: 音声url
   is_deleted: 是否删除
   is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  play_count: 播放次数
   create_time: 创建时间
   update_time: 更新时间
 # 直播时长
@@ -55,5 +56,17 @@ live_duration:
   start_time: 开始时间
   end_time: 结束时间
   title: 标题
+  create_time: 创建时间
+  update_time: 更新时间
+# 公告
+announcement:
+  id: 主键
+  title: 公告标题
+  content_html: 公告内容
+  author: 作者
+  publish_time: 发布时间
+  is_pinned: 是否置顶：0-否，1-是
+  category: 分类：system/feature/update/holiday
+  is_deleted: 软删除标记：0-未删除，1-已删除
   create_time: 创建时间
   update_time: 更新时间

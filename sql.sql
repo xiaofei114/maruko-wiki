@@ -75,6 +75,23 @@ CREATE TABLE live_duration (
     update_time INTEGER                 -- 记录更新时间（毫秒时间戳）
 );
 
+-- 给 audio 表添加 play_count 字段（如果不存在）
+ALTER TABLE audio ADD COLUMN play_count INTEGER DEFAULT 0;
+
+-- 公告
+CREATE TABLE IF NOT EXISTS announcement (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,                    -- 公告标题
+    content_html TEXT NOT NULL,             -- 公告内容（HTML格式）
+    author TEXT NOT NULL,                   -- 作者
+    publish_time INTEGER NOT NULL,          -- 发布时间（Unix时间戳）
+    is_pinned INTEGER DEFAULT 0,            -- 是否置顶：0-否，1-是
+    category TEXT DEFAULT 'system',         -- 分类：system/feature/update/holiday
+    is_deleted INTEGER DEFAULT 0,           -- 软删除标记：0-未删除，1-已删除
+    create_time INTEGER,
+    update_time INTEGER
+);
+
 -- ==================== 时间戳触发器 ====================
 
 -- 用户表的触发器
@@ -209,3 +226,9 @@ CREATE INDEX idx_audio_create_time ON audio(create_time);
 CREATE INDEX idx_live_duration_start_time ON live_duration(start_time);
 CREATE INDEX idx_live_duration_end_time ON live_duration(end_time);
 CREATE INDEX idx_live_duration_status ON live_duration(end_time IS NULL);
+
+
+-- 公告索引
+CREATE INDEX IF NOT EXISTS idx_announcement_is_deleted ON announcement(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_announcement_is_pinned ON announcement(is_pinned);
+CREATE INDEX IF NOT EXISTS idx_announcement_publish_time ON announcement(publish_time);

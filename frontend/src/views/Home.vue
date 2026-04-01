@@ -16,12 +16,30 @@ const requiredEffectiveDays = 22 // 每月需要的有效天数
 
 // 计算本月总直播时长（精确到分钟）
 const liveHours = computed(() => {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() // 0-based
+  
+  // 本月开始和结束时间戳
+  const monthStart = new Date(currentYear, currentMonth, 1, 0, 0, 0).getTime()
+  const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).getTime()
+  
   let totalMinutes = 0
+  
   liveRecords.value.forEach(session => {
     // 处理正在直播的情况（endTime为null）
-    const endTime = session.endTime || Date.now()
-    const duration = calculateSessionDuration(session.startTime, endTime)
-    totalMinutes += duration
+    const sessionEndTime = session.endTime || Date.now()
+    
+    // 计算该直播在本月内的实际时间段
+    // 取直播时间段和本月时间段的交集
+    const effectiveStartTime = Math.max(session.startTime, monthStart)
+    const effectiveEndTime = Math.min(sessionEndTime, monthEnd)
+    
+    // 如果直播在本月内有有效时间段
+    if (effectiveStartTime < effectiveEndTime) {
+      const duration = Math.floor((effectiveEndTime - effectiveStartTime) / (1000 * 60))
+      totalMinutes += duration
+    }
   })
   
   // 转换为小时（保留两位小数，精确到分钟）
@@ -434,6 +452,20 @@ const getStatusText = (status) => {
   return statusMap[status] || '未知状态'
 }
 
+// 将小时转换为"xx小时xx分钟"格式
+const formatHoursToHM = (hours) => {
+  const totalMinutes = Math.round(hours * 60)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (h > 0 && m > 0) {
+    return `${h}小时${m}分钟`
+  } else if (h > 0) {
+    return `${h}小时`
+  } else {
+    return `${m}分钟`
+  }
+}
+
 // 格式化数字（添加千位分隔符）
 const formatNumber = (num) => {
   if (!num && num !== 0) return '---'
@@ -560,13 +592,18 @@ onMounted(async () => {
               <el-statistic :value="roomInfo.attention">
                 <template #title>
                   <div class="stat-title">
-                    丸子今天10w粉了吗？
+                    {{ roomInfo.attention >= 100000 ? '猫猫今天20w粉了吗？' : '猫猫今天10w粉了吗？' }}
                   </div>
                 </template>
-                <template #suffix>/100,000</template>
+                <template #suffix>/{{ roomInfo.attention >= 100000 ? '200,000' : '100,000' }}</template>
               </el-statistic>
               <div style="font-size: 13px;color: #52c41a;">
-                距离10w粉还差 {{ formatNumber(100000 - roomInfo.attention) }} 粉丝
+                <template v-if="roomInfo.attention >= 100000">
+                  恭喜猫猫10w粉达成！距离20w粉还差 {{ formatNumber(200000 - roomInfo.attention) }} 粉丝
+                </template>
+                <template v-else>
+                  距离10w粉还差 {{ formatNumber(100000 - roomInfo.attention) }} 粉丝
+                </template>
               </div>
               <transition :name="attentionChange.type === 'increase' ? 'float-up' : 'float-down'">
                 <div v-if="attentionChange.show" class="float-change" :class="attentionChange.type">
@@ -586,7 +623,7 @@ onMounted(async () => {
               <el-statistic :value="captain">
                 <template #title>
                   <div class="stat-title">
-                    今天又多了几个爹呢？
+                    猫猫今天多了几个爹呢？
                   </div>
                 </template>
                 <template #suffix>位舰长大人</template>
@@ -613,20 +650,20 @@ onMounted(async () => {
               <el-statistic :value="liveHours">
                 <template #title>
                   <div class="stat-title">
-                    月末又要补时长了吗？
+                    猫猫月末又要补时长了吗？
                   </div>
                 </template>
                 <template #suffix>小时/90小时</template>
               </el-statistic>
               <!-- 四种状态显示 -->
               <div v-if="90 - liveHours > 0 && calculateRemainingEffectiveDays() > 0" style="font-size: 13px;color: #f56c6c;">
-                本月还差 {{ formatNumber(90 - liveHours) }} 小时，还差 {{ calculateRemainingEffectiveDays() }} 天有效天，猫猫加油哦~
+                本月还差 {{ formatHoursToHM(90 - liveHours) }}，还差 {{ calculateRemainingEffectiveDays() }} 天有效天，猫猫加油哦~
               </div>
               <div v-else-if="90 - liveHours <= 0 && calculateRemainingEffectiveDays() > 0" style="font-size: 13px;color: #e6a23c;">
                 本月时长达标辣！但是还差 {{ calculateRemainingEffectiveDays() }} 天有效天
               </div>
               <div v-else-if="90 - liveHours > 0 && calculateRemainingEffectiveDays() <= 0" style="font-size: 13px;color: #409eff;">
-                本月还差 {{ formatNumber(90 - liveHours) }} 小时，但是有效天达标辣！
+                本月还差 {{ formatHoursToHM(90 - liveHours) }}，但是有效天达标辣！
               </div>
               <div v-else style="font-size: 13px;color: #67c23a;">
                 本月时长和有效天都达标辣！撒花撒花~
@@ -743,6 +780,7 @@ onMounted(async () => {
       <!-- 丸子专区 -->
       <div class="maruko-section">
         <div class="maruko-content">
+
           <div class="module-card photo-album-module" @click="goTo('/photo-album', true)" style="cursor: pointer;">
             <div class="module-header">
               <h2>丸子相簿</h2>
@@ -768,6 +806,20 @@ onMounted(async () => {
               </div>
             </div>
           </div>
+
+          <div class="module-card photo-album-module" @click="goTo('/announcement', true)" style="cursor: pointer;">
+            <div class="module-header">
+              <h2>公告中心</h2>
+            </div>
+            <div class="module-body">
+              <div class="album-content">
+                <div class="album-placeholder">
+                  <p>同步每份动态，与你共赴崭新旅程</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

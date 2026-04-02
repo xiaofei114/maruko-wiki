@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "@vue-office/docx": "^1.6.3",
     "axios": "^1.13.2",
     "element-plus": "^2.11.9",
     "pinia": "^3.0.4",

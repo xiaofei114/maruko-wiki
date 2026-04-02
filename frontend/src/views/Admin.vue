@@ -23,6 +23,11 @@ import {
     resetUserPassword as resetUserPasswordAPI,
     deleteUser as deleteUserAPI
 } from '@/api/admin'
+import {
+    getPlanDocuments,
+    deletePlanDocument,
+    setCurrentPlanDocument
+} from '@/api/planDocument'
 
 // 用户状态
 const userStore = useUserStore()
@@ -31,10 +36,11 @@ const { permission } = storeToRefs(userStore)
 // 活跃标签页
 const activeTab = ref('audio')
 
-// 选中的音频/相册/用户
+// 选中的音频/相册/用户/企划表
 const selectedAudio = ref(null)
 const selectedAlbum = ref(null)
 const selectedUser = ref(null)
+const planDocuments = ref([])
 
 // 编辑对话框
 const editCategoryDialog = ref(false)
@@ -300,10 +306,22 @@ const fetchUsers = async () => {
     }
 }
 
+const fetchPlanDocuments = async () => {
+    try {
+        const response = await getPlanDocuments()
+        if (response.code === 200) {
+            planDocuments.value = response.data || []
+        }
+    } catch (error) {
+        ElMessage.error('获取企划表列表失败')
+    }
+}
+
 const fetchAllData = async () => {
     const promises = [
         fetchAudioCategories(),
-        fetchAlbumCategories()
+        fetchAlbumCategories(),
+        fetchPlanDocuments()
     ]
 
     // 只有超级管理员才能获取用户数据
@@ -1012,6 +1030,41 @@ const handleDeleteAlbum = async (album) => {
     }
 }
 
+// 企划表管理方法
+const handleDeletePlanDocument = async (document) => {
+    try {
+        await ElMessageBox.confirm(`确定要删除文档"${document.title}"吗？`, '警告', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+        })
+
+        await deletePlanDocument(document.id)
+        ElMessage.success('文档已删除')
+
+        // 重新获取数据
+        await fetchPlanDocuments()
+    } catch (error) {
+        if (error !== 'cancel') {
+            console.error('删除文档失败:', error)
+            ElMessage.error('删除文档失败')
+        }
+    }
+}
+
+const handleSetCurrentPlanDocument = async (document) => {
+    try {
+        await setCurrentPlanDocument(document.id)
+        ElMessage.success('已设置为当前文档')
+
+        // 重新获取数据
+        await fetchPlanDocuments()
+    } catch (error) {
+        console.error('设置当前文档失败:', error)
+        ElMessage.error('设置当前文档失败')
+    }
+}
+
 // 筛选和分页方法
 const resetAudioFilters = () => {
     audioFilters.value = {
@@ -1220,6 +1273,50 @@ onMounted(() => {
                                     <el-tag :type="getPermissionType(user.permission)" size="small">
                                         {{ getPermissionLabel(user.permission) }}
                                     </el-tag>
+                                </div>
+                            </div>
+                        </el-tab-pane>
+
+                        <!-- 企划表管理 -->
+                        <el-tab-pane label="企划表管理" name="plan-documents">
+                            <div v-if="planDocuments.length === 0" class="empty-state">
+                                <el-empty description="暂无企划表数据" :image-size="60">
+                                    <template #image>
+                                        <el-icon size="60" class="empty-icon">
+                                            <Document />
+                                        </el-icon>
+                                    </template>
+                                </el-empty>
+                            </div>
+                            <div v-else class="plan-document-list">
+                                <div v-for="document in planDocuments" :key="document.id" class="plan-document-item">
+                                    <div class="plan-document-info">
+                                        <span class="plan-document-title">{{ document.title }}</span>
+                                        <span class="plan-document-meta">{{ document.fileName }}</span>
+                                        <span class="plan-document-meta">{{ formatTime(document.uploadTime) }}</span>
+                                        <el-tag v-if="document.isCurrent" type="success" size="small">当前文档</el-tag>
+                                    </div>
+                                    <div class="plan-document-actions">
+                                        <el-button 
+                                            v-if="!document.isCurrent" 
+                                            size="small" 
+                                            @click.stop="handleSetCurrentPlanDocument(document)" 
+                                            type="success" 
+                                            plain
+                                        >
+                                            设置为当前
+                                        </el-button>
+                                        <el-button 
+                                            size="small" 
+                                            @click.stop="handleDeletePlanDocument(document)" 
+                                            type="danger" 
+                                            plain
+                                        >
+                                            <el-icon>
+                                                <Delete />
+                                            </el-icon>
+                                        </el-button>
+                                    </div>
                                 </div>
                             </div>
                         </el-tab-pane>
@@ -2500,15 +2597,47 @@ onMounted(() => {
     .user-detail :deep(.el-card__body) {
         padding: 12px 16px;
     }
+}
 
-    .user-actions {
-        flex-direction: column;
-        gap: 8px;
-    }
+/* 企划表管理样式 */
+.plan-document-list {
+    padding: 10px 0;
+}
 
-    .user-actions .el-button {
-        width: 100%;
-    }
+.plan-document-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.3s ease;
+}
+
+.plan-document-item:hover {
+    background-color: #f5f7fa;
+}
+
+.plan-document-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.plan-document-title {
+    font-weight: 500;
+    font-size: 14px;
+    color: #333;
+}
+
+.plan-document-meta {
+    font-size: 12px;
+    color: #999;
+}
+
+.plan-document-actions {
+    display: flex;
+    gap: 8px;
 }
 
 .user-detail :deep(.el-card) {

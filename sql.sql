@@ -1,4 +1,4 @@
--- 用户账号表
+-- ==================== 用户账号表 ====================
 CREATE TABLE user (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE user (
     update_time INTEGER DEFAULT 0
 );
 
--- 相册表
+-- ==================== 相册表 ====================
 CREATE TABLE photo_album (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE photo_album (
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
--- 照片表
+-- ==================== 照片表 ====================
 CREATE TABLE photo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     album_id INTEGER NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE photo (
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
--- 音声分类表
+-- ==================== 音声分类表 ====================
 CREATE TABLE audio_classification (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -50,13 +50,14 @@ CREATE TABLE audio_classification (
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
--- 音声表
+-- ==================== 音声表 ====================
 CREATE TABLE audio (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     classification_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     url TEXT NOT NULL,
+    play_count INTEGER DEFAULT 0,
     is_deleted INTEGER NOT NULL DEFAULT 0 CHECK(is_deleted IN (0, 1)),
     is_review INTEGER NOT NULL DEFAULT 0 CHECK(is_review IN (0, 1, 2)),
     create_time INTEGER NOT NULL,
@@ -65,31 +66,42 @@ CREATE TABLE audio (
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
--- 直播时长
+-- ==================== 直播时长表 ====================
 CREATE TABLE live_duration (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    start_time INTEGER NOT NULL,        -- 直播开始时间（毫秒时间戳）
-    end_time INTEGER,                   -- 直播结束时间（毫秒时间戳），NULL表示正在直播
-    title TEXT,                         -- 直播标题
-    create_time INTEGER NOT NULL,       -- 记录创建时间（毫秒时间戳）
-    update_time INTEGER                 -- 记录更新时间（毫秒时间戳）
+    start_time INTEGER NOT NULL,
+    end_time INTEGER,
+    title TEXT,
+    create_time INTEGER NOT NULL,
+    update_time INTEGER
 );
 
--- 给 audio 表添加 play_count 字段（如果不存在）
-ALTER TABLE audio ADD COLUMN play_count INTEGER DEFAULT 0;
-
--- 公告
-CREATE TABLE IF NOT EXISTS announcement (
+-- ==================== 公告表 ====================
+CREATE TABLE announcement (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,                    -- 公告标题
-    content_html TEXT NOT NULL,             -- 公告内容（HTML格式）
-    author TEXT NOT NULL,                   -- 作者
-    publish_time INTEGER NOT NULL,          -- 发布时间（Unix时间戳）
-    is_pinned INTEGER DEFAULT 0,            -- 是否置顶：0-否，1-是
-    category TEXT DEFAULT 'system',         -- 分类：system/feature/update/holiday
-    is_deleted INTEGER DEFAULT 0,           -- 软删除标记：0-未删除，1-已删除
+    title TEXT NOT NULL,
+    content_html TEXT NOT NULL,
+    author TEXT NOT NULL,
+    publish_time INTEGER NOT NULL,
+    is_pinned INTEGER DEFAULT 0,
+    category TEXT DEFAULT 'system',
+    is_deleted INTEGER DEFAULT 0,
     create_time INTEGER,
     update_time INTEGER
+);
+
+-- ==================== 企划文档表 ====================
+CREATE TABLE plan_document (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    upload_time INTEGER NOT NULL,
+    uploader_id INTEGER NOT NULL,
+    is_current INTEGER DEFAULT 0,
+    create_time INTEGER DEFAULT 0,
+    update_time INTEGER DEFAULT 0,
+    FOREIGN KEY (uploader_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
 -- ==================== 时间戳触发器 ====================
@@ -189,6 +201,25 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
+-- 企划文档表的触发器
+CREATE TRIGGER plan_document_insert_timestamp 
+AFTER INSERT ON plan_document
+BEGIN
+    UPDATE plan_document 
+    SET create_time = strftime('%s', 'now'),
+        update_time = strftime('%s', 'now')
+    WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER plan_document_update_timestamp 
+AFTER UPDATE ON plan_document
+WHEN OLD.update_time = NEW.update_time
+BEGIN
+    UPDATE plan_document 
+    SET update_time = strftime('%s', 'now')
+    WHERE id = NEW.id;
+END;
+
 -- ==================== 索引 ====================
 
 -- 用户表索引
@@ -225,10 +256,13 @@ CREATE INDEX idx_audio_create_time ON audio(create_time);
 -- 直播时长索引
 CREATE INDEX idx_live_duration_start_time ON live_duration(start_time);
 CREATE INDEX idx_live_duration_end_time ON live_duration(end_time);
-CREATE INDEX idx_live_duration_status ON live_duration(end_time IS NULL);
-
 
 -- 公告索引
-CREATE INDEX IF NOT EXISTS idx_announcement_is_deleted ON announcement(is_deleted);
-CREATE INDEX IF NOT EXISTS idx_announcement_is_pinned ON announcement(is_pinned);
-CREATE INDEX IF NOT EXISTS idx_announcement_publish_time ON announcement(publish_time);
+CREATE INDEX idx_announcement_is_deleted ON announcement(is_deleted);
+CREATE INDEX idx_announcement_is_pinned ON announcement(is_pinned);
+CREATE INDEX idx_announcement_publish_time ON announcement(publish_time);
+
+-- 企划文档表索引
+CREATE INDEX idx_plan_document_uploader ON plan_document(uploader_id);
+CREATE INDEX idx_plan_document_current ON plan_document(is_current);
+CREATE INDEX idx_plan_document_upload_time ON plan_document(upload_time);

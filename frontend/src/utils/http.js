@@ -2,8 +2,9 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 // 创建统一的 axios 实例
+const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660';
 const http = axios.create({
-    baseURL: import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api',
+    baseURL: baseUrl,
     timeout: 10000,
     headers: {
         'Content-Type': 'application/json'

@@ -1,0 +1,52 @@
+{
+  "httpPort": 6660,
+  "domainName": [
+    "http://localhost:6660",
+    "http://localhost:5173",
+    "http://localhost:5174"
+  ],
+  "token": "maruko",
+  "log": {
+    "cmd": "info",
+    "file": "all"
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "password": null
+  },
+  "email": {
+    "host": "smtp.qq.com",
+    "port": 587,
+    "secure": false,
+    "auth": {
+      "user": "",
+      "pass": ""
+    },
+    "from": "用户名 <请填写您的邮箱地址>",
+    "subject": ""
+  },
+  "bilibili": {
+    "roomId": 1929354869,
+    "userId": 3546938511198692,
+    "ttl": 60
+  },
+  "deepseek": {
+    "apiKey": null
+  },
+  "ai": {
+    "limits": {
+      "authenticated": 100,
+      "guest": 5
+    },
+    "security": {
+      "maxRequestsPerMinute": 10,
+      "maxRequestsPerHour": 50,
+      "suspiciousThreshold": 20,
+      "blockDuration": 3600
+    }
+  },
+  "download": {
+    "audio": 200
+  }
+}

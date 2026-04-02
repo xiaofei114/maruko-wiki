@@ -10,6 +10,8 @@ import userRoutes from '../routes/user.js';
 import bilibiliRoutes from '../routes/bilibili.js';
 import aiRoutes from '../routes/ai.js';
 import announcementRoutes from '../routes/announcement.js';
+import planDocumentRoutes from '../routes/planDocument.js';
+import chalk from 'chalk';
 
 export default async () => {
     const appConfig = read_json("configs", "config")
@@ -17,12 +19,7 @@ export default async () => {
     const App = express();
 
     App.use(cors({
-        origin: (origin, callback) => {
-            const domainName = appConfig.domainName; //允许的域名
-            const allow = !origin || domainName.includes(origin)
-            if (!allow) logger.warn(`拒绝跨域请求:${origin}`);
-            callback(null, allow);
-        }
+        origin: '*'
     }));
     App.use(express.json());
     App.use(express.urlencoded({ extended: false }));
@@ -31,7 +28,7 @@ export default async () => {
         logger.info(`${req.method}://${clientIp}${req.url}`);
         // 只在未设置Content-Type时设置为text/plain，避免覆盖文件服务的MIME类型
         if (!res.get('Content-Type')) {
-            res.set("Content-Type", "text/plain");
+            res.set("Content-Type", "text/plain; charset=utf-8");
         }
         next();
     });
@@ -40,6 +37,7 @@ export default async () => {
     App.use('/api', audioRoutes);
     App.use('/api', albumRoutes);
     App.use('/api', announcementRoutes); // 公告相关路由
+    App.use('/api', planDocumentRoutes); // 企划文档相关路由
     App.use('/api/admin', adminRoutes);
     App.use('/api/super-admin', superAdminRoutes);
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由

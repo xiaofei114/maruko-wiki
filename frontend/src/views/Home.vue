@@ -820,6 +820,19 @@ onMounted(async () => {
             </div>
           </div>
 
+          <div class="module-card photo-album-module" @click="goTo('/plan-document', true)" style="cursor: pointer;">
+            <div class="module-header">
+              <h2>企划表</h2>
+            </div>
+            <div class="module-body">
+              <div class="album-content">
+                <div class="album-placeholder">
+                  <p>查看和管理企划文档，规划未来方向</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

@@ -1,10 +1,11 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled, Warning, Document, Delete, Download } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { getPlanDocuments, uploadPlanDocument, deletePlanDocument, setCurrentPlanDocument } from '@/api/planDocument'
+import DocxPreview from '@/components/DocxPreview.vue'
 
 const userStore = useUserStore()
 const { isAuthenticated } = storeToRefs(userStore)
@@ -12,12 +13,44 @@ const { isAuthenticated } = storeToRefs(userStore)
 const planDocuments = ref([])
 const loading = ref(false)
 const error = ref(null)
+const selectedDocument = ref(null)
+const previewError = ref('')
+const previewRenderKey = ref(0)
+
+const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660'
+const selectedPreviewUrl = computed(() => {
+  if (!selectedDocument.value?.filePath) return ''
+  return `${baseUrl}/api/file/${selectedDocument.value.filePath}`
+})
 
 const uploadDialogVisible = ref(false)
 const uploadForm = ref({
   documentFile: null,
   documentName: ''
 })
+
+function syncSelectedDocument() {
+  if (planDocuments.value.length === 0) {
+    selectedDocument.value = null
+    return
+  }
+
+  if (selectedDocument.value) {
+    const matched = planDocuments.value.find(item => item.id === selectedDocument.value.id)
+    if (matched) {
+      selectedDocument.value = matched
+      return
+    }
+  }
+
+  selectedDocument.value = planDocuments.value.find(item => item.isCurrent) || planDocuments.value[0]
+}
+
+function selectDocument(doc) {
+  selectedDocument.value = doc
+  previewError.value = ''
+  previewRenderKey.value += 1
+}
 
 async function fetchPlanDocuments() {
   try {
@@ -26,6 +59,7 @@ async function fetchPlanDocuments() {
     const response = await getPlanDocuments()
     if (response.code === 200) {
       planDocuments.value = response.data || []
+      syncSelectedDocument()
     } else {
       throw new Error(response.message || '获取失败')
     }
@@ -154,7 +188,6 @@ function formatTime(timestamp) {
 
 function downloadDocument(doc) {
   if (!doc || !doc.filePath) return
-  const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660'
   const url = `${baseUrl}/api/file/${doc.filePath}`
   const link = document.createElement('a')
   link.href = url
@@ -162,6 +195,11 @@ function downloadDocument(doc) {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+}
+
+function onPreviewError(payload) {
+  const detail = payload?.message ? `（${payload.message}）` : ''
+  previewError.value = `当前文档暂不支持在线预览，请下载后查看${detail}`
 }
 
 function openUploadDialog() {
@@ -226,46 +264,67 @@ onMounted(() => {
         </el-empty>
       </div>
 
-      <div v-else class="document-grid">
-        <div 
-          v-for="doc in planDocuments" 
-          :key="doc.id" 
-          class="document-card"
-          :class="{ 'current-document': doc.isCurrent }"
-        >
-          <div class="card-header">
-            <h3>{{ doc.title }}</h3>
-            <el-tag v-if="doc.isCurrent" type="success" size="small">当前文档</el-tag>
-          </div>
-          <div class="card-body">
-            <div class="document-info">
-              <p class="file-name">{{ doc.fileName }}</p>
-              <p class="upload-time">{{ formatTime(doc.uploadTime) }}</p>
+      <div v-else class="document-preview-page">
+        <div class="document-grid">
+              <div 
+                v-for="doc in planDocuments" 
+                :key="doc.id" 
+                class="document-card"
+                :class="{ 'current-document': doc.isCurrent, 'selected-document': selectedDocument?.id === doc.id }"
+                @click="selectDocument(doc)"
+              >
+                <div class="card-header">
+                  <h3>{{ doc.title }}</h3>
+                  <el-tag v-if="doc.isCurrent" type="success" size="small">当前文档</el-tag>
+                </div>
+                <div class="card-body">
+                  <div class="document-info">
+                    <p class="file-name">{{ doc.fileName }}</p>
+                    <p class="upload-time">{{ formatTime(doc.uploadTime) }}</p>
+                  </div>
+                </div>
+                <div class="card-footer">
+                  <el-button @click.stop="downloadDocument(doc)" type="primary" size="small" plain>
+                    <el-icon><Download /></el-icon>
+                    下载
+                  </el-button>
+                  <el-button 
+                    v-if="!doc.isCurrent" 
+                    @click.stop="setAsCurrent(doc)" 
+                    type="success" 
+                    size="small" 
+                    plain
+                  >
+                    设置为当前
+                  </el-button>
+                  <el-button 
+                    v-if="isAuthenticated" 
+                    @click.stop="deleteDocument(doc)" 
+                    type="danger" 
+                    size="small" 
+                    plain
+                  >
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </div>
+              </div>
             </div>
+
+        <div class="bottom-preview-panel">
+          <div class="preview-panel-header">
+            <h3>实时预览</h3>
+            <span v-if="selectedDocument">当前选中：{{ selectedDocument.fileName }}</span>
           </div>
-          <div class="card-footer">
-            <el-button @click="downloadDocument(doc)" type="primary" size="small" plain>
-              <el-icon><Download /></el-icon>
-              下载
-            </el-button>
-            <el-button 
-              v-if="!doc.isCurrent" 
-              @click="setAsCurrent(doc)" 
-              type="success" 
-              size="small" 
-              plain
-            >
-              设置为当前
-            </el-button>
-            <el-button 
-              v-if="isAuthenticated" 
-              @click="deleteDocument(doc)" 
-              type="danger" 
-              size="small" 
-              plain
-            >
-              <el-icon><Delete /></el-icon>
-            </el-button>
+          <div class="preview-panel-body">
+            <el-empty v-if="!selectedDocument" description="请选择上方文档后自动展示" :image-size="60" />
+            <el-empty v-else-if="previewError" :description="previewError" :image-size="60" />
+            <docx-preview
+              v-else
+              :key="`bottom-${previewRenderKey}`"
+              :src="selectedPreviewUrl"
+              style="height: 100%"
+              @error="onPreviewError"
+            />
           </div>
         </div>
       </div>
@@ -427,6 +486,12 @@ onMounted(() => {
   gap: 20px;
 }
 
+.document-preview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 .document-card {
   background: white;
   border-radius: 16px;
@@ -444,6 +509,11 @@ onMounted(() => {
 .document-card.current-document {
   border-color: #67c23a;
   background: linear-gradient(135deg, #f0f9eb 0%, white 100%);
+}
+
+.document-card.selected-document {
+  border-color: #409eff;
+  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.2), 0 12px 30px rgba(64, 158, 255, 0.18);
 }
 
 .card-header {
@@ -506,6 +576,40 @@ onMounted(() => {
   gap: 10px;
 }
 
+.bottom-preview-panel {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #ebeef5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.preview-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f0f2f5;
+  background: #fafcff;
+}
+
+.preview-panel-header h3 {
+  margin: 0;
+  color: #303133;
+  font-size: 15px;
+}
+
+.preview-panel-header span {
+  color: #606266;
+  font-size: 12px;
+}
+
+.preview-panel-body {
+  height: 420px;
+  padding: 12px;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 15px;
@@ -529,6 +633,10 @@ onMounted(() => {
 
   .document-grid {
     grid-template-columns: 1fr;
+  }
+
+  .preview-panel-body {
+    height: 360px;
   }
 }
 </style>

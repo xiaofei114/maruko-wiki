@@ -1,321 +1,183 @@
 # 小猫丸子 Wiki
 
-一个专为哔哩哔哩主播 [猫丸子 Maruko](https://space.bilibili.com/3546938511198692) 创建的粉丝互动网站。「北立交桥 · 妖精管理局 · 猫猫祟祟」
+一个面向猫丸子社区的前后端一体项目，包含内容展示、公告系统、相册/音声/企划表与管理后台能力。
 
-## 项目特色
+> 提示：当前仓库数据可能为清空状态（0 相册 / 0 音声 / 0 企划 / 0 用户），但功能代码完整可用。
 
-### 实时数据追踪
-- 粉丝数统计（目标：10万粉里程碑）
-- 舰长数统计（目标：千舰成就）
-- 直播状态实时监控
-- 主播信息动态展示
+## 功能说明（按当前代码）
 
-### 丰富多彩的内容
-- **丸子相簿** - 粉丝上传的精彩瞬间
-- **丸子音声** - 有趣的音频合集
-- **企划表** - 未来规划文档展示
+### 前台页面
+- 首页（`/`）：主播信息、直播状态、粉丝数、舰长数、直播时长统计。
+- 相册（`/photo-album`、`/photo-album/:id`）：相册与照片浏览。
+- 音声（`/audio`）：音频分类与播放。
+- 公告（`/announcement`）：公告列表与内容展示。
+- 企划表（`/plan-document`）：Word 文档列表、选中联动实时预览（支持文档内图片渲染）。
+- 登录（`/login`）、个人页（`/profile`）、后台（`/admin`）。
 
-### 完善的管理系统
-- 管理员后台
-- 用户管理系统
-- 文件上传管理
-- 内容审核功能
+### 管理后台
+- 音频管理：审核、编辑、删除。
+- 相册管理：审核、编辑、删除。
+- 企划表管理：设置当前文档、删除、右侧实时预览。
+- 用户管理（超管可见）：权限调整、封禁/解封、重置密码、删除。
 
-## 技术架构
+### 后端服务
+- JWT 鉴权与权限校验。
+- SQLite 数据存储（`maruko-sql.db` 为主库）。
+- 文件访问接口（`/api/file/*`）。
+- 公告、相册、音声、企划表、用户、Bilibili 代理、AI 路由。
 
-### 前端 (Frontend)
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Vue | 3.5.25 | 渐进式 JavaScript 框架 |
-| Element Plus | 2.11.9 | Vue 3 UI 组件库 |
-| Vite | 7.2.4 | 下一代前端构建工具 |
-| Pinia | 3.0.4 | Vue 状态管理库 |
-| Vue Router | 4.6.4 | Vue.js 官方路由 |
-| Axios | 1.13.2 | HTTP 客户端 |
-| @vue-office/docx | 1.6.3 | Word 文档预览组件 |
+## 技术栈
 
-### 后端 (Backend)
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Node.js | 20+ | JavaScript 运行时 |
-| Express | 4.21.2 | Web 应用框架 |
-| better-sqlite3 | 11.9.0 | SQLite 数据库 |
-| jsonwebtoken | 9.0.2 | JWT 认证 |
-| bcrypt | 5.1.1 | 密码加密 |
-| ioredis | 5.6.1 | Redis 客户端 |
-| log4js | 6.9.1 | 日志管理 |
-| nodemailer | 7.0.12 | 邮件发送 |
-| multer | 1.4.5-lts.1 | 文件上传处理 |
+### 前端
+- Vue 3 + Vite
+- Element Plus + Pinia + Vue Router
+- Axios
+- `docx-preview`（当前文档预览主方案）
+- `@vue-office/docx`（历史依赖，仍在 `package.json` 中）
 
-### 开发工具
-- **包管理**: pnpm
-- **代码检查**: ESLint
-- **版本控制**: Git
-
-## 数据库结构
-
-### 数据表
-| 表名 | 说明 |
-|------|------|
-| user | 用户账号表 |
-| photo_album | 相册表 |
-| photo | 照片表 |
-| audio_classification | 音声分类表 |
-| audio | 音声表 |
-| live_duration | 直播时长表 |
-| announcement | 公告表 |
-| plan_document | 企划文档表 |
-
-### 数据库文件
-- `sql.sql` - 完整的 SQLite 数据库初始化脚本（模板）
-- `sql.yaml` - 数据库结构说明文档
-
-## 快速开始
-
-### 环境要求
-
-#### 基础环境
-- Node.js >= 20.19.0 || >= 22.12.0
-- pnpm >= 8.0.0
-- Redis >= 6.0
-
-#### 编译环境（Windows）
-由于项目使用了 better-sqlite3 和 bcrypt 等需要编译的原生模块，需要以下编译环境：
-
-**Python 环境：**
-- Python >= 3.8（推荐 3.10+）
-
-**C/C++ 编译环境：**
-- Visual Studio Build Tools 2022 或 Visual Studio 2019/2022
-- Windows SDK（包含在 Visual Studio 中）
-
-**Linux/macOS：**
-- gcc/g++ >= 8.0
-- make
-- Python >= 3.8
-
-### 安装步骤
-
-1. **克隆项目**
-   ```bash
-   git clone --depth=1 https://gitee.com/xiaofeiawa/maruko-wiki.git
-   cd maruko-wiki
-   ```
-
-2. **安装依赖**
-   ```bash
-   # 安装后端依赖
-   cd backend
-   pnpm install
-
-   # 安装前端依赖
-   cd ../frontend
-   pnpm install
-   ```
-
-3. **配置环境**
-   ```bash
-   # 复制后端配置文件
-   cd backend
-   cp examples/config.yaml configs/config.yaml
-   
-   # 编辑配置文件，修改以下内容：
-   # - 数据库路径
-   # - JWT 密钥
-   # - Redis 连接信息
-   # - 邮件服务配置（可选）
-   ```
-
-4. **初始化数据库**
-   ```bash
-   # 方法1：使用 SQL 脚本初始化
-   cd backend
-   sqlite3 data/maruko-sql.db < ../sql.sql
-   
-   # 方法2：启动后端服务时自动创建表结构
-   pnpm run dev
-   ```
-
-5. **启动 Redis 服务**
-   ```bash
-   # Windows
-   redis-server.exe
-   
-   # Linux/macOS
-   redis-server
-   ```
-
-6. **启动服务**
-   ```bash
-   # 启动后端服务
-   cd backend
-   pnpm run dev
-
-   # 启动前端服务（新终端）
-   cd frontend
-   pnpm run dev
-   ```
-
-7. **访问应用**
-   - 前端: http://localhost:5173
-   - 后端API: http://localhost:6660
+### 后端
+- Node.js + Express
+- better-sqlite3
+- Redis（ioredis）
+- jsonwebtoken / bcrypt / multer / nodemailer / log4js
 
 ## 项目结构
 
-```
-maruko-wiki/
-├── backend/                    # 后端服务
+```text
+maruko-wiki-kx/
+├── frontend/
 │   ├── src/
-│   │   ├── components/         # 核心组件
-│   │   ├── method/            # 工具方法
-│   │   ├── routes/            # API 路由
-│   │   ├── services/          # 业务服务
-│   │   └── ...
-│   ├── configs/               # 配置文件
-│   │   └── config.yaml        # 主配置文件
-│   ├── data/                  # 数据存储
-│   │   ├── document/          # 文档资源
-│   │   │   └── plans/         # 企划文档
-│   │   ├── images/            # 图片资源
-│   │   ├── audios/            # 音频资源
-│   │   └── maruko-sql.db      # SQLite 数据库
-│   ├── logs/                  # 日志文件
+│   │   ├── views/            # 页面
+│   │   ├── components/       # 组件（含 DocxPreview）
+│   │   ├── api/              # 前端接口封装
+│   │   ├── router/
+│   │   └── stores/
 │   └── package.json
-├── frontend/                   # 前端应用
+├── backend/
 │   ├── src/
-│   │   ├── api/               # API 接口
-│   │   ├── components/        # Vue 组件
-│   │   ├── views/             # 页面视图
-│   │   │   ├── Home.vue       # 首页
-│   │   │   ├── PhotoAlbum.vue # 相簿页
-│   │   │   ├── Audio.vue      # 音声页
-│   │   │   ├── PlanDocument.vue # 企划表页
-│   │   │   └── Admin.vue      # 管理后台
-│   │   ├── router/            # 路由配置
-│   │   ├── stores/            # 状态管理
-│   │   └── ...
-│   ├── public/                # 静态资源
+│   │   ├── routes/           # 路由层
+│   │   ├── services/         # 业务层
+│   │   ├── method/           # 工具方法
+│   │   └── components/       # 启动组件
+│   ├── configs/
+│   ├── data/
+│   │   ├── document/         # 文件存储目录（audios/images/plans）
+│   │   ├── maruko-sql.db     # 主数据库
+│   │   └── maruko-wiki.db    # 额外数据库
 │   └── package.json
-├── sql.sql                     # 数据库初始化脚本
-├── sql.yaml                    # 数据库结构说明
-├── LICENSE                     # 许可证
-└── README.md                   # 项目说明
+├── sql.sql
+├── sql.yaml
+└── README.md
 ```
 
-## 部署说明
+## 本地开发
 
-### 开发环境
+### 1. 环境要求
+- Node.js `>= 20`
+- pnpm
+- Redis
+- SQLite3（可选，用于手动导入 SQL）
+
+### 2. 安装依赖
+
 ```bash
-# 终端1：启动后端
+cd backend
+pnpm install
+
+cd ../frontend
+pnpm install
+```
+
+### 3. 准备配置
+
+在 `backend/configs/` 放置配置文件（可参考 `backend/examples/config.yaml`）。
+
+### 4. 初始化数据库（可选）
+
+首次部署或重建库时可执行：
+
+```bash
+cd backend
+sqlite3 data/maruko-sql.db < ../sql.sql
+```
+
+### 5. 启动项目
+
+```bash
+# 终端1：后端
 cd backend
 pnpm run dev
 
-# 终端2：启动前端
+# 终端2：前端
 cd frontend
 pnpm run dev
 ```
 
-### 生产环境
+默认地址：
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:6660`
 
-#### 后端部署
+## 部署说明（修正版）
+
+### 后端部署
+
 ```bash
 cd backend
-# 使用 PM2 管理进程
-pnpm install -g pm2
+pnpm install --prod
+pnpm run start
+```
+
+建议使用 PM2 托管：
+
+```bash
+pnpm add -g pm2
 pm2 start app.js --name maruko-backend
+pm2 save
 ```
 
-#### 前端部署
+### 前端部署
+
 ```bash
 cd frontend
-# 构建
+pnpm install
 pnpm run build
-
-# 使用 nginx 或其他静态服务器托管 dist 目录
-# 或使用
-pnpm run preview
 ```
 
-#### Nginx 配置示例
+将构建产物 `frontend/dist` 部署到 Nginx 静态目录。
+
+### Nginx 参考配置
+
 ```nginx
 server {
     listen 80;
     server_name your-domain.com;
-    
-    # 前端静态文件
+
     location / {
-        root /path/to/maruko-wiki/frontend/dist;
+        root /var/www/maruko/frontend/dist;
         try_files $uri $uri/ /index.html;
     }
-    
-    # 后端 API 代理
+
     location /api {
         proxy_pass http://127.0.0.1:6660;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 ```
 
-## 功能模块
-
-### 用户权限
-| 权限等级 | 说明 |
-|---------|------|
-| 1 | 管理员 - 拥有所有权限 |
-| 2 | 编辑 - 可上传和管理内容 |
-| 3 | 普通用户 - 可浏览和上传 |
-
-### 文件上传
-- **图片**: 支持 jpg、png、gif 格式
-- **音频**: 支持 mp3、wav、ogg 格式
-- **文档**: 支持 doc、docx 格式
-
 ## 常见问题
 
-### 1. 原生模块编译失败
-```bash
-# 清除缓存重新安装
-pnpm store prune
-rm -rf node_modules
-pnpm install
-```
+### 1) 原生模块安装失败（better-sqlite3 / bcrypt）
+- Windows 需安装 Python 与 C++ Build Tools。
+- 建议删除 `node_modules` 后重新安装。
 
-### 2. Redis 连接失败
-确保 Redis 服务已启动：
-```bash
-# Windows
-redis-server.exe
+### 2) Redis 连接失败
+- 检查 Redis 服务是否启动，配置是否正确。
 
-# Linux/macOS
-redis-server
-```
-
-### 3. 数据库初始化
-如果数据库文件不存在，可以手动创建：
-```bash
-sqlite3 data/maruko-sql.db < sql.sql
-```
-
-## 贡献指南
-
-欢迎为小猫丸子 Wiki 贡献代码！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
+### 3) 页面显示空数据
+- 当前仓库可能已清空业务数据，属正常现象；可通过后台创建或导入数据库数据。
 
 ## 许可证
 
-本项目采用 BSD 3-Clause 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 致谢
-
-- 感谢所有为项目贡献代码的开发者
-- 感谢 [猫丸子 Maruko](https://space.bilibili.com/3546938511198692) 带来的欢乐
-
----
-
-Made with love for 猫丸子 Maruko
+BSD 3-Clause，详见 `LICENSE`。

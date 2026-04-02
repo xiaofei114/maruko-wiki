@@ -1,38 +1,38 @@
-httpPort: 6660 # http服务端口
-domainName: # 允许的域名
+httpPort: 6660
+domainName:
   - http://localhost:6660
   - http://localhost:5173
-token: maruko # token密钥
-log: # 日志级别
-  cmd: info # 命令行日志级别
-  file: all # 文件日志级别
-redis: # redis配置
-  host: localhost # redis地址
-  port: 6379 # redis端口
-  password: null # redis密码
-email: # 邮件配置
-  host: smtp.qq.com # 邮件服务器地址
-  port: 587 # 邮件服务器端口
-  secure: false # 邮件服务器是否使用SSL加密
-  auth: # 邮件服务器是否需要身份验证 
+token: maruko
+log:
+  cmd: info
+  file: all
+redis:
+  host: localhost
+  port: 6379
+  password: null
+email:
+  host: smtp.qq.com
+  port: 587
+  secure: false
+  auth:
     user: # 请填写您的邮箱
     pass: # 请填写您的邮箱密码
-  from: 用户名 <请填写您的邮箱地址> # 发件人信息
+  from: 用户名 <请填写您的邮箱地址>
   subject: # 邮件标题
-bilibili: # bilibili配置
-  roomId: 1929354869 # 直播间ID
-  userId: 3546938511198692 # 用户ID
-  ttl: 60 # 直播间信息缓存时间（秒）
-deepseek: # deepseek配置
-  apiKey: null # deepseek API密钥
-ai: # AI配置
-  limits: # 请求限制
-    authenticated: 100 # 已登录用户每日使用次数
-    guest: 5 # 未登录用户每日使用次数
+bilibili:
+  roomId: 1929354869
+  userId: 3546938511198692
+  ttl: 60
+deepseek:
+  apiKey: null
+ai:
+  limits:
+    authenticated: 100  # 已登录用户每日使用次数
+    guest: 5           # 未登录用户每日使用次数
   security:
-    maxRequestsPerMinute: 10 # 每分钟最大请求次数（IP级别）
-    maxRequestsPerHour: 50 # 每小时最大请求次数（IP级别）
-    suspiciousThreshold: 20 # 可疑行为阈值（连续失败次数）
-    blockDuration: 3600 # 封禁时长（秒）
-download: # 下载配置
-  audio: 200 # 音频下载限额（MB）
+    maxRequestsPerMinute: 10  # 每分钟最大请求次数（IP级别）
+    maxRequestsPerHour: 50    # 每小时最大请求次数（IP级别）
+    suspiciousThreshold: 20   # 可疑行为阈值（连续失败次数）
+    blockDuration: 3600       # 封禁时长（秒）
+download: 
+  audio: 200

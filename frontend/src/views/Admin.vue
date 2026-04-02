@@ -3,7 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause } from '@element-plus/icons-vue'
+import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause, Document } from '@element-plus/icons-vue'
+import DocxPreview from '@/components/DocxPreview.vue'
 import {
     getAudioCategories,
     reviewAudio,
@@ -41,6 +42,14 @@ const selectedAudio = ref(null)
 const selectedAlbum = ref(null)
 const selectedUser = ref(null)
 const planDocuments = ref([])
+const selectedPlanDocument = ref(null)
+const planPreviewError = ref('')
+const planPreviewRenderKey = ref(0)
+const planPreviewBaseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660'
+const selectedPlanPreviewUrl = computed(() => {
+    if (!selectedPlanDocument.value?.filePath) return ''
+    return `${planPreviewBaseUrl}/api/file/${selectedPlanDocument.value.filePath}`
+})
 
 // 编辑对话框
 const editCategoryDialog = ref(false)
@@ -311,6 +320,14 @@ const fetchPlanDocuments = async () => {
         const response = await getPlanDocuments()
         if (response.code === 200) {
             planDocuments.value = response.data || []
+            if (planDocuments.value.length === 0) {
+                selectedPlanDocument.value = null
+            } else if (selectedPlanDocument.value) {
+                const matched = planDocuments.value.find(item => item.id === selectedPlanDocument.value.id)
+                selectedPlanDocument.value = matched || planDocuments.value.find(item => item.isCurrent) || planDocuments.value[0]
+            } else {
+                selectedPlanDocument.value = planDocuments.value.find(item => item.isCurrent) || planDocuments.value[0]
+            }
         }
     } catch (error) {
         ElMessage.error('获取企划表列表失败')
@@ -1065,6 +1082,21 @@ const handleSetCurrentPlanDocument = async (document) => {
     }
 }
 
+const selectPlanDocument = (document) => {
+    selectedPlanDocument.value = document
+    selectedAudio.value = null
+    selectedAlbum.value = null
+    selectedUser.value = null
+    activeTab.value = 'plan-documents'
+    planPreviewError.value = ''
+    planPreviewRenderKey.value += 1
+}
+
+const onPlanPreviewError = (payload) => {
+    const detail = payload?.message ? `（${payload.message}）` : ''
+    planPreviewError.value = `当前文档暂不支持在线预览，请下载后查看${detail}`
+}
+
 // 筛选和分页方法
 const resetAudioFilters = () => {
     audioFilters.value = {
@@ -1289,7 +1321,13 @@ onMounted(() => {
                                 </el-empty>
                             </div>
                             <div v-else class="plan-document-list">
-                                <div v-for="document in planDocuments" :key="document.id" class="plan-document-item">
+                                <div
+                                    v-for="document in planDocuments"
+                                    :key="document.id"
+                                    class="plan-document-item"
+                                    :class="{ 'plan-document-selected': selectedPlanDocument?.id === document.id }"
+                                    @click="selectPlanDocument(document)"
+                                >
                                     <div class="plan-document-info">
                                         <span class="plan-document-title">{{ document.title }}</span>
                                         <span class="plan-document-meta">{{ document.fileName }}</span>
@@ -1297,19 +1335,19 @@ onMounted(() => {
                                         <el-tag v-if="document.isCurrent" type="success" size="small">当前文档</el-tag>
                                     </div>
                                     <div class="plan-document-actions">
-                                        <el-button 
-                                            v-if="!document.isCurrent" 
-                                            size="small" 
-                                            @click.stop="handleSetCurrentPlanDocument(document)" 
-                                            type="success" 
+                                        <el-button
+                                            v-if="!document.isCurrent"
+                                            size="small"
+                                            @click.stop="handleSetCurrentPlanDocument(document)"
+                                            type="success"
                                             plain
                                         >
                                             设置为当前
                                         </el-button>
-                                        <el-button 
-                                            size="small" 
-                                            @click.stop="handleDeletePlanDocument(document)" 
-                                            type="danger" 
+                                        <el-button
+                                            size="small"
+                                            @click.stop="handleDeletePlanDocument(document)"
+                                            type="danger"
                                             plain
                                         >
                                             <el-icon>
@@ -1447,11 +1485,17 @@ onMounted(() => {
                             {{ selectedAlbum.name }} - 照片列表
                             <span class="album-meta">({{ formatTime(selectedAlbum.create_time) }})</span>
                         </h3>
-                        <h3 v-else-if="selectedUser">
+                        <h3 v-else-if="selectedUser && activeTab === 'users'">
                             <el-icon>
                                 <User />
                             </el-icon>
                             {{ selectedUser.name }} - 用户详情
+                        </h3>
+                        <h3 v-else-if="selectedPlanDocument && activeTab === 'plan-documents'">
+                            <el-icon>
+                                <Document />
+                            </el-icon>
+                            {{ selectedPlanDocument.title }} - 实时预览
                         </h3>
                         <p v-else class="no-selection">请从左侧选择要查看的内容</p>
                     </div>
@@ -1624,7 +1668,7 @@ onMounted(() => {
                         </div>
 
                         <!-- 用户详情 -->
-                        <div v-else-if="selectedUser" class="user-detail">
+                        <div v-else-if="selectedUser && activeTab === 'users'" class="user-detail">
                             <el-card>
                                 <template #header>
                                     <div class="user-header">
@@ -1671,6 +1715,24 @@ onMounted(() => {
                                     </div>
                                 </template>
                             </el-card>
+                        </div>
+
+                        <!-- 企划表预览 -->
+                        <div v-else-if="selectedPlanDocument && activeTab === 'plan-documents'" class="plan-preview-right-panel">
+                            <div class="plan-preview-header">
+                                <h3>实时预览</h3>
+                                <span>{{ selectedPlanDocument.fileName }}</span>
+                            </div>
+                            <div class="plan-preview-body">
+                                <el-empty v-if="planPreviewError" :description="planPreviewError" :image-size="80" />
+                                <docx-preview
+                                    v-else
+                                    :key="`admin-right-${planPreviewRenderKey}`"
+                                    :src="selectedPlanPreviewUrl"
+                                    style="height: 100%"
+                                    @error="onPlanPreviewError"
+                                />
+                            </div>
                         </div>
 
                         <!-- 未选择内容 -->
@@ -2600,8 +2662,12 @@ onMounted(() => {
 }
 
 /* 企划表管理样式 */
+
 .plan-document-list {
     padding: 10px 0;
+    border: 1px solid #f0f2f5;
+    border-radius: 12px;
+    background: #fff;
 }
 
 .plan-document-item {
@@ -2615,6 +2681,11 @@ onMounted(() => {
 
 .plan-document-item:hover {
     background-color: #f5f7fa;
+}
+
+.plan-document-item.plan-document-selected {
+    background: #ecf5ff;
+    border-left: 4px solid #409eff;
 }
 
 .plan-document-info {
@@ -2638,6 +2709,40 @@ onMounted(() => {
 .plan-document-actions {
     display: flex;
     gap: 8px;
+}
+
+.plan-preview-right-panel {
+    border: 1px solid #ebeef5;
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+    height: 100%;
+}
+
+.plan-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #f0f2f5;
+    background: #fafcff;
+}
+
+.plan-preview-header h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #303133;
+}
+
+.plan-preview-header span {
+    font-size: 12px;
+    color: #606266;
+}
+
+.plan-preview-body {
+    height: 480px;
+    padding: 10px;
 }
 
 .user-detail :deep(.el-card) {
@@ -2765,6 +2870,10 @@ onMounted(() => {
 
 /* 响应式按钮 */
 @media (max-width: 768px) {
+
+    .plan-preview-body {
+        height: 360px;
+    }
 
     .review-buttons,
     .action-buttons {

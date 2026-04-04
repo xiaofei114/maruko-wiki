@@ -70,3 +70,15 @@ announcement:
   is_deleted: 软删除标记：0-未删除，1-已删除
   create_time: 创建时间
   update_time: 更新时间
+
+# 企划文档
+plan_document:
+  id: 主键
+  title: 文档标题
+  file_path: 文件存储路径
+  file_name: 原始文件名
+  upload_time: 上传时间（Unix时间戳）
+  uploader_id: 上传者ID（外键）
+  is_current: 是否为当前显示文档：0-否，1-是
+  create_time: 创建时间
+  update_time: 更新时间

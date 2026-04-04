@@ -10,6 +10,8 @@ import userRoutes from '../routes/user.js';
 import bilibiliRoutes from '../routes/bilibili.js';
 import aiRoutes from '../routes/ai.js';
 import announcementRoutes from '../routes/announcement.js';
+import planDocumentRoutes from '../routes/planDocument.js';
+import chalk from 'chalk';
 
 export default async () => {
     const appConfig = read_json("configs", "config")
@@ -26,12 +28,13 @@ export default async () => {
     }));
     App.use(express.json());
     App.use(express.urlencoded({ extended: false }));
+    // 请求日志中间件
     App.use((req, res, next) => {
         const clientIp = req.headers["x-forwarded-for"] || req.ip;
         logger.info(`${req.method}://${clientIp}${req.url}`);
         // 只在未设置Content-Type时设置为text/plain，避免覆盖文件服务的MIME类型
         if (!res.get('Content-Type')) {
-            res.set("Content-Type", "text/plain");
+            res.set("Content-Type", "text/plain; charset=utf-8");
         }
         next();
     });
@@ -40,13 +43,13 @@ export default async () => {
     App.use('/api', audioRoutes);
     App.use('/api', albumRoutes);
     App.use('/api', announcementRoutes); // 公告相关路由
+    App.use('/api', planDocumentRoutes); // 企划文档相关路由
     App.use('/api/admin', adminRoutes);
     App.use('/api/super-admin', superAdminRoutes);
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由
     App.use('/api/ai', aiRoutes); // AI相关路由
-    App.use('/', userRoutes); // 用户相关路由（登录、注册等）
 
-    // 通过url获取/data/document下的文件
+    // 通过url获取/data/document下的文件 - 必须在用户路由之前
     App.get('/api/file/*', async (req, res) => {
         const filePath = req.params[0]; // 获取路径参数
         const result = await getFile(filePath, req, res);
@@ -59,6 +62,22 @@ export default async () => {
             });
         }
     });
+
+    // 兼容nginx代理后的请求（/api前缀被nginx去掉）
+    App.get('/file/*', async (req, res) => {
+        const filePath = req.params[0]; // 获取路径参数
+        const result = await getFile(filePath, req, res);
+
+        // 如果服务失败，返回错误信息
+        if (!result.success) {
+            return res.status(result.code).json({
+                code: result.code,
+                message: result.message
+            });
+        }
+    });
+
+    App.use('/', userRoutes); // 用户相关路由（登录、注册等）
 
 
     const PORT = appConfig.httpPort;

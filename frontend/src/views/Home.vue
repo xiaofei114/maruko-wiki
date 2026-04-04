@@ -807,6 +807,19 @@ onMounted(async () => {
             </div>
           </div>
 
+          <div class="module-card message-module" @click="goTo('/plan-document', true)" style="cursor: pointer;">
+            <div class="module-header">
+              <h2>丸子企划</h2>
+            </div>
+            <div class="module-body">
+              <div class="message-content">
+                <div class="message-placeholder">
+                  <p>绘出明日蓝图，邀你共同执笔未来</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="module-card photo-album-module" @click="goTo('/announcement', true)" style="cursor: pointer;">
             <div class="module-header">
               <h2>公告中心</h2>

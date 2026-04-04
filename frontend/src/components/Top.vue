@@ -22,6 +22,7 @@ const friendlyLinks = [
   { name: '龟按钮', url: 'https://kami.shanerubian.online/' },
   { name: '浣熊按钮', url: 'https://huanxiong.shanerubian.online/' },
   { name: '埋按钮', url: 'https://maibutton.yangdujun.top/' },
+  { name: '黛棠OI-WIKI', url: 'http://101.35.241.220/' },
 ]
 
 // 计算属性

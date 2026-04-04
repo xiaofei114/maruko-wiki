@@ -220,14 +220,14 @@ onMounted(() => {
     <div class="container">
       <section class="page-hero">
         <div class="hero-content">
-          <h1 class="hero-title">企划表</h1>
-          <p class="hero-subtitle">查看和管理企划文档，规划未来方向</p>
+          <h1 class="hero-title">丸子企划</h1>
+          <p class="hero-subtitle">绘出明日蓝图，邀你共同执笔未来</p>
         </div>
       </section>
 
-      <div class="controls-card">
+      <div class="controls-card" v-if="isAuthenticated">
         <div class="controls-main">
-          <el-button v-if="isAuthenticated" @click="openUploadDialog" type="primary" plain>
+          <el-button @click="openUploadDialog" type="primary" plain>
             <el-icon><UploadFilled /></el-icon>
             上传文档
           </el-button>
@@ -418,7 +418,7 @@ onMounted(() => {
 
 .hero-title {
   font-size: clamp(2rem, 5vw, 3rem);
-  color: #FF85A2;
+  color: #409eff;
   margin-bottom: 10px;
   font-weight: 700;
   font-family: 'Comic Sans MS', cursive;

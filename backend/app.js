@@ -9,7 +9,7 @@ import chalk from 'chalk';
     await import('./src/components/redis.js').then(module => module.default());
     await import('./src/components/email.js').then(module => module.default());
     await import('./src/components/http.js').then(module => module.default());
-    await import('./src/components/initialize.js').then(module => module.default()); //定时任务，可选
+    await import('./src/components/initialize.js').then(module => module.default());
     logger.info(chalk.white("———————起来干活惹喵———————"));
     logger.info(chalk.white("          ᜊ•͈⌔•͈ᜊ         "));
 })();

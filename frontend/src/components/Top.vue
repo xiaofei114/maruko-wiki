@@ -60,7 +60,7 @@ const navItems = computed(() => {
     { name: '首页', path: '/' },
     { name: '相簿', path: '/photo-album' },
     { name: '音声', path: '/audio' },
-    { name: '企划表', path: '/plan-document' },
+    { name: '企划', path: '/plan-document' },
     { name: '公告', path: '/announcement' },
   ]
 

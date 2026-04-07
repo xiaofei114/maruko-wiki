@@ -31,6 +31,7 @@ async function fetchAudioList() {
 
 // 播放状态
 const audio = ref(null) // HTMLAudioElement
+const audioPlayPromise = ref(null) // 追踪当前播放 Promise，用于取消
 const currentSectionIndex = ref(-1)
 const currentTrackIndex = ref(-1)
 const isPlaying = ref(false)
@@ -331,14 +332,14 @@ async function playCurrent() {
         if (!audioUnlocked.value) {
             unlockAudio()
         }
-        audio.value.play().then(() => {
+        audioPlayPromise.value = audio.value.play()
+        audioPlayPromise.value.then(() => {
             isPlaying.value = true
         }).catch((error) => {
-            console.error('播放失败:', error)
-            ElMessage.error('播放失败，请联系管理员')
-            // 如果播放失败，尝试解锁音频
-            if (!audioUnlocked.value) {
-                unlockAudio()
+            // 忽略 AbortError，只在非中止错误时提示
+            if (error.name !== 'AbortError') {
+                console.error('播放失败:', error)
+                ElMessage.error('播放失败，请联系管理员')
             }
             isPlaying.value = false
         })
@@ -399,6 +400,7 @@ function stopPlayback(resetModes = true, keepAiAutoPlay = false) {
         audio.value.currentTime = 0
         audio.value.loop = false
     }
+    audioPlayPromise.value = null
     isPlaying.value = false
 
     // 停止所有后台音频
@@ -909,7 +911,10 @@ function playAiAutoPlayCurrent() {
         audio.value.play().then(() => {
             isPlaying.value = true
         }).catch((error) => {
-            console.error('AI自动播放失败:', error)
+            // 忽略 AbortError
+            if (error.name !== 'AbortError') {
+                console.error('AI自动播放失败:', error)
+            }
             // 播放失败时继续下一个
             aiAutoPlayIndex.value++
             playAiAutoPlayCurrent()

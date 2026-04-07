@@ -82,6 +82,6 @@ export default async () => {
 
     const PORT = appConfig.httpPort;
     App.listen(PORT, () => {
-        logger.info(chalk.white('HTTP服务器启动成功: ' + chalk.blue(`http://localhost:${PORT}`)))
+        logger.info(chalk.white('HTTP服务启动成功: ' + chalk.blue(`http://localhost:${PORT}`)))
     });
 }

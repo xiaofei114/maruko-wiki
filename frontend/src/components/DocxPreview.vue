@@ -25,13 +25,13 @@ async function renderDocx() {
 
     loading.value = true
     containerRef.value.innerHTML = ''
-    
+
     const token = localStorage.getItem('maruko_token')
     const headers = {}
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
-    
+
     const response = await fetch(props.src, { headers })
     if (!response.ok) {
       throw new Error(`请求失败: ${response.status}`)
@@ -40,7 +40,9 @@ async function renderDocx() {
     const blob = await response.blob()
     await renderAsync(blob, containerRef.value, undefined, {
       useBase64URL: true,
-      inWrapper: true
+      inWrapper: true,
+      breakPages: true,
+      ignoreLastRenderedPageBreak: true
     })
   } catch (error) {
     const errorMsg = error?.message || ''
@@ -93,6 +95,13 @@ onMounted(() => {
   background: #fff;
 }
 
+@media (max-width: 768px) {
+  :deep(.docx-preview-container .docx-wrapper) {
+    padding: 0;
+    display: block;
+  }
+}
+
 .docx-loading {
   padding: 18px;
 }
@@ -123,6 +132,7 @@ onMounted(() => {
   from {
     background-position: 200% 0;
   }
+
   to {
     background-position: -200% 0;
   }

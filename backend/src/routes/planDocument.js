@@ -11,10 +11,10 @@ router.get('/plan-documents', ...createPublicRoute(getPlanDocuments));
 router.get('/plan-documents/current', ...createPublicRoute(getCurrentPlanDocument));
 
 router.post('/plan-documents', ...createAdminUploadRouteHandler({
-    destination: path.join(process.cwd(), 'data', 'document', 'plans'),
+    destination: path.join(process.cwd(), 'data', 'document', 'docs'),
     maxSize: 20 * 1024 * 1024,
     allowedTypes: ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-    allowedExtensions: ['.doc', '.docx', '.DOC', '.DOCX']
+    allowedExtensions: ['.docx', '.DOCX']
 }, 'document', async (req) => {
     const { title, is_current } = req.body;
     const file = req.file;

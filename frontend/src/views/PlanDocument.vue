@@ -84,12 +84,12 @@ async function handleUpload() {
       return
     }
 
-    const allowedTypes = ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-    const allowedExtensions = ['.doc', '.docx']
+    const allowedTypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    const allowedExtensions = ['.docx']
     const fileExtension = uploadForm.value.documentFile.name.split('.').pop().toLowerCase()
 
     if (!allowedTypes.includes(uploadForm.value.documentFile.type) && !allowedExtensions.includes('.' + fileExtension)) {
-      ElMessage.error('只支持Word文档格式（.doc, .docx）')
+      ElMessage.error('只支持 Word 格式（.docx）')
       return
     }
 
@@ -99,7 +99,7 @@ async function handleUpload() {
     formData.append('is_current', '1')
 
     const response = await uploadPlanDocument(formData)
-    if (response.code === 201) {
+    if (response.code === 200) {
       ElMessage.success('文档上传成功')
       uploadDialogVisible.value = false
       
@@ -338,7 +338,7 @@ onMounted(() => {
               :on-change="handleFileChange" 
               :auto-upload="false"
               :show-file-list="true" 
-              accept=".doc,.docx" 
+              accept=".docx" 
               action="" 
               drag 
               :limit="1"
@@ -353,7 +353,7 @@ onMounted(() => {
               </div>
               <template #tip>
                 <div class="el-upload__tip">
-                  只支持 Word 格式（.doc, .docx）
+                  只支持 Word 格式（.docx）
                 </div>
               </template>
             </el-upload>
@@ -514,7 +514,7 @@ onMounted(() => {
 }
 
 .document-card.selected-document {
-  border-color: #FF85A2;
+  border-color: #409eff;
   box-shadow: 0 0 0 1px rgba(255, 133, 162, 0.2), 0 12px 30px rgba(255, 133, 162, 0.18);
 }
 
@@ -608,7 +608,6 @@ onMounted(() => {
 }
 
 .preview-panel-body {
-  height: 420px;
   padding: 12px;
 }
 

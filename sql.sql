@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS plan_document (
     is_current INTEGER DEFAULT 0,           -- 是否为当前显示文档：0-否，1-是
     create_time INTEGER DEFAULT 0,          -- 记录创建时间
     update_time INTEGER DEFAULT 0,          -- 记录更新时间
+    deleted INTEGER DEFAULT 0,              -- 软删除标记：0-未删除，1-已删除
     FOREIGN KEY (uploader_id) REFERENCES user(id) ON DELETE CASCADE
 );
 

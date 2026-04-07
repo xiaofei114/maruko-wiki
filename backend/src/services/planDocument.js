@@ -29,7 +29,7 @@ export async function uploadPlanDocument(file, documentData, userId, permission,
     }
 
     const fileName = path.basename(file.path);
-    const filePath = path.join('plans', fileName).replace(/\\/g, '/');
+    const filePath = path.join('docs', fileName).replace(/\\/g, '/');
     const displayName = originalName || file.originalname;
 
     if (documentData.isCurrent) {
@@ -81,6 +81,7 @@ export async function getPlanDocuments() {
     const documents = queryAll(
       `SELECT id, title, file_name, file_path, upload_time, uploader_id, is_current
        FROM plan_document
+       WHERE deleted = 0
        ORDER BY upload_time DESC`
     );
 
@@ -110,7 +111,7 @@ export async function deletePlanDocument(documentId, userId, permission) {
     const document = queryOne(`
         SELECT id, title, file_path
         FROM plan_document
-        WHERE id = ?
+        WHERE id = ? AND deleted = 0
     `, [documentId]);
 
     if (!document) {
@@ -126,7 +127,11 @@ export async function deletePlanDocument(documentId, userId, permission) {
       fs.unlinkSync(filePath);
     }
 
-    const deleteResult = remove('DELETE FROM plan_document WHERE id = ?', [documentId]);
+    const currentTime = Math.floor(Date.now() / 1000);
+    const deleteResult = update(
+      'UPDATE plan_document SET deleted = 1, update_time = ? WHERE id = ?',
+      [currentTime, documentId]
+    );
 
     if (deleteResult.changes === 0) {
       return {
@@ -155,7 +160,7 @@ export async function deletePlanDocument(documentId, userId, permission) {
 export async function setCurrentPlanDocument(documentId, userId, permission) {
   try {
     const document = queryOne(
-      'SELECT id FROM plan_document WHERE id = ?',
+      'SELECT id FROM plan_document WHERE id = ? AND deleted = 0',
       [documentId]
     );
 
@@ -163,8 +168,8 @@ export async function setCurrentPlanDocument(documentId, userId, permission) {
       return { success: false, message: '文档不存在', code: 404 };
     }
 
-    update('UPDATE plan_document SET is_current = 0');
-    update('UPDATE plan_document SET is_current = 1 WHERE id = ?', [documentId]);
+    update('UPDATE plan_document SET is_current = 0 WHERE deleted = 0');
+    update('UPDATE plan_document SET is_current = 1 WHERE id = ? AND deleted = 0', [documentId]);
 
     return { success: true, message: '已设置为当前文档' };
   } catch (error) {
@@ -178,7 +183,7 @@ export async function getCurrentPlanDocument() {
     const document = queryOne(
       `SELECT id, title, file_name, file_path, upload_time, uploader_id, is_current
        FROM plan_document
-       WHERE is_current = 1
+       WHERE is_current = 1 AND deleted = 0
        LIMIT 1`
     );
 
@@ -215,6 +220,7 @@ export async function getPlanDocumentsForAdmin() {
               u.name as uploader_name
        FROM plan_document pd
        LEFT JOIN user u ON pd.uploader_id = u.id
+       WHERE pd.deleted = 0
        ORDER BY pd.upload_time DESC`
     );
 

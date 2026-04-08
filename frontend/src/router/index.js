@@ -15,48 +15,48 @@ const router = createRouter({
         },
         {
             path: '/',
-            component: () => import('../views/Start.vue'),
+            component: () => import('../views/Home.vue'),
             children: [
                 {
                     path: '',
                     name: 'home',
-                    component: () => import('../views/Home.vue'),
+                    component: () => import('../components/Home/index.vue'),
                 },
                 {
                     path: '/photo-album',
                     name: 'photo-album',
-                    component: () => import('../views/PhotoAlbum.vue'),
+                    component: () => import('../components/PhotoAlbum/index.vue'),
                 },
                 {
                     path: '/photo-album/:id',
                     name: 'photo-album-detail',
-                    component: () => import('../views/PhotoAlbumDetail.vue'),
+                    component: () => import('../components/PhotoAlbum/detail.vue'),
                 },
                 {
                     path: '/audio',
                     name: 'audio',
-                    component: () => import('../views/Audio.vue'),
+                    component: () => import('../components/Audio/index.vue'),
                 },
                 {
                     path: '/announcement',
                     name: 'announcement',
-                    component: () => import('../views/Announcement.vue'),
+                    component: () => import('../components/Announcement/index.vue'),
                 },
                 {
                     path: '/plan-document',
                     name: 'plan-document',
-                    component: () => import('../views/PlanDocument.vue'),
+                    component: () => import('../components/PlanDocument/index.vue'),
                 },
 
                 {
                     path: '/admin',
                     name: 'admin',
-                    component: () => import('../views/Admin.vue'),
+                    component: () => import('../components/Admin/index.vue'),
                 },
                 {
                     path: '/profile',
                     name: 'profile',
-                    component: () => import('../views/Profile.vue'),
+                    component: () => import('../components/User/Profile/index.vue'),
                 },
             ]
         },

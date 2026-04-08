@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { User, Lock, ArrowRight, ArrowLeft, Message } from '@element-plus/icons-vue'
 import { sendVerification, verifyCode, register } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
+import img from '@/assets/登录页背景图.jpg'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -232,8 +233,8 @@ const goBack = () => {
 </script>
 
 <template>
-  <div class="login-container">
-    <div class="login-box" :class="{ 'animate-in': true, 'hover': isHovered }" @mouseenter="isHovered = true"
+  <div class="login-container" :style="{ backgroundImage: `url(${img})` }">
+    <div class="login-box" :class="{ 'hover': isHovered }" @mouseenter="isHovered = true"
       @mouseleave="isHovered = false">
 
       <div class="back-button-container">
@@ -247,13 +248,12 @@ const goBack = () => {
 
       <div class="login-header">
         <h2>猫丸子Maruko</h2>
-        <p>{{ isLoginMode ? '欢迎回来！' : '加入我们吧！' }}</p>
+        <p>{{ isLoginMode ? '猫丸伴，欢迎回家！' : '是新的猫丸伴吗！？' }}</p>
       </div>
 
-      <div class="form-container" :class="{ 'flipped': !isLoginMode }"
-        :style="{ height: isLoginMode ? '160px' : '310px' }">
-        <div class="form-card">
-          <!-- 登录表单 -->
+      <div class="form-flipper" :class="{ 'flipped': !isLoginMode }" :style="{ height: isLoginMode ? '160px' : '310px' }">
+        <!-- 登录表单 -->
+        <div class="form-panel login-panel">
           <el-form class="login-form" ref="loginFormRef" :model="loginForm" :rules="loginRules">
             <el-form-item prop="email">
               <el-input v-model="loginForm.email" placeholder="请输入邮箱" :prefix-icon="Message" clearable />
@@ -269,14 +269,14 @@ const goBack = () => {
               </el-icon>
             </el-button>
           </el-form>
+        </div>
 
-          <!-- 注册表单 -->
+        <!-- 注册表单 -->
+        <div class="form-panel register-panel">
           <el-form class="register-form" ref="bindFormRef" :model="bindForm" :rules="bindRules">
-            <!-- 验证码输入框 -->
             <el-form-item prop="name">
               <el-input v-model="bindForm.name" placeholder="请输入用户名" :prefix-icon="User" clearable />
             </el-form-item>
-            <!-- 邮箱和验证码按钮行 -->
             <div class="email-row">
               <el-form-item prop="email" class="email-item">
                 <el-input v-model="bindForm.email" placeholder="请输入邮箱" :prefix-icon="Message" clearable />
@@ -286,12 +286,9 @@ const goBack = () => {
                 {{ codeButtonText }}
               </el-button>
             </div>
-
-            <!-- 验证码输入框 -->
             <el-form-item prop="verificationCode">
               <el-input v-model="bindForm.verificationCode" placeholder="请输入验证码" :prefix-icon="Lock" clearable />
             </el-form-item>
-
             <el-form-item prop="password">
               <el-input v-model="bindForm.password" type="password" placeholder="请输入密码" :prefix-icon="Lock"
                 show-password clearable />
@@ -328,7 +325,10 @@ const goBack = () => {
   align-items: center;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .login-container::before {
@@ -338,9 +338,9 @@ const goBack = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.3) 0%, transparent 50%);
+  background: radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.3) 0%, transparent 50%);
   animation: float 20s ease-in-out infinite;
 }
 
@@ -348,23 +348,26 @@ const goBack = () => {
   width: 100%;
   max-width: 420px;
   padding: 50px 40px;
-  background: rgba(255, 255, 255, 0.98);
+  background: rgba(255, 255, 255, 0.381);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1),
     0 0 0 1px rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(20px);
   position: relative;
   z-index: 1;
-  transform: translateY(30px) scale(0.95);
-  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translateY(30px);
+  opacity: 0;
+  animation: slideUp 0.6s ease forwards;
   border: 2px solid rgba(255, 255, 255, 0.2);
   margin: 20px;
   box-sizing: border-box;
 }
 
-.login-box.animate-in {
-  transform: translateY(0) scale(1);
-  opacity: 1;
+@keyframes slideUp {
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .login-box.hover {
@@ -379,10 +382,7 @@ const goBack = () => {
 
 .login-header h2 {
   font-size: 32px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-primary);
   margin: 0 0 12px 0;
   font-weight: 700;
   letter-spacing: 2px;
@@ -398,51 +398,43 @@ const goBack = () => {
   letter-spacing: 0.5px;
 }
 
-.form-container {
+/* 表单翻转容器 */
+.form-flipper {
   position: relative;
-  width: 100%;
-  /* min-height: 260px; */
+  height: 160px;
   perspective: 1000px;
-  -webkit-perspective: 1000px;
-  transition: all 0.3s ease;
+  transition: height 0.4s ease;
 }
 
-.form-card {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
-  transform-origin: center center;
-  -webkit-transform-origin: center center;
-  transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  -webkit-transition: -webkit-transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.form-container.flipped .form-card {
-  transform: rotateY(180deg);
-  -webkit-transform: rotateY(180deg);
-}
-
-.login-form,
-.register-form {
+.form-panel {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  -moz-backface-visibility: hidden;
-  -ms-backface-visibility: hidden;
+  transition: transform 0.6s ease;
   transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
-  transform-origin: center center;
-  -webkit-transform-origin: center center;
 }
 
-.register-form {
+.login-panel {
+  transform: rotateY(0deg);
+}
+
+.register-panel {
   transform: rotateY(180deg);
-  -webkit-transform: rotateY(180deg);
+}
+
+.form-flipper.flipped .login-panel {
+  transform: rotateY(-180deg);
+}
+
+.form-flipper.flipped .register-panel {
+  transform: rotateY(0deg);
+}
+
+.login-form,
+.register-form {
+  width: 100%;
 }
 
 /* 邮箱行布局 */
@@ -466,27 +458,27 @@ const goBack = () => {
 .mode-switch {
   text-align: center;
   padding-top: 20px;
-  border-top: 1px solid rgba(102, 126, 234, 0.1);
+  border-top: 1px solid var(--color-primary-alpha-10);
 }
 
 .switch-button {
   background: rgba(255, 255, 255, 0.8);
-  border: 2px solid rgba(102, 126, 234, 0.2);
-  color: #667eea;
+  border: 2px solid var(--color-primary-alpha-20);
+  color: var(--color-primary);
   font-size: 15px;
   padding: 12px 24px;
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   border-radius: 10px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 4px 12px var(--color-primary-alpha-10);
   font-weight: 500;
 }
 
 .switch-button:hover {
-  background: rgba(102, 126, 234, 0.1);
-  border-color: rgba(102, 126, 234, 0.3);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.2);
+  background: var(--color-primary-alpha-10);
+  border-color: var(--color-primary-alpha-30);
+  box-shadow: 0 6px 20px var(--color-primary-alpha-20);
 }
 
 .login-button,
@@ -498,7 +490,7 @@ const goBack = () => {
   justify-content: center;
   height: 40px;
   margin-top: 12px;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px var(--color-primary-alpha-30);
 }
 
 .back-button-container {
@@ -509,12 +501,12 @@ const goBack = () => {
 }
 
 .back-button {
-  color: #667eea;
+  color: var(--color-primary);
   font-weight: 500;
   transition: all 0.3s ease;
 }
 
 .back-button:hover {
-  color: #764ba2;
+  color: var(--color-primary-light);
 }
 </style>

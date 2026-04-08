@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause } from '@element-plus/icons-vue'
+import PageHero from '@/components/ComponentStyle/PageHero.vue'
 import {
     getAudioCategories,
     reviewAudio,
@@ -1068,12 +1069,10 @@ onMounted(() => {
     <div class="admin-page">
         <div class="content-wrapper">
             <!-- 页面头部 -->
-            <section class="page-hero">
-                <div class="hero-content">
-                    <h1 class="hero-title">管理后台</h1>
-                    <p class="hero-subtitle">守护方寸秩序，为你呈现此刻美好</p>
-                </div>
-            </section>
+            <PageHero 
+              title="管理后台" 
+              subtitle="守护方寸秩序，为你呈现此刻美好" 
+            />
 
             <!-- 统计卡片 -->
             <div class="stats-grid">
@@ -1603,107 +1602,19 @@ onMounted(() => {
 .content-wrapper {
     max-width: 1400px;
     margin: 0 auto;
-    margin-top: 20px;
-    padding: 0 20px;
+    padding: 20px;
 }
 
 /* 响应式内容包装器 */
 @media (max-width: 768px) {
     .content-wrapper {
-        margin-top: 16px;
-        padding: 0 16px;
+        padding: 15px;
     }
 }
 
 @media (max-width: 480px) {
     .content-wrapper {
-        margin-top: 12px;
-        padding: 0 12px;
-    }
-}
-
-/* 页面头部 */
-.page-hero {
-    text-align: center;
-    margin-bottom: 40px;
-    padding: 60px 20px;
-    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
-    border-radius: 20px;
-    box-shadow: 0 8px 25px rgba(64, 158, 255, 0.1);
-    position: relative;
-    overflow: hidden;
-}
-
-/* 响应式页面头部 */
-@media (max-width: 768px) {
-    .page-hero {
-        margin-bottom: 30px;
-        padding: 40px 20px;
-        border-radius: 16px;
-    }
-}
-
-@media (max-width: 480px) {
-    .page-hero {
-        margin-bottom: 20px;
-        padding: 30px 15px;
-        border-radius: 15px;
-    }
-}
-
-.page-hero::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(64, 158, 255, 0.05) 0%, transparent 70%);
-    animation: float 20s infinite linear;
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-}
-
-.hero-title {
-    font-size: clamp(2rem, 5vw, 3rem);
-    color: #409eff;
-    margin-bottom: 10px;
-    font-weight: 700;
-    font-family: 'Comic Sans MS', cursive;
-    text-shadow: 0 2px 10px rgba(64, 158, 255, 0.2);
-}
-
-.hero-subtitle {
-    font-size: 1.1rem;
-    color: #666;
-    max-width: 500px;
-    margin: 0 auto;
-}
-
-/* 响应式标题 */
-@media (max-width: 768px) {
-    .hero-title {
-        font-size: clamp(1.5rem, 6vw, 2.5rem);
-        margin-bottom: 8px;
-    }
-
-    .hero-subtitle {
-        font-size: 1rem;
-        max-width: 100%;
-    }
-}
-
-@media (max-width: 480px) {
-    .hero-title {
-        font-size: clamp(1.25rem, 7vw, 2rem);
-        margin-bottom: 6px;
-    }
-
-    .hero-subtitle {
-        font-size: 0.9rem;
+        padding: 12px;
     }
 }
 
@@ -1762,7 +1673,7 @@ onMounted(() => {
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #409eff 0%, #66b1ff 50%, #91d5ff 100%);
+    background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-light) 50%, var(--color-primary-lighter) 100%);
     opacity: 0;
     transition: opacity 0.3s ease;
 }
@@ -1781,7 +1692,7 @@ onMounted(() => {
 .stat-icon {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -1789,7 +1700,7 @@ onMounted(() => {
     color: white;
     font-size: 20px;
     flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+    box-shadow: 0 4px 12px var(--color-primary-alpha-30);
 }
 
 .stat-content {
@@ -1803,7 +1714,7 @@ onMounted(() => {
     color: #1a202c;
     margin-bottom: 4px;
     line-height: 1.2;
-    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -1953,13 +1864,13 @@ onMounted(() => {
 }
 
 .category-tabs :deep(.el-tabs__item:hover) {
-    color: #409eff;
+    color: var(--color-primary);
 }
 
 .category-tabs :deep(.el-tabs__item.is-active) {
-    color: #409eff;
+    color: var(--color-primary);
     font-weight: 600;
-    border-bottom: 2px solid #409eff;
+    border-bottom: 2px solid var(--color-primary);
     margin-bottom: -1px;
     position: relative;
 }
@@ -2053,8 +1964,8 @@ onMounted(() => {
 }
 
 .tag-item.active {
-    border-color: #409eff;
-    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-alpha-20);
 }
 
 .tag-info {
@@ -2220,7 +2131,7 @@ onMounted(() => {
 }
 
 .content-header h3 .el-icon {
-    color: #409eff;
+    color: var(--color-primary);
     font-size: 20px;
 }
 
@@ -2383,7 +2294,7 @@ onMounted(() => {
     content: '';
     width: 4px;
     height: 16px;
-    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
     border-radius: 2px;
 }
 
@@ -2686,17 +2597,17 @@ onMounted(() => {
 
 /* 图标样式 */
 .audio-icon {
-    color: #409eff;
+    color: var(--color-primary);
     font-size: 18px;
     margin-right: 12px;
-    filter: drop-shadow(0 2px 4px rgba(64, 158, 255, 0.2));
+    filter: drop-shadow(0 2px 4px var(--color-primary-alpha-20));
 }
 
 .album-icon {
-    color: #409eff;
+    color: var(--color-primary);
     font-size: 18px;
     margin-right: 12px;
-    filter: drop-shadow(0 2px 4px rgba(64, 158, 255, 0.2));
+    filter: drop-shadow(0 2px 4px var(--color-primary-alpha-20));
 }
 
 /* 响应式对话框 */
@@ -2726,17 +2637,5 @@ onMounted(() => {
     }
 }
 
-@keyframes float {
-    0% {
-        transform: translateY(0px) rotate(0deg);
-    }
-
-    50% {
-        transform: translateY(-20px) rotate(180deg);
-    }
-
-    100% {
-        transform: translateY(0px) rotate(360deg);
-    }
-}
+/* 响应式按钮 */
 </style>

@@ -602,7 +602,7 @@ onMounted(() => {
   width: 50px;
   height: 50px;
   border: 5px solid #f3f3f3;
-  border-top: 5px solid #409eff;
+  border-top: 5px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 20px;
@@ -689,7 +689,7 @@ onMounted(() => {
 }
 
 .header-icon {
-  color: #409eff;
+  color: var(--color-primary);
   font-size: 20px;
 }
 
@@ -716,7 +716,7 @@ onMounted(() => {
 
 .zoom-icon {
   font-size: 14px;
-  color: #409eff;
+  color: var(--color-primary);
 }
 
 /* 头像样式 */
@@ -727,7 +727,7 @@ onMounted(() => {
 
 .avatar-clickable:hover {
   transform: scale(1.05);
-  box-shadow: 0 0 10px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 0 10px var(--color-primary-alpha-50);
 }
 
 .avatar-hint {
@@ -771,7 +771,7 @@ onMounted(() => {
 }
 
 .avatar-uploader-trigger:hover {
-  border-color: #409eff;
+  border-color: var(--color-primary);
 }
 
 /* 名字编辑样式 */
@@ -782,7 +782,7 @@ onMounted(() => {
 }
 
 .user-name:hover {
-  color: #409eff;
+  color: var(--color-primary);
   text-decoration: underline;
 }
 

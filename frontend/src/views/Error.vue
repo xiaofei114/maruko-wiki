@@ -56,7 +56,11 @@ function goHome() {
 <style scoped>
 .error-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #b0e0e6 0%, #87ceeb 30%, #4682b4 70%, #1e90ff 100%);
+  background: linear-gradient(135deg,
+    var(--color-primary-alpha-30) 0%,
+    var(--color-primary-alpha-50) 30%,
+    var(--color-primary-dark) 70%,
+    var(--color-primary) 100%);
   position: relative;
   overflow: hidden;
   font-family: 'Comic Sans MS', 'Chalkduster', 'Bradley Hand', cursive, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -189,14 +193,14 @@ function goHome() {
 }
 
 .home-button {
-  background: linear-gradient(45deg, #0066cc, #0099ff);
+  background: linear-gradient(45deg, var(--color-primary-dark), var(--color-primary));
   color: white;
-  box-shadow: 0 4px 20px rgba(0, 102, 204, 0.3);
+  box-shadow: 0 4px 20px var(--color-primary-alpha-30);
 }
 
 .home-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 102, 204, 0.5);
+  box-shadow: 0 8px 30px var(--color-primary-alpha-50);
 }
 
 .back-button {

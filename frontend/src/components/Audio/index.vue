@@ -5,6 +5,7 @@ import { UploadFilled, Warning, VideoPlay, Download, TrendCharts } from '@elemen
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios, recordAudioPlay, getWeeklyPopularAudios, getTotalPopularAudios } from '@/api/audio'
+import PageHero from '@/components/ComponentStyle/PageHero.vue'
 
 // 音声数据
 const audioSections = ref([])
@@ -1149,12 +1150,7 @@ onBeforeUnmount(() => {
 <template>
     <div class="audio-page" @click="unlockAudio">
         <div class="container">
-            <section class="page-hero">
-                <div class="hero-content">
-                    <h1 class="hero-title">丸子音声</h1>
-                    <p class="hero-subtitle">聆听奇妙回响，与你分享此刻欢愉</p>
-                </div>
-            </section>
+            <PageHero title="丸子音声" subtitle="聆听奇妙回响，与你分享此刻欢愉" />
 
             <div class="controls-card">
                 <div class="controls-main">
@@ -1410,7 +1406,7 @@ onBeforeUnmount(() => {
     width: 50px;
     height: 50px;
     border: 5px solid #f3f3f3;
-    border-top: 5px solid #409eff;
+    border-top: 5px solid var(--color-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 20px;
@@ -1437,53 +1433,10 @@ onBeforeUnmount(() => {
     padding: 20px 20px 40px;
 }
 
-.page-hero {
-    text-align: center;
-    margin-bottom: 40px;
-    padding: 60px 20px;
-    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
-    border-radius: 20px;
-    box-shadow: 0 8px 25px rgba(64, 158, 255, 0.1);
-    position: relative;
-    overflow: hidden;
-}
-
-.page-hero::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(64, 158, 255, 0.05) 0%, transparent 70%);
-    animation: float 20s infinite linear;
-}
-
 .audio-tag {
     padding: 8px 12px;
     font-size: 14px;
     cursor: pointer;
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-}
-
-.hero-title {
-    font-size: clamp(2rem, 5vw, 3rem);
-    color: #409eff;
-    margin-bottom: 10px;
-    font-weight: 700;
-    font-family: 'Comic Sans MS', cursive;
-    text-shadow: 0 2px 10px rgba(64, 158, 255, 0.2);
-}
-
-.hero-subtitle {
-    font-size: 1.1rem;
-    color: #666;
-    max-width: 500px;
-    margin: 0 auto;
 }
 
 .header-card h1 {
@@ -1534,7 +1487,7 @@ onBeforeUnmount(() => {
 }
 
 .controls-status .now-playing i {
-    color: #409eff;
+    color: var(--color-primary);
 }
 
 
@@ -1715,7 +1668,7 @@ onBeforeUnmount(() => {
 }
 
 .hot-audio-count .el-icon {
-    color: #409eff;
+    color: var(--color-primary);
     font-size: 12px;
 }
 
@@ -1804,15 +1757,6 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
     .container {
         padding: 15px;
-    }
-
-    .page-hero {
-        padding: 40px 20px;
-        margin-bottom: 30px;
-    }
-
-    .hero-title {
-        font-size: 2.5rem;
     }
 
     .controls-card {
@@ -1909,7 +1853,7 @@ onBeforeUnmount(() => {
     padding: 16px;
     background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
     border-radius: 12px;
-    border-left: 4px solid #409eff;
+    border-left: 4px solid var(--color-primary);
 }
 
 .ai-match-intro p {

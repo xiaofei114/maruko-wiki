@@ -7,6 +7,7 @@ import { ElMessage } from 'element-plus'
 import { Picture, Loading, Warning } from '@element-plus/icons-vue'
 import { Plus } from '@element-plus/icons-vue'
 import { getAlbums, createAlbum } from '@/api/album'
+import PageHero from '@/components/ComponentStyle/PageHero.vue'
 import img from '@/assets/背景图.jpg'
 
 const router = useRouter()
@@ -141,12 +142,7 @@ onMounted(() => {
 <template>
   <div class="photo-album-page">
     <div class="content-wrapper">
-      <div class="page-hero">
-        <div class="hero-content">
-          <h1 class="hero-title">丸子相簿</h1>
-          <p class="hero-subtitle">记录精彩时刻，与你分享美好时光</p>
-        </div>
-      </div>
+      <PageHero title="丸子相簿" subtitle="记录精彩时刻，与你分享美好时光" />
       <div v-if="loading" class="loading-container">
         <div class="loading-spinner"></div>
         <p>正在加载相册...</p>
@@ -281,7 +277,7 @@ onMounted(() => {
   width: 50px;
   height: 50px;
   border: 5px solid #f3f3f3;
-  border-top: 5px solid #409eff;
+  border-top: 5px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 20px;
@@ -309,50 +305,6 @@ onMounted(() => {
   padding: 20px 20px 40px;
 }
 
-/* 页面头部 */
-.page-hero {
-  text-align: center;
-  margin-bottom: 40px;
-  padding: 60px 20px;
-  background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
-  border-radius: 20px;
-  box-shadow: 0 8px 25px rgba(64, 158, 255, 0.1);
-  position: relative;
-  overflow: hidden;
-}
-
-.page-hero::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(64, 158, 255, 0.05) 0%, transparent 70%);
-  animation: float 20s infinite linear;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-
-.hero-title {
-  font-size: clamp(2rem, 5vw, 3rem);
-  color: #409eff;
-  margin-bottom: 10px;
-  font-weight: 700;
-  font-family: 'Comic Sans MS', cursive;
-  text-shadow: 0 2px 10px rgba(64, 158, 255, 0.2);
-}
-
-.hero-subtitle {
-  font-size: 1.1rem;
-  color: #666;
-  max-width: 500px;
-  margin: 0 auto;
-}
-
 /* 相簿网格 */
 .album-grid {
   display: grid;
@@ -375,7 +327,7 @@ onMounted(() => {
 
 .album-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 30px rgba(64, 158, 255, 0.15);
+  box-shadow: 0 12px 30px var(--color-primary-alpha-15);
 }
 
 /* 新建相册卡片 */
@@ -385,9 +337,9 @@ onMounted(() => {
 }
 
 .create-card:hover {
-  border-color: #409eff;
-  background: #f0f8ff;
-  box-shadow: 0 12px 30px rgba(64, 158, 255, 0.1);
+  border-color: var(--color-primary);
+  background: var(--color-primary-alpha-10);
+  box-shadow: 0 12px 30px var(--color-primary-alpha-10);
 }
 
 .create-image {
@@ -406,7 +358,7 @@ onMounted(() => {
 }
 
 .create-card:hover .create-content {
-  color: #409eff;
+  color: var(--color-primary);
 }
 
 .create-icon {
@@ -459,8 +411,8 @@ onMounted(() => {
 
 .album-card:hover .card-overlay {
   background: linear-gradient(to top,
-      rgba(64, 158, 255, 0.8) 0%,
-      rgba(64, 158, 255, 0.4) 50%,
+      var(--color-primary-alpha-80) 0%,
+      var(--color-primary-alpha-40) 50%,
       transparent 100%);
 }
 
@@ -523,7 +475,7 @@ onMounted(() => {
 }
 
 .preview-header h2 i {
-  color: #409eff;
+  color: var(--color-primary);
 }
 
 /* 照片网格 */
@@ -626,36 +578,6 @@ onMounted(() => {
   color: #c0c4cc;
 }
 
-
-/* 动画 */
-@keyframes float {
-  0% {
-    transform: translateY(0px) rotate(0deg);
-  }
-
-  50% {
-    transform: translateY(-20px) rotate(180deg);
-  }
-
-  100% {
-    transform: translateY(0px) rotate(360deg);
-  }
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
   .album-grid {
@@ -677,7 +599,7 @@ onMounted(() => {
   }
 
   .content-wrapper {
-    padding: 0 15px 20px;
+    padding: 15px;
   }
 
   .preview-section {

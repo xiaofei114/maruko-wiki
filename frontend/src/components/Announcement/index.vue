@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { Bell, Clock, User, Star, Plus, Edit, Delete } from '@element-plus/icons-vue'
+import PageHero from '@/components/ComponentStyle/PageHero.vue'
 import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from '@/api/announcement.js'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
@@ -236,13 +237,10 @@ const handleDelete = (announcement) => {
 <template>
     <div class="announcement-page">
         <div class="content-wrapper">
-            <!-- 页面头部 -->
-            <div class="page-hero">
-                <div class="hero-content">
-                    <h1 class="hero-title">公告中心</h1>
-                    <p class="hero-subtitle">同步每份动态，与你共赴崭新旅程</p>
-                </div>
-            </div>
+            <PageHero 
+              title="公告中心" 
+              subtitle="同步每份动态，与你共赴崭新旅程" 
+            />
 
             <!-- 公告列表 -->
             <div class="announcement-section">
@@ -395,50 +393,6 @@ const handleDelete = (announcement) => {
     padding: 20px;
 }
 
-/* 页面头部 */
-.page-hero {
-    text-align: center;
-    margin-bottom: 40px;
-    padding: 60px 20px;
-    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
-    border-radius: 20px;
-    box-shadow: 0 8px 25px rgba(64, 158, 255, 0.1);
-    position: relative;
-    overflow: hidden;
-}
-
-.page-hero::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(64, 158, 255, 0.05) 0%, transparent 70%);
-    animation: float 20s infinite linear;
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-}
-
-.hero-title {
-    font-size: clamp(2rem, 5vw, 3rem);
-    color: #409eff;
-    margin-bottom: 10px;
-    font-weight: 700;
-    font-family: 'Comic Sans MS', cursive;
-    text-shadow: 0 2px 10px rgba(64, 158, 255, 0.2);
-}
-
-.hero-subtitle {
-    font-size: 1.1rem;
-    color: #666;
-    max-width: 500px;
-    margin: 0 auto;
-}
-
 /* 公告区域 */
 .announcement-section {
     background: white;
@@ -472,12 +426,12 @@ const handleDelete = (announcement) => {
     padding: 24px;
     transition: all 0.3s ease;
     position: relative;
-    -webkit-tap-highlight-color: rgba(64, 158, 255, 0.1);
+    -webkit-tap-highlight-color: var(--color-primary-alpha-10);
 }
 
 .announcement-card:hover {
-    border-color: #409eff;
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 12px var(--color-primary-alpha-10);
     transform: translateY(-2px);
 }
 
@@ -566,12 +520,12 @@ const handleDelete = (announcement) => {
 }
 
 .content-html h4 {
-    color: #409eff;
+    color: var(--color-primary);
     font-size: 16px;
     font-weight: 600;
     margin: 20px 0 12px 0;
     padding-bottom: 8px;
-    border-bottom: 2px solid #409eff;
+    border-bottom: 2px solid var(--color-primary);
 }
 
 .content-html strong {
@@ -598,7 +552,7 @@ const handleDelete = (announcement) => {
 
 .expand-btn,
 .collapse-btn {
-    color: #409eff;
+    color: var(--color-primary);
     font-size: 14px;
     padding: 4px 8px;
     border-radius: 4px;
@@ -607,8 +561,8 @@ const handleDelete = (announcement) => {
 
 .expand-btn:hover,
 .collapse-btn:hover {
-    background-color: rgba(64, 158, 255, 0.1);
-    color: #66b1ff;
+    background-color: var(--color-primary-alpha-10);
+    color: var(--color-primary-light);
 }
 
 /* 公告底部 */
@@ -642,6 +596,20 @@ const handleDelete = (announcement) => {
     padding: 60px 20px;
 }
 
+@keyframes float {
+    0% {
+        transform: translateY(0px) rotate(0deg);
+    }
+
+    50% {
+        transform: translateY(-20px) rotate(180deg);
+    }
+
+    100% {
+        transform: translateY(0px) rotate(360deg);
+    }
+}
+
 .empty-icon {
     color: #c0c4cc;
 }
@@ -664,19 +632,6 @@ const handleDelete = (announcement) => {
 @media (max-width: 768px) {
     .content-wrapper {
         padding: 15px;
-    }
-
-    .page-hero {
-        padding: 40px 20px;
-        margin-bottom: 30px;
-    }
-
-    .hero-title {
-        font-size: 2.2rem;
-    }
-
-    .hero-subtitle {
-        font-size: 1rem;
     }
 
     .announcement-section {
@@ -740,22 +695,6 @@ const handleDelete = (announcement) => {
 @media (max-width: 480px) {
     .content-wrapper {
         padding: 10px;
-    }
-
-    .page-hero {
-        padding: 30px 15px;
-        margin-bottom: 20px;
-        border-radius: 15px;
-    }
-
-    .hero-title {
-        font-size: 1.8rem;
-        margin-bottom: 8px;
-    }
-
-    .hero-subtitle {
-        font-size: 0.9rem;
-        max-width: 100%;
     }
 
     .announcement-section {
@@ -836,19 +775,6 @@ const handleDelete = (announcement) => {
 @media (max-width: 375px) {
     .content-wrapper {
         padding: 8px;
-    }
-
-    .page-hero {
-        padding: 25px 12px;
-        margin-bottom: 15px;
-    }
-
-    .hero-title {
-        font-size: 1.6rem;
-    }
-
-    .hero-subtitle {
-        font-size: 0.85rem;
     }
 
     .announcement-section {

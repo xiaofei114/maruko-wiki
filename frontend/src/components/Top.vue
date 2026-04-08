@@ -346,7 +346,7 @@ const openLink = (url) => {
 .top-bar {
   width: 100%;
   height: 60px;
-  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
@@ -357,6 +357,12 @@ const openLink = (url) => {
 .login {
   width: 75px;
   height: 35px;
+  background-color: #ffffffa5;
+  transition: all 0.3s ease;
+}
+
+.login:hover {
+  background-color: #ffffff4e;
 }
 
 .container {
@@ -437,7 +443,7 @@ const openLink = (url) => {
 }
 
 :deep(.el-menu--horizontal>.el-menu-item.is-active) {
-  border-bottom: 2px solid #3040e7;
+  border-bottom: 2px solid var(--color-primary);
 }
 
 /* 移动端显示品牌图标，隐藏文字 */
@@ -820,7 +826,7 @@ const openLink = (url) => {
   justify-content: space-between;
   align-items: center;
   padding: 3px 24px;
-  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
   color: white;
   height: 60px;
 }

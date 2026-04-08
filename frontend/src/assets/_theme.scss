@@ -1,0 +1,17 @@
+// ========================================
+// 主题配置 - 修改这里即可更换全站主题色
+// ========================================
+
+// 💡 主色调 - 只需要修改这一个值！
+$theme-color: #409EFF;
+
+// ========================================
+// 自动生成的颜色变体
+// ========================================
+
+@use 'sass:color';
+
+$primary: $theme-color;
+$primary-light: color.adjust($theme-color, $lightness: 10%);
+$primary-lighter: color.adjust($theme-color, $lightness: 20%);
+$primary-dark: color.adjust($theme-color, $lightness: -10%);

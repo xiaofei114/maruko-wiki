@@ -5,7 +5,8 @@ import { UploadFilled, Warning, Document, Delete, Download } from '@element-plus
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { getPlanDocuments, uploadPlanDocument, deletePlanDocument, setCurrentPlanDocument } from '@/api/planDocument'
-import DocxPreview from '@/components/DocxPreview.vue'
+import PageHero from '@/components/ComponentStyle/PageHero.vue'
+import DocxPreview from '@/components/ComponentStyle/DocxPreview.vue'
 
 const userStore = useUserStore()
 const { isAuthenticated } = storeToRefs(userStore)
@@ -218,12 +219,7 @@ onMounted(() => {
 <template>
   <div class="plan-document-page">
     <div class="container">
-      <section class="page-hero">
-        <div class="hero-content">
-          <h1 class="hero-title">丸子企划</h1>
-          <p class="hero-subtitle">绘出明日蓝图，邀你共同执笔未来</p>
-        </div>
-      </section>
+      <PageHero title="丸子企划" subtitle="绘出明日蓝图，邀你共同执笔未来" />
 
       <div class="controls-card" v-if="isAuthenticated">
         <div class="controls-main">
@@ -384,52 +380,9 @@ onMounted(() => {
 }
 
 .container {
-  max-width: 1600px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px 20px 40px;
-}
-
-.page-hero {
-  text-align: center;
-  margin-bottom: 40px;
-  padding: 60px 20px;
-  background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
-  border-radius: 20px;
-  box-shadow: 0 8px 25px rgba(64, 158, 255, 0.1);
-  position: relative;
-  overflow: hidden;
-}
-
-.page-hero::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(64, 158, 255, 0.05) 0%, transparent 70%);
-  animation: float 20s infinite linear;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-
-.hero-title {
-  font-size: clamp(2rem, 5vw, 3rem);
-  color: #409eff;
-  margin-bottom: 10px;
-  font-weight: 700;
-  font-family: 'Comic Sans MS', cursive;
-  text-shadow: 0 2px 10px rgba(255, 133, 162, 0.2);
-}
-
-.hero-subtitle {
-  font-size: 1.1rem;
-  color: #666;
-  max-width: 500px;
-  margin: 0 auto;
 }
 
 .controls-card {
@@ -465,7 +418,7 @@ onMounted(() => {
   width: 50px;
   height: 50px;
   border: 5px solid #f3f3f3;
-  border-top: 5px solid #FF85A2;
+  border-top: 5px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 20px;
@@ -505,7 +458,7 @@ onMounted(() => {
 
 .document-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 30px rgba(64, 158, 255, 0.15);
+  box-shadow: 0 12px 30px var(--color-primary-alpha-15);
 }
 
 .document-card.current-document {
@@ -514,8 +467,8 @@ onMounted(() => {
 }
 
 .document-card.selected-document {
-  border-color: #409eff;
-  box-shadow: 0 0 0 1px rgba(255, 133, 162, 0.2), 0 12px 30px rgba(255, 133, 162, 0.18);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary-alpha-20), 0 12px 30px var(--color-primary-alpha-18);
 }
 
 .card-header {
@@ -614,15 +567,6 @@ onMounted(() => {
 @media (max-width: 768px) {
   .container {
     padding: 15px;
-  }
-
-  .page-hero {
-    padding: 40px 20px;
-    margin-bottom: 30px;
-  }
-
-  .hero-title {
-    font-size: 2.2rem;
   }
 
   .controls-card {

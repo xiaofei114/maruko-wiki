@@ -578,8 +578,8 @@ onBeforeUnmount(() => {
 }
 
 .upload-card:hover {
-  border-color: #409eff;
-  background: #f0f8ff;
+  border-color: var(--color-primary);
+  background: var(--color-primary-alpha-10);
 }
 
 .upload-content {
@@ -589,7 +589,7 @@ onBeforeUnmount(() => {
 }
 
 .upload-card:hover .upload-content {
-  color: #409eff;
+  color: var(--color-primary);
 }
 
 .upload-icon {

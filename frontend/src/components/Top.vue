@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
@@ -12,6 +12,24 @@ const showDropdown = ref(false)
 const showMobileMenu = ref(false)
 const isSidebarClosing = ref(false)
 const sidebarTimer = ref(null)
+
+// 点击外部关闭下拉菜单
+const handleClickOutside = (e) => {
+  const userArea = document.querySelector('.user-area')
+  if (showDropdown.value && userArea && !userArea.contains(e.target)) {
+    showDropdown.value = false
+  }
+}
+
+// 链接到生命周期
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  cleanupTimer()
+})
 
 // 友情链接数据
 const friendlyLinks = [
@@ -177,10 +195,7 @@ const cleanupTimer = () => {
   }
 }
 
-// 组件卸载时清理定时器
-onUnmounted(() => {
-  cleanupTimer()
-})
+// 组件卸载时清理定时器（已合并到上面的 onUnmounted）
 
 // 点击品牌：桌面端导航，移动端打开菜单
 const onBrandClick = (e) => {

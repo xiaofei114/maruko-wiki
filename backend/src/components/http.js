@@ -11,6 +11,8 @@ import bilibiliRoutes from '../routes/bilibili.js';
 import aiRoutes from '../routes/ai.js';
 import announcementRoutes from '../routes/announcement.js';
 import planDocumentRoutes from '../routes/planDocument.js';
+import logsRoutes from '../routes/logs.js';
+import dictionaryRoutes from '../routes/dictionary.js';
 import chalk from 'chalk';
 
 export default async () => {
@@ -45,6 +47,8 @@ export default async () => {
     App.use('/api', announcementRoutes); // 公告相关路由
     App.use('/api', planDocumentRoutes); // 企划文档相关路由
     App.use('/api/admin', adminRoutes);
+    App.use('/api/admin', logsRoutes); // 日志查询路由
+    App.use('/api/admin', dictionaryRoutes); // 字典管理路由
     App.use('/api/super-admin', superAdminRoutes);
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由
     App.use('/api/ai', aiRoutes); // AI相关路由

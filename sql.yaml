@@ -82,3 +82,36 @@ plan_document:
   is_current: 是否为当前显示文档：0-否，1-是
   create_time: 创建时间
   update_time: 更新时间
+
+# 日志表
+logs:
+  id: 主键
+  log_type: 日志类型
+  log_name: 日志名称
+  log_content: 日志内容
+  log_return: 返回值
+  user_name: 用户名
+  user_ip: 用户IP
+  created_at: 创建时间
+
+# 字典类型表
+dictionary_type:
+  id: 主键
+  name: 类型名称
+  dict_type: 字典类型标识（唯一）
+  is_banned: 是否禁用
+  created_at: 创建时间
+  updated_at: 更新时间
+
+# 字典项表
+dictionary_item:
+  id: 主键
+  dict_type: 字典类型标识（外键关联 dictionary_type）
+  dict_label: 字典标签
+  dict_key: 字典键
+  dict_key2: 字典键2
+  sort: 排序
+  display_style: 显示样式
+  is_banned: 是否禁用
+  created_at: 创建时间
+  updated_at: 更新时间

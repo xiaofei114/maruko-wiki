@@ -23,14 +23,14 @@ import {
 const router = express.Router();
 
 // 音声管理
-router.get('/audios', ...createAdminRoute(getAudiosForAdmin, 2));
+router.get('/audios', ...createAdminRoute(getAudiosForAdmin, 2, { logName: '获取音声列表' }));
 
 router.post('/audios/:id/review', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
     is_review: { type: 'number', required: true, enum: [0, 1, 2] }
 }, async (req) => {
     return await reviewAudio(req.params.id, req.body.is_review, req.user.id);
-}, 2));
+}, 2, 500, { logName: '审核音声' }));
 
 router.put('/audios/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
@@ -65,13 +65,13 @@ router.put('/audios/:id', ...createAdminValidatedRouteHandler({
     if (finalClassificationId !== undefined) updateData.classification_id = finalClassificationId;
 
     return await updateAudio(req.params.id, updateData, req.user.id);
-}, 2));
+}, 2, 500, { logName: '更新音声' }));
 
 router.delete('/audios/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
     return await deleteAudio(req.params.id, req.user.id);
-}, 2));
+}, 2, 500, { logName: '删除音声' }));
 
 // 音声分类管理
 router.put('/audio-classifications/:id', ...createAdminValidatedRouteHandler({
@@ -79,23 +79,23 @@ router.put('/audio-classifications/:id', ...createAdminValidatedRouteHandler({
     name: { required: true, minLength: 1, maxLength: 50 }
 }, async (req) => {
     return await updateAudioClassification(req.params.id, { name: req.body.name }, req.user.id);
-}, 2));
+}, 2, 500, { logName: '更新音声分类' }));
 
 router.delete('/audio-classifications/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
     return await deleteAudioClassification(req.params.id, req.user.id);
-}, 2));
+}, 2, 500, { logName: '删除音声分类' }));
 
 // 相册管理
-router.get('/albums', ...createAdminRoute(getAlbumsForAdmin, 2));
+router.get('/albums', ...createAdminRoute(getAlbumsForAdmin, 2, { logName: '获取相册列表' }));
 
 router.post('/albums/:id/review', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
     is_review: { type: 'number', required: true, enum: [0, 1, 2] }
 }, async (req) => {
     return await reviewAlbum(req.params.id, req.body.is_review, req.user.id);
-}, 2));
+}, 2, 500, { logName: '审核相册' }));
 
 router.put('/albums/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
@@ -103,13 +103,13 @@ router.put('/albums/:id', ...createAdminValidatedRouteHandler({
     introduction: { required: false, maxLength: 500 }
 }, async (req) => {
     return await updateAlbum(req.params.id, req.body, req.user.id);
-}, 2));
+}, 2, 500, { logName: '更新相册' }));
 
 router.delete('/albums/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
     return await deleteAlbum(req.params.id, req.user.id);
-}, 2));
+}, 2, 500, { logName: '删除相册' }));
 
 // 照片管理
 router.post('/photos/:id/review', ...createAdminValidatedRouteHandler({
@@ -117,7 +117,7 @@ router.post('/photos/:id/review', ...createAdminValidatedRouteHandler({
     is_review: { type: 'number', required: true, enum: [0, 1, 2] }
 }, async (req) => {
     return await reviewPhoto(req.params.id, req.body.is_review, req.user.id);
-}, 2));
+}, 2, 500, { logName: '审核照片' }));
 
 router.put('/photos/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
@@ -157,12 +157,12 @@ router.put('/photos/:id', ...createAdminValidatedRouteHandler({
     if (finalAlbumId !== undefined) updateData.album_id = finalAlbumId;
 
     return await updatePhoto(req.params.id, updateData, req.user.id);
-}, 2));
+}, 2, 500, { logName: '更新照片' }));
 
 router.delete('/photos/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
     return await deletePhoto(req.params.id, req.user.id);
-}, 2));
+}, 2, 500, { logName: '删除照片' }));
 
 export default router;

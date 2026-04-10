@@ -4,6 +4,16 @@ import fs from 'fs';
 import { handleServiceResult, sendError } from './response.js';
 import { optionalAuth, authenticateToken, requirePermission } from './auth.js';
 import { validateId, validateRequired, validateEnum, validateRange, validateLength } from './validation.js';
+import { addLog } from '../services/logs.js';
+
+/**
+ * 从请求中获取客户端IP
+ * @param {object} req - Express请求对象
+ * @returns {string} 客户端IP
+ */
+function getClientIp(req) {
+    return req.headers["x-forwarded-for"] || req.ip || req.connection?.remoteAddress || '';
+}
 
 /**
  * 创建标准路由处理包装器
@@ -274,13 +284,39 @@ export function createCrudHandlers(options) {
  * 创建管理接口的路由处理包装器
  * @param {function} serviceFunction - 服务函数
  * @param {number} requiredPermission - 需要的权限级别
+ * @param {object} options - 额外选项
+ * @param {string} options.logName - 日志名称，如 "获取音声列表"
+ * @param {string} options.logType - 日志类型，默认为 "admin_operation"
  * @returns {Array} 中间件数组 [authenticateToken, requirePermission, handler]
  */
-export function createAdminRoute(serviceFunction, requiredPermission = 2) {
+export function createAdminRoute(serviceFunction, requiredPermission = 2, options = {}) {
+    const { logName = '', logType = 'admin_operation' } = options;
+
     return [
         authenticateToken,
         requirePermission(requiredPermission),
-        createRouteHandler(serviceFunction)
+        async (req, res) => {
+            try {
+                const result = await serviceFunction(req);
+
+                // 记录操作日志
+                if (logName) {
+                    addLog({
+                        logType,
+                        logName,
+                        logContent: `${req.method} ${req.originalUrl}`,
+                        userName: req.user?.name || '',
+                        userIp: getClientIp(req),
+                        logReturn: result
+                    });
+                }
+
+                return handleServiceResult(res, result);
+            } catch (error) {
+                logger.error('路由处理错误:', error);
+                return sendError(res, 500, '服务器内部错误');
+            }
+        }
     ];
 }
 
@@ -290,9 +326,14 @@ export function createAdminRoute(serviceFunction, requiredPermission = 2) {
  * @param {function} serviceFunction - 服务层函数
  * @param {number} requiredPermission - 需要的权限级别
  * @param {number} defaultErrorCode - 默认错误码
+ * @param {object} options - 额外选项
+ * @param {string} options.logName - 日志名称，如 "审核音声"
+ * @param {string} options.logType - 日志类型，默认为 "admin_operation"
  * @returns {function} Express中间件数组
  */
-export function createAdminValidatedRouteHandler(validations, serviceFunction, requiredPermission = 2, defaultErrorCode = 500) {
+export function createAdminValidatedRouteHandler(validations, serviceFunction, requiredPermission = 2, defaultErrorCode = 500, options = {}) {
+    const { logName = '', logType = 'admin_operation' } = options;
+
     return [
         authenticateToken,
         requirePermission(requiredPermission),
@@ -383,7 +424,28 @@ export function createAdminValidatedRouteHandler(validations, serviceFunction, r
 
             next();
         },
-        createRouteHandler(serviceFunction, defaultErrorCode)
+        async (req, res) => {
+            try {
+                const result = await serviceFunction(req);
+
+                // 记录操作日志
+                if (logName) {
+                    addLog({
+                        logType,
+                        logName,
+                        logContent: `${req.method} ${req.originalUrl}`,
+                        userName: req.user?.name || '',
+                        userIp: getClientIp(req),
+                        logReturn: result
+                    });
+                }
+
+                return handleServiceResult(res, result, defaultErrorCode);
+            } catch (error) {
+                logger.error('路由处理错误:', error);
+                return sendError(res, 500, '服务器内部错误');
+            }
+        }
     ];
 }
 

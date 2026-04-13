@@ -43,22 +43,18 @@ router.get('/dictionary/types', ...createAdminRoute(async (req) => {
  * - name: 类型名称
  * - dict_type: 类型标识
  */
-router.post('/dictionary/types', authenticateToken, requirePermission(2), async (req, res) => {
-    try {
-        const { typeId, name, dict_type } = req.body;
-
-        const result = await addOrUpdateType({
-            typeId: typeId ? parseInt(typeId) : undefined,
-            name,
-            dict_type
-        });
-
-        return handleServiceResult(res, result);
-    } catch (error) {
-        logger.error('创建/更新字典类型失败:', error);
-        return sendError(res, 500, '服务器内部错误');
-    }
-});
+router.post('/dictionary/types', ...createAdminValidatedRouteHandler({
+    name: { required: true, minLength: 1, maxLength: 50 },
+    dict_type: { required: true, minLength: 1, maxLength: 50 },
+    typeId: { required: false }
+}, async (req) => {
+    const { typeId, name, dict_type } = req.body;
+    return await addOrUpdateType({
+        typeId: typeId ? parseInt(typeId) : undefined,
+        name,
+        dict_type
+    });
+}, 2, 500, { logName: '创建/更新字典类型' }));
 
 /**
  * 删除字典类型
@@ -68,7 +64,7 @@ router.delete('/dictionary/types/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
     return await deleteType(req.params.id);
-}, 2));
+}, 2, 500, { logName: '删除字典类型' }));
 
 /**
  * 禁用/启用字典类型
@@ -76,22 +72,12 @@ router.delete('/dictionary/types/:id', ...createAdminValidatedRouteHandler({
  * Body参数:
  * - banned: 是否禁用 (true/false)
  */
-router.put('/dictionary/types/:id/ban', authenticateToken, requirePermission(2), async (req, res) => {
-    try {
-        const { banned } = req.body;
-        const id = parseInt(req.params.id);
-
-        if (!id || id <= 0) {
-            return sendError(res, 400, '无效的类型ID');
-        }
-
-        const result = await banType(id, banned);
-        return handleServiceResult(res, result);
-    } catch (error) {
-        logger.error('禁用/启用字典类型失败:', error);
-        return sendError(res, 500, '服务器内部错误');
-    }
-});
+router.put('/dictionary/types/:id/ban', ...createAdminValidatedRouteHandler({
+    id: { source: 'params', type: 'id', required: true },
+    banned: { type: 'boolean', required: true }
+}, async (req) => {
+    return await banType(req.params.id, req.body.banned);
+}, 2, 500, { logName: '禁用/启用字典类型' }));
 
 // ======================== 字典项接口 ========================
 
@@ -127,26 +113,26 @@ router.get('/dictionary/items', ...createAdminRoute(async (req) => {
  * - sort: 排序（可选）
  * - display_style: 显示样式（可选）
  */
-router.post('/dictionary/items', authenticateToken, requirePermission(2), async (req, res) => {
-    try {
-        const { itemId, dict_type, dict_label, dict_key, dict_key2, sort, display_style } = req.body;
-
-        const result = await addOrUpdateItem({
-            itemId: itemId ? parseInt(itemId) : undefined,
-            dict_type,
-            dict_label,
-            dict_key,
-            dict_key2,
-            sort: sort ? parseInt(sort) : undefined,
-            display_style
-        });
-
-        return handleServiceResult(res, result);
-    } catch (error) {
-        logger.error('创建/更新字典项失败:', error);
-        return sendError(res, 500, '服务器内部错误');
-    }
-});
+router.post('/dictionary/items', ...createAdminValidatedRouteHandler({
+    dict_type: { required: true, minLength: 1, maxLength: 50 },
+    dict_label: { required: true, minLength: 1, maxLength: 100 },
+    dict_key: { required: true },
+    dict_key2: { required: false },
+    sort: { required: false, type: 'number' },
+    display_style: { required: false },
+    itemId: { required: false }
+}, async (req) => {
+    const { itemId, dict_type, dict_label, dict_key, dict_key2, sort, display_style } = req.body;
+    return await addOrUpdateItem({
+        itemId: itemId ? parseInt(itemId) : undefined,
+        dict_type,
+        dict_label,
+        dict_key,
+        dict_key2,
+        sort: sort ? parseInt(sort) : undefined,
+        display_style
+    });
+}, 2, 500, { logName: '创建/更新字典项' }));
 
 /**
  * 删除字典项
@@ -156,7 +142,7 @@ router.delete('/dictionary/items/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
     return await deleteItem(req.params.id);
-}, 2));
+}, 2, 500, { logName: '删除字典项' }));
 
 /**
  * 禁用/启用字典项
@@ -164,21 +150,11 @@ router.delete('/dictionary/items/:id', ...createAdminValidatedRouteHandler({
  * Body参数:
  * - banned: 是否禁用 (true/false)
  */
-router.put('/dictionary/items/:id/ban', authenticateToken, requirePermission(2), async (req, res) => {
-    try {
-        const { banned } = req.body;
-        const id = parseInt(req.params.id);
-
-        if (!id || id <= 0) {
-            return sendError(res, 400, '无效的字典项ID');
-        }
-
-        const result = await banItem(id, banned);
-        return handleServiceResult(res, result);
-    } catch (error) {
-        logger.error('禁用/启用字典项失败:', error);
-        return sendError(res, 500, '服务器内部错误');
-    }
-});
+router.put('/dictionary/items/:id/ban', ...createAdminValidatedRouteHandler({
+    id: { source: 'params', type: 'id', required: true },
+    banned: { type: 'boolean', required: true }
+}, async (req) => {
+    return await banItem(req.params.id, req.body.banned);
+}, 2, 500, { logName: '禁用/启用字典项' }));
 
 export default router;

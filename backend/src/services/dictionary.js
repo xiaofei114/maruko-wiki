@@ -36,14 +36,15 @@ export async function getTypesPaged({ page = 1, pageSize = 10, includeBanned = f
         page = Math.max(1, parseInt(page)) || 1;
         pageSize = Math.max(1, parseInt(pageSize)) || 10;
 
-        // 获取总数
-        const countSql = `SELECT COUNT(*) as total FROM dictionary_type ${includeBanned ? '' : 'WHERE is_banned = 0'}`;
+        // 获取总数（排除软删除的记录）
+        const countSql = `SELECT COUNT(*) as total FROM dictionary_type WHERE is_deleted = 0 ${includeBanned ? '' : 'AND is_banned = 0'}`;
         const { total } = queryOne(countSql);
 
         // 获取分页数据
         const dataSql = `
            SELECT * FROM dictionary_type
-           ${includeBanned ? '' : 'WHERE is_banned = 0'}
+           WHERE is_deleted = 0
+           ${includeBanned ? '' : 'AND is_banned = 0'}
            ORDER BY id
            LIMIT ? OFFSET ?
        `;
@@ -90,10 +91,43 @@ export async function addType(typeData) {
     }
 
     try {
+        // 检查是否存在相同 dict_type 的记录（包括软删除的）
+        const existing = queryOne(
+            'SELECT id, is_deleted FROM dictionary_type WHERE dict_type = ?',
+            [dict_type]
+        );
+
+        if (existing) {
+            if (existing.is_deleted) {
+                // 如果已被软删除，则恢复并更新
+                const now = new Date().toISOString();
+                update(`
+                    UPDATE dictionary_type
+                    SET name = ?, is_deleted = 0, is_banned = 0, updated_at = ?
+                    WHERE id = ?
+                `, [name, now, existing.id]);
+
+                return {
+                    success: true,
+                    message: '字典类型已恢复并更新',
+                    data: { id: existing.id }
+                };
+            } else {
+                // 已存在且未删除，返回错误
+                return {
+                    success: false,
+                    message: '该字典类型标识已存在',
+                    code: 400
+                };
+            }
+        }
+
+        // 不存在，正常插入
+        const now = new Date().toISOString();
         const result = insert(`
-            INSERT INTO dictionary_type (name, dict_type)
-            VALUES (?, ?)
-        `, [name, dict_type]);
+            INSERT INTO dictionary_type (name, dict_type, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+        `, [name, dict_type, now, now]);
 
         return {
             success: true,
@@ -106,24 +140,39 @@ export async function addType(typeData) {
 }
 
 /**
- * 删除字典类型
+ * 删除字典类型（软删除，同时删除关联的字典项）
  * @param {number} typeId - 字典类型ID
  * @returns {object} 操作结果
  */
 export async function deleteType(typeId) {
     try {
-        const result = update(`
-            DELETE FROM dictionary_type
-            WHERE id = ?
-        `, [Number(typeId)]);
+        // 先获取该字典类型的 dict_type
+        const type = queryOne('SELECT dict_type FROM dictionary_type WHERE id = ? AND is_deleted = 0', [Number(typeId)]);
 
-        if (result.changes === 0) {
+        if (!type) {
             return {
                 success: false,
-                message: '未找到对应字典类型',
+                message: '未找到对应字典类型或已删除',
                 code: 404
             };
         }
+
+        const now = new Date().toISOString();
+
+        // 软删除字典类型
+        update(`
+            UPDATE dictionary_type
+            SET is_deleted = 1, updated_at = ?
+            WHERE id = ? AND is_deleted = 0
+        `, [now, Number(typeId)]);
+
+        // 同时软删除关联的字典项
+        update(`
+            UPDATE dictionary_item
+            SET is_deleted = 1, updated_at = ?
+            WHERE dict_type = ? AND is_deleted = 0
+        `, [now, type.dict_type]);
+
         return {
             success: true,
             message: '删除字典类型成功'
@@ -158,8 +207,8 @@ export async function updateType(data) {
     }
 
     try {
-        // 获取当前字典类型信息
-        const currentType = queryOne('SELECT dict_type FROM dictionary_type WHERE id = ?', [typeId]);
+        // 获取当前字典类型信息（只能更新未删除的）
+        const currentType = queryOne('SELECT dict_type FROM dictionary_type WHERE id = ? AND is_deleted = 0', [typeId]);
 
         if (!currentType) {
             return {
@@ -171,16 +220,25 @@ export async function updateType(data) {
 
         const oldDictType = currentType.dict_type;
 
-        // 更新字典类型表
+        // 更新字典类型表，添加 updated_at
         const setClause = fieldsToUpdate.map(f => `${f.key} = ?`).join(', ');
         const params = fieldsToUpdate.map(f => f.value);
+        params.push(new Date().toISOString());
         params.push(typeId);
 
-        update(`
+        const updateResult = update(`
             UPDATE dictionary_type
-            SET ${setClause}
-            WHERE id = ?
+            SET ${setClause}, updated_at = ?
+            WHERE id = ? AND is_deleted = 0
         `, params);
+
+        if (updateResult.changes === 0) {
+            return {
+                success: false,
+                message: '字典类型不存在或已被删除',
+                code: 404
+            };
+        }
 
         // 如果更新了dict_type，同步更新字典项
         if (dict_type && dict_type !== oldDictType) {
@@ -208,11 +266,19 @@ export async function updateType(data) {
  */
 export async function banType(typeId, banned = true) {
     try {
-        update(`
+        const result = update(`
             UPDATE dictionary_type
             SET is_banned = ?
-            WHERE id = ?
+            WHERE id = ? AND is_deleted = 0
         `, [banned ? 1 : 0, Number(typeId)]);
+
+        if (result.changes === 0) {
+            return {
+                success: false,
+                message: '字典类型不存在或已被删除',
+                code: 404
+            };
+        }
 
         return {
             success: true,
@@ -248,11 +314,12 @@ export async function getItemsPaged({ dictType, page = 1, pageSize = 10, include
         page = Math.max(1, parseInt(page)) || 1;
         pageSize = Math.max(1, parseInt(pageSize)) || 10;
 
-        // 获取总数
+        // 获取总数（排除软删除的记录）
         const countSql = `
             SELECT COUNT(*) as total
             FROM dictionary_item
             WHERE dict_type = ?
+            AND is_deleted = 0
             ${includeBanned ? '' : 'AND is_banned = 0'}
         `;
         const { total } = queryOne(countSql, [dictType]);
@@ -261,6 +328,7 @@ export async function getItemsPaged({ dictType, page = 1, pageSize = 10, include
         const dataSql = `
             SELECT * FROM dictionary_item
             WHERE dict_type = ?
+            AND is_deleted = 0
             ${includeBanned ? '' : 'AND is_banned = 0'}
             ORDER BY sort ASC, id DESC
             LIMIT ? OFFSET ?
@@ -312,17 +380,52 @@ export async function addItem(itemData) {
     }
 
     try {
+        // 检查是否存在相同 (dict_type, dict_key) 的记录（包括软删除的）
+        const existing = queryOne(
+            'SELECT id, is_deleted FROM dictionary_item WHERE dict_type = ? AND dict_key = ?',
+            [dict_type, dict_key]
+        );
+
+        if (existing) {
+            if (existing.is_deleted) {
+                // 如果已被软删除，则恢复并更新
+                const now = new Date().toISOString();
+                update(`
+                    UPDATE dictionary_item
+                    SET dict_label = ?, dict_key2 = ?, sort = ?, display_style = ?, is_deleted = 0, is_banned = 0, updated_at = ?
+                    WHERE id = ?
+                `, [dict_label, dict_key2 || null, sort || 0, display_style || null, now, existing.id]);
+
+                return {
+                    success: true,
+                    message: '字典项已恢复并更新',
+                    data: { id: existing.id }
+                };
+            } else {
+                // 已存在且未删除，返回错误
+                return {
+                    success: false,
+                    message: '该字典类型下的字典键已存在',
+                    code: 400
+                };
+            }
+        }
+
+        // 不存在，正常插入
+        const now = new Date().toISOString();
         const result = insert(`
             INSERT INTO dictionary_item
-            (dict_type, dict_label, dict_key, dict_key2, sort, display_style)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (dict_type, dict_label, dict_key, dict_key2, sort, display_style, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             dict_type,
             dict_label,
             dict_key,
             dict_key2 || null,
             sort || 0,
-            display_style || null
+            display_style || null,
+            now,
+            now
         ]);
 
         return {
@@ -336,21 +439,22 @@ export async function addItem(itemData) {
 }
 
 /**
- * 删除字典项
+ * 删除字典项（软删除）
  * @param {number} itemId - 字典项ID
  * @returns {object} 操作结果
  */
 export async function deleteItem(itemId) {
     try {
         const result = update(`
-            DELETE FROM dictionary_item
-            WHERE id = ?
-        `, [Number(itemId)]);
+            UPDATE dictionary_item
+            SET is_deleted = 1, updated_at = ?
+            WHERE id = ? AND is_deleted = 0
+        `, [new Date().toISOString(), Number(itemId)]);
 
         if (result.changes === 0) {
             return {
                 success: false,
-                message: '未找到对应字典项',
+                message: '未找到对应字典项或已删除',
                 code: 404
             };
         }
@@ -396,13 +500,22 @@ export async function updateItem(data) {
     try {
         const setClause = fieldsToUpdate.map(f => `${f.key} = ?`).join(', ');
         const params = fieldsToUpdate.map(f => f.value);
+        params.push(new Date().toISOString());
         params.push(itemId);
 
-        update(`
+        const result = update(`
             UPDATE dictionary_item
-            SET ${setClause}
-            WHERE id = ?
+            SET ${setClause}, updated_at = ?
+            WHERE id = ? AND is_deleted = 0
         `, params);
+
+        if (result.changes === 0) {
+            return {
+                success: false,
+                message: '字典项不存在或已被删除',
+                code: 404
+            };
+        }
 
         return {
             success: true,
@@ -421,11 +534,19 @@ export async function updateItem(data) {
  */
 export async function banItem(itemId, banned = true) {
     try {
-        update(`
+        const result = update(`
             UPDATE dictionary_item
             SET is_banned = ?
-            WHERE id = ?
+            WHERE id = ? AND is_deleted = 0
         `, [banned ? 1 : 0, Number(itemId)]);
+
+        if (result.changes === 0) {
+            return {
+                success: false,
+                message: '字典项不存在或已被删除',
+                code: 404
+            };
+        }
 
         return {
             success: true,

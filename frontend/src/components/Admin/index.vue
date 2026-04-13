@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause } from '@element-plus/icons-vue'
+import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause, ArrowRight } from '@element-plus/icons-vue'
 import PageHero from '@/components/ComponentStyle/PageHero.vue'
 import {
     getAudioCategories,
@@ -326,6 +326,15 @@ const getPermissionType = (permission) => {
     return types[permission] || 'info'
 }
 
+// 前往新版管理后台
+const goToNewAdmin = () => {
+    const token = userStore.token
+    if (token) {
+        window.open(`${import.meta.env.VITE_APP_ADMIN_URL}/?token=${token}`, '_blank')
+    } else {
+        window.open('/admin/', '_blank')
+    }
+}
 
 const getStatusLabel = (isBanned) => {
     return isBanned === 0 ? '正常' : '禁用'
@@ -1069,10 +1078,19 @@ onMounted(() => {
     <div class="admin-page">
         <div class="content-wrapper">
             <!-- 页面头部 -->
-            <PageHero 
-              title="管理后台" 
-              subtitle="守护方寸秩序，为你呈现此刻美好" 
+            <PageHero
+              title="管理后台"
+              subtitle="守护方寸秩序，为你呈现此刻美好"
             />
+
+            <!-- TODO 还没做好，不急着上 -->
+            <!-- 前往新版管理后台 -->
+            <!-- <div class="new-admin-entry">
+              <el-button type="success" plain @click="goToNewAdmin">
+                前往新版管理后台
+                <el-icon style="margin-left: 6px"><ArrowRight /></el-icon>
+              </el-button>
+            </div> -->
 
             <!-- 统计卡片 -->
             <div class="stats-grid">
@@ -1619,6 +1637,10 @@ onMounted(() => {
 }
 
 /* 统计卡片 */
+.new-admin-entry {
+    margin-bottom: 30px;
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

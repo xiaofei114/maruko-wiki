@@ -59,7 +59,7 @@ router.post('/admin/announcements', ...createAdminRoute(async (req) => {
         isPinned,
         category
     }, req.user.id);
-}, 2));
+}, 2, { logName: '创建公告' }));
 
 /**
  * 更新公告（管理员）
@@ -97,7 +97,7 @@ router.put('/admin/announcements/:id', ...createAdminRoute(async (req) => {
         isPinned,
         category
     }, req.user.id);
-}, 2));
+}, 2, { logName: '更新公告' }));
 
 /**
  * 删除公告（管理员，软删除）
@@ -115,6 +115,6 @@ router.delete('/admin/announcements/:id', ...createAdminRoute(async (req) => {
     }
     
     return await deleteAnnouncement(id, req.user.id);
-}, 2));
+}, 2, { logName: '删除公告' }));
 
 export default router;

@@ -7,20 +7,21 @@ import { queryOne, queryAll } from '../method/database.js';
 /**
  * 添加操作日志
  * @param {object} params - 日志参数
- * @param {string} params.logType - 日志类型
+ * @param {string} params.logType - 日志类型（HTTP方法）
  * @param {string} params.logName - 日志名称
- * @param {string} params.logContent - 日志内容
+ * @param {string} params.logContent - 日志内容（请求URL）
+ * @param {string} params.requestParams - 请求参数JSON
  * @param {string} params.userName - 用户名
  * @param {string} params.userIp - 用户IP
  * @param {any} params.logReturn - 返回值
  */
-export function addLog({ logType, logName, logContent, userName, userIp, logReturn }) {
+export function addLog({ logType, logName, logContent, requestParams, userName, userIp, logReturn }) {
     try {
         const stmt = global.db.prepare(`
-            INSERT INTO logs (log_type, log_name, log_content, log_return, user_name, user_ip)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO logs (log_type, log_name, log_content, request_params, log_return, user_name, user_ip)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
-        stmt.run(logType, logName, logContent, logReturn ? JSON.stringify(logReturn) : '', userName || '', userIp || '');
+        stmt.run(logType, logName, logContent, requestParams || '', logReturn ? JSON.stringify(logReturn) : '', userName || '', userIp || '');
     } catch (error) {
         logger.error('记录日志失败:', error);
     }
@@ -57,6 +58,7 @@ export async function getQueryLogs({ page = 1, pageSize = 10, showUserIp = false
             'log_return',
             'user_name',
             'created_at',
+            'request_params',
             ...(showUserIp === true || showUserIp === 'true' ? ['user_ip'] : [])
         ];
 

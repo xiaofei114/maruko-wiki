@@ -7,12 +7,24 @@ import { validateId, validateRequired, validateEnum, validateRange, validateLeng
 import { addLog } from '../services/logs.js';
 
 /**
- * 从请求中获取客户端IP
+ * 从请求中获取客户端真实IP
  * @param {object} req - Express请求对象
  * @returns {string} 客户端IP
  */
 function getClientIp(req) {
-    return req.headers["x-forwarded-for"] || req.ip || req.connection?.remoteAddress || '';
+    // x-forwarded-for 格式: client, proxy1, proxy2, ...
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    if (xForwardedFor) {
+        const ips = xForwardedFor.split(',').map(ip => ip.trim());
+        return ips[0] || '';
+    }
+
+    // x-real-ip 常用作反向代理设置的头部
+    if (req.headers["x-real-ip"]) {
+        return req.headers["x-real-ip"];
+    }
+
+    return req.ip || req.connection?.remoteAddress || '';
 }
 
 /**
@@ -292,7 +304,7 @@ export function createCrudHandlers(options) {
 export function createAdminRoute(serviceFunction, requiredPermission = 2, options = {}) {
     const { logName = '', logType = 'admin_operation' } = options;
 
-    return [
+        return [
         authenticateToken,
         requirePermission(requiredPermission),
         async (req, res) => {
@@ -302,9 +314,10 @@ export function createAdminRoute(serviceFunction, requiredPermission = 2, option
                 // 记录操作日志
                 if (logName) {
                     addLog({
-                        logType,
+                        logType: req.method,
                         logName,
-                        logContent: `${req.method} ${req.originalUrl}`,
+                        logContent: req.originalUrl,
+                        requestParams: JSON.stringify({ body: req.body, query: req.query, params: req.params }),
                         userName: req.user?.name || '',
                         userIp: getClientIp(req),
                         logReturn: result
@@ -431,9 +444,10 @@ export function createAdminValidatedRouteHandler(validations, serviceFunction, r
                 // 记录操作日志
                 if (logName) {
                     addLog({
-                        logType,
+                        logType: req.method,
                         logName,
-                        logContent: `${req.method} ${req.originalUrl}`,
+                        logContent: req.originalUrl,
+                        requestParams: JSON.stringify({ body: req.body, query: req.query, params: req.params }),
                         userName: req.user?.name || '',
                         userIp: getClientIp(req),
                         logReturn: result

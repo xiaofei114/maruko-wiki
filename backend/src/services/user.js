@@ -140,7 +140,7 @@ export async function login(accountNumber, password, token) {
 
     try {
         // 查找用户
-        const user = queryOne('SELECT * FROM user WHERE account_number = ?', [accountNumber]);
+        const user = queryOne('SELECT * FROM user WHERE account_number = ? AND is_deleted = 0', [accountNumber]);
         if (!user) {
             return createErrorResponse('账号或密码错误', 401);
         }
@@ -230,33 +230,35 @@ export async function register(username, password, email, verificationCode) {
         return createErrorResponse('验证码验证失败: ' + codeResult.message, 400);
     }
 
-    try {
-        // 检查用户名是否已存在
-        if (exists('user', { name: username })) {
-            return createErrorResponse('用户名已存在', 400);
+        try {
+            // 检查用户名是否已存在（排除软删除）
+            const usernameExists = queryOne('SELECT 1 FROM user WHERE name = ? AND is_deleted = 0 LIMIT 1', [username]);
+            if (usernameExists) {
+                return createErrorResponse('用户名已存在', 400);
+            }
+
+            // 检查邮箱是否已被注册（排除软删除）
+            const emailExists = queryOne('SELECT 1 FROM user WHERE account_number = ? AND is_deleted = 0 LIMIT 1', [email]);
+            if (emailExists) {
+                return createErrorResponse('该邮箱已被注册', 400);
+            }
+
+            // 密码加密
+            const hashedPassword = await hashPassword(password);
+
+            // 创建用户记录
+            const result = insert(`
+                INSERT INTO user (name, account_number, password, permission, is_banned, create_time, update_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [username, email, hashedPassword, PERMISSIONS.USER, 0, getCurrentTimestamp(), getCurrentTimestamp()]);
+
+            logger.info(`新用户注册成功: ${username} (${email})`);
+            return createSuccessResponse('注册成功', { userId: result.lastInsertRowid });
+
+        } catch (error) {
+            logger.error('注册失败:', error);
+            return createErrorResponse('注册失败，请稍后重试', 500);
         }
-
-        // 检查邮箱是否已被注册
-        if (exists('user', { account_number: email })) {
-            return createErrorResponse('该邮箱已被注册', 400);
-        }
-
-        // 密码加密
-        const hashedPassword = await hashPassword(password);
-
-        // 创建用户记录
-        const result = insert(`
-            INSERT INTO user (name, account_number, password, permission, is_banned, create_time, update_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [username, email, hashedPassword, PERMISSIONS.USER, 0, getCurrentTimestamp(), getCurrentTimestamp()]);
-
-        logger.info(`新用户注册成功: ${username} (${email})`);
-        return createSuccessResponse('注册成功', { userId: result.lastInsertRowid });
-
-    } catch (error) {
-        logger.error('注册失败:', error);
-        return createErrorResponse('注册失败，请稍后重试', 500);
-    }
 }
 
 /**
@@ -274,29 +276,64 @@ function generateRandomPassword(length = 8) {
 }
 
 /**
- * 获取所有用户列表 - 超级管理员专用
- * @returns {object} 用户列表
- */
-/**
  * 获取用户列表 - 超级管理员专用
+ * @param {object} params - 查询参数（可选）
+ * @param {number} params.page - 页码，默认1
+ * @param {number} params.pageSize - 每页数量，默认null（返回全部）
+ * @param {string} params.sortBy - 排序字段，默认 'permission'（可选值：permission, create_time）
+ * @param {string} params.sortOrder - 排序方向，默认 'asc'（可选值：asc, desc）
  * @returns {object} 用户列表结果
  */
-export async function getUsers() {
+export async function getUsers(params = {}) {
     try {
-        const users = queryAll(`
-            SELECT
-                id,
-                name,
-                account_number,
-                permission,
-                is_banned,
-                create_time
-            FROM user
-            ORDER BY create_time DESC
-        `);
+        const { page = 1, pageSize = null, sortBy = 'permission', sortOrder = 'asc' } = params;
 
-        logger.info(`获取用户列表: ${users.length}个用户`);
-        return createSuccessResponse('获取用户列表成功', users);
+        // 验证排序参数
+        const validSortFields = ['permission', 'create_time'];
+        const validSortOrders = ['asc', 'desc'];
+        const finalSortBy = validSortFields.includes(sortBy) ? sortBy : 'permission';
+        const finalSortOrder = validSortOrders.includes(sortOrder?.toLowerCase()) ? sortOrder.toLowerCase() : 'asc';
+
+        // 获取总数
+        const { total } = queryOne('SELECT COUNT(*) as total FROM user WHERE is_deleted = 0');
+
+        // 如果没有分页参数，返回全部用户
+        if (!pageSize) {
+            const users = queryAll(`
+                SELECT id, name, account_number, permission, is_banned, create_time
+                FROM user
+                WHERE is_deleted = 0
+                ORDER BY ${finalSortBy} ${finalSortOrder}, create_time ${finalSortOrder}
+            `);
+            return createSuccessResponse('获取用户列表成功', users);
+        }
+
+        // 分页参数处理
+        const pageNum = Math.max(1, parseInt(page)) || 1;
+        const size = Math.max(1, parseInt(pageSize)) || 10;
+        const offset = (pageNum - 1) * size;
+        const totalPages = Math.ceil(total / size);
+
+        // 分页查询
+        const users = queryAll(`
+            SELECT id, name, account_number, permission, is_banned, create_time
+            FROM user
+            WHERE is_deleted = 0
+            ORDER BY ${finalSortBy} ${finalSortOrder}, create_time ${finalSortOrder}
+            LIMIT ? OFFSET ?
+        `, [size, offset]);
+
+        return createSuccessResponse('获取用户列表成功', {
+            pagination: {
+                total,
+                totalPages,
+                currentPage: pageNum,
+                pageSize: size,
+                hasNext: pageNum < totalPages,
+                hasPrev: pageNum > 1
+            },
+            data: users
+        });
 
     } catch (error) {
         logger.error('获取用户列表失败:', error);
@@ -507,7 +544,7 @@ export async function resetUserPassword(userId, adminId) {
 }
 
 /**
- * 删除用户 - 超级管理员专用（彻底删除）
+ * 删除用户 - 超级管理员专用（软删除）
  * @param {number} userId - 用户ID
  * @param {number} adminId - 操作管理员ID
  * @returns {object} 操作结果
@@ -515,11 +552,11 @@ export async function resetUserPassword(userId, adminId) {
 export async function deleteUser(userId, adminId) {
     try {
         // 检查用户是否存在
-        const user = queryOne('SELECT id, name FROM user WHERE id = ?', [userId]);
+        const user = queryOne('SELECT id, name FROM user WHERE id = ? AND is_deleted = 0', [userId]);
         if (!user) {
             return {
                 success: false,
-                message: '用户不存在',
+                message: '用户不存在或已删除',
                 code: 404
             };
         }
@@ -533,26 +570,27 @@ export async function deleteUser(userId, adminId) {
             };
         }
 
-        // 开始事务，确保数据一致性
+        const currentTime = getCurrentTimestamp();
+
+        // 开始事务，软删除用户相关的所有数据
         const db = global.db;
         db.exec('BEGIN TRANSACTION');
 
         try {
-            // 删除用户相关的所有数据
-            // 删除用户的音频
-            db.prepare('DELETE FROM audio WHERE user_id = ?').run(userId);
-            // 删除用户的音频分类
-            db.prepare('DELETE FROM audio_classification WHERE user_id = ?').run(userId);
-            // 删除用户的相册
-            db.prepare('DELETE FROM photo_album WHERE user_id = ?').run(userId);
-            // 删除用户的照片
-            db.prepare('DELETE FROM photo WHERE user_id = ?').run(userId);
-            // 最后删除用户
-            db.prepare('DELETE FROM user WHERE id = ?').run(userId);
+            // 软删除用户的音频
+            db.prepare('UPDATE audio SET is_deleted = 1, update_time = ? WHERE user_id = ? AND is_deleted = 0').run(currentTime, userId);
+            // 软删除用户的音频分类
+            db.prepare('UPDATE audio_classification SET is_deleted = 1, update_time = ? WHERE user_id = ? AND is_deleted = 0').run(currentTime, userId);
+            // 软删除用户的相册
+            db.prepare('UPDATE photo_album SET is_deleted = 1, update_time = ? WHERE user_id = ? AND is_deleted = 0').run(currentTime, userId);
+            // 软删除用户的照片
+            db.prepare('UPDATE photo SET is_deleted = 1, update_time = ? WHERE user_id = ? AND is_deleted = 0').run(currentTime, userId);
+            // 最后软删除用户
+            db.prepare('UPDATE user SET is_deleted = 1, update_time = ? WHERE id = ? AND is_deleted = 0').run(currentTime, userId);
 
             db.exec('COMMIT');
 
-            logger.info(`彻底删除用户成功: ${user.name}(${userId}) by admin ${adminId}`);
+            logger.info(`软删除用户成功: ${user.name}(${userId}) by admin ${adminId}`);
 
             return {
                 success: true,

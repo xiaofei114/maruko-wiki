@@ -139,7 +139,7 @@ export function getUserInfo(userId) {
     return queryOne(`
         SELECT id, name, account_number, permission, is_banned, create_time
         FROM user
-        WHERE id = ?
+        WHERE id = ? AND is_deleted = 0
     `, [userId]);
 }
 

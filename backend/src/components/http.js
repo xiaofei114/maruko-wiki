@@ -20,6 +20,9 @@ export default async () => {
 
     const App = express();
 
+    // 信任代理，以便正确获取客户端真实IP
+    App.set('trust proxy', true);
+
     App.use(cors({
         origin: (origin, callback) => {
             const domainName = appConfig.domainName; //允许的域名

@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { createPublicRoute, createAdminUploadRouteHandler, createAdminRoute, createRouteHandler } from '../method/route-helpers.js';
-import { authenticateToken } from '../method/auth.js';
+import { createPublicRoute, createAdminUploadRouteHandler, createAdminRoute, createAdminValidatedRouteHandler } from '../method/route-helpers.js';
 import { uploadPlanDocument, getPlanDocuments, deletePlanDocument, setCurrentPlanDocument, getCurrentPlanDocument, getPlanDocumentsForAdmin } from '../services/planDocument.js';
 
 const router = express.Router();
@@ -33,34 +32,20 @@ router.post('/plan-documents', ...createAdminUploadRouteHandler({
     return result;
 }));
 
-router.delete('/plan-documents/:id', authenticateToken, createRouteHandler(async (req) => {
+router.delete('/plan-documents/:id', ...createAdminValidatedRouteHandler({
+    id: { source: 'params', type: 'id', required: true }
+}, async (req) => {
     const documentId = parseInt(req.params.id);
-    
-    if (!documentId || documentId <= 0) {
-        return {
-            success: false,
-            message: '无效的文档ID',
-            code: 400
-        };
-    }
-    
     return await deletePlanDocument(documentId, req.user.id, req.user.permission);
-}));
+}, 2, 500, { logName: '删除企划文档' }));
 
-router.put('/plan-documents/:id/current', authenticateToken, createRouteHandler(async (req) => {
+router.put('/plan-documents/:id/current', ...createAdminValidatedRouteHandler({
+    id: { source: 'params', type: 'id', required: true }
+}, async (req) => {
     const documentId = parseInt(req.params.id);
-    
-    if (!documentId || documentId <= 0) {
-        return {
-            success: false,
-            message: '无效的文档ID',
-            code: 400
-        };
-    }
-    
     return await setCurrentPlanDocument(documentId, req.user.id, req.user.permission);
-}));
+}, 2, 500, { logName: '设置当前企划文档' }));
 
-router.get('/admin/plan-documents', ...createAdminRoute(getPlanDocumentsForAdmin));
+router.get('/admin/plan-documents', ...createAdminRoute(getPlanDocumentsForAdmin, 2, { logName: '获取企划文档列表' }));
 
 export default router;

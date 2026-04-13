@@ -1,0 +1,46 @@
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
+import { useRouter, useRoute } from 'vue-router'
+
+export const useUserStore = defineStore('user', () => {
+    const token = ref(localStorage.getItem("maruko_token") || null)
+    const user = ref(null)
+    const permission = ref(null)
+    const router = useRouter()
+
+    const loginIn = (newToken, newUser,newPermission) => {
+        // 先保存原始 token 到 localStorage
+        localStorage.setItem("maruko_token", newToken)
+        // 设置带 Bearer 前缀的 token
+        token.value = newToken
+        user.value = newUser
+        permission.value = newPermission
+    }
+
+    const loginOut = () => {
+        token.value = null
+        localStorage.removeItem("maruko_token")
+        user.value = null
+        router.push('/')
+    }
+
+    //是否已登录
+    const isAuthenticated = computed(() => {
+        return !!token.value && !!user.value
+    })
+
+    //是否是管理员（权限 >= 2）
+    const isAdmin = computed(() => {
+        return permission.value <= 2
+    })
+
+    return {
+        token,
+        user,
+        permission,
+        loginIn,
+        loginOut,
+        isAuthenticated,
+        isAdmin,
+    }
+})

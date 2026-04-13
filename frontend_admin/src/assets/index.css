@@ -1,0 +1,34 @@
+* {
+    -webkit-user-select: none; /* Safari 3.1+ */
+    -moz-user-select: none;    /* Firefox */
+    -ms-user-select: none;     /* IE 10+ */
+    user-select: none;         /* 标准语法 */
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+body::-webkit-scrollbar {
+  width: 0;
+}
+
+img {
+  -webkit-user-drag: none;
+}
+
+a {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  text-decoration: none;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}

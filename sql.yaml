@@ -6,43 +6,48 @@ user:
   password: 密码哈希
   permission: 权限 (1:超级管理员, 2:管理员, 3:普通用户)
   is_banned: 是否封禁
+  is_deleted: 是否删除
   create_time: 创建时间
   update_time: 更新时间
+
 # 相册
 photo_album:
   id: 主键
-  user_id: 创建标签的用户id（外键）
-  name: 标签名
+  user_id: 创建相册的用户id（外键）
+  name: 相册名
   introduction: 简介
   is_deleted: 是否删除
   is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
   create_time: 创建时间
   update_time: 更新时间
+
 # 照片
 photo:
   id: 主键
   album_id: 相册id（外键）
-  user_id: 创建标签的用户id（外键）
+  user_id: 上传照片的用户id（外键）
   name: 照片名
   url: 照片url
   is_deleted: 是否删除
   is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
   create_time: 创建时间
   update_time: 更新时间
+
 # 音声分类
 audio_classification:
   id: 主键
-  user_id: 创建标签的用户id（外键）
+  user_id: 创建分类的用户id（外键）
   name: 分类名
   is_deleted: 是否删除
   is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
   create_time: 创建时间
   update_time: 更新时间
+
 # 音声
 audio:
   id: 主键
   classification_id: 音声分类id（外键）
-  user_id: 创建标签的用户id（外键）
+  user_id: 上传音声的用户id（外键）
   name: 音声名
   url: 音声url
   is_deleted: 是否删除
@@ -50,6 +55,7 @@ audio:
   play_count: 播放次数
   create_time: 创建时间
   update_time: 更新时间
+
 # 直播时长
 live_duration:
   id: 主键
@@ -58,6 +64,7 @@ live_duration:
   title: 标题
   create_time: 创建时间
   update_time: 更新时间
+
 # 公告
 announcement:
   id: 主键
@@ -80,6 +87,7 @@ plan_document:
   upload_time: 上传时间（Unix时间戳）
   uploader_id: 上传者ID（外键）
   is_current: 是否为当前显示文档：0-否，1-是
+  is_deleted: 软删除标记：0-未删除，1-已删除
   create_time: 创建时间
   update_time: 更新时间
 
@@ -90,6 +98,7 @@ logs:
   log_name: 日志名称
   log_content: 日志内容
   log_return: 返回值
+  request_params: 请求参数JSON
   user_name: 用户名
   user_ip: 用户IP
   created_at: 创建时间
@@ -100,18 +109,20 @@ dictionary_type:
   name: 类型名称
   dict_type: 字典类型标识（唯一）
   is_banned: 是否禁用
+  is_deleted: 是否删除
   created_at: 创建时间
   updated_at: 更新时间
 
 # 字典项表
 dictionary_item:
   id: 主键
-  dict_type: 字典类型标识（外键关联 dictionary_type）
+  dict_type: 字典类型标识（外键）
   dict_label: 字典标签
   dict_key: 字典键
   dict_key2: 字典键2
   sort: 排序
   display_style: 显示样式
   is_banned: 是否禁用
+  is_deleted: 是否删除
   created_at: 创建时间
   updated_at: 更新时间

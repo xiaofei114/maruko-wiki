@@ -100,12 +100,11 @@ export async function addType(typeData) {
         if (existing) {
             if (existing.is_deleted) {
                 // 如果已被软删除，则恢复并更新
-                const now = new Date().toISOString();
                 update(`
                     UPDATE dictionary_type
-                    SET name = ?, is_deleted = 0, is_banned = 0, updated_at = ?
+                    SET name = ?, is_deleted = 0, is_banned = 0
                     WHERE id = ?
-                `, [name, now, existing.id]);
+                `, [name, existing.id]);
 
                 return {
                     success: true,
@@ -123,11 +122,10 @@ export async function addType(typeData) {
         }
 
         // 不存在，正常插入
-        const now = new Date().toISOString();
         const result = insert(`
-            INSERT INTO dictionary_type (name, dict_type, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
-        `, [name, dict_type, now, now]);
+            INSERT INTO dictionary_type (name, dict_type)
+            VALUES (?, ?)
+        `, [name, dict_type]);
 
         return {
             success: true,
@@ -157,21 +155,19 @@ export async function deleteType(typeId) {
             };
         }
 
-        const now = new Date().toISOString();
-
         // 软删除字典类型
         update(`
             UPDATE dictionary_type
-            SET is_deleted = 1, updated_at = ?
+            SET is_deleted = 1
             WHERE id = ? AND is_deleted = 0
-        `, [now, Number(typeId)]);
+        `, [Number(typeId)]);
 
         // 同时软删除关联的字典项
         update(`
             UPDATE dictionary_item
-            SET is_deleted = 1, updated_at = ?
+            SET is_deleted = 1
             WHERE dict_type = ? AND is_deleted = 0
-        `, [now, type.dict_type]);
+        `, [type.dict_type]);
 
         return {
             success: true,
@@ -220,15 +216,14 @@ export async function updateType(data) {
 
         const oldDictType = currentType.dict_type;
 
-        // 更新字典类型表，添加 updated_at
+        // 更新字典类型表
         const setClause = fieldsToUpdate.map(f => `${f.key} = ?`).join(', ');
         const params = fieldsToUpdate.map(f => f.value);
-        params.push(new Date().toISOString());
         params.push(typeId);
 
         const updateResult = update(`
             UPDATE dictionary_type
-            SET ${setClause}, updated_at = ?
+            SET ${setClause}
             WHERE id = ? AND is_deleted = 0
         `, params);
 
@@ -389,12 +384,11 @@ export async function addItem(itemData) {
         if (existing) {
             if (existing.is_deleted) {
                 // 如果已被软删除，则恢复并更新
-                const now = new Date().toISOString();
                 update(`
                     UPDATE dictionary_item
-                    SET dict_label = ?, dict_key2 = ?, sort = ?, display_style = ?, is_deleted = 0, is_banned = 0, updated_at = ?
+                    SET dict_label = ?, dict_key2 = ?, sort = ?, display_style = ?, is_deleted = 0, is_banned = 0
                     WHERE id = ?
-                `, [dict_label, dict_key2 || null, sort || 0, display_style || null, now, existing.id]);
+                `, [dict_label, dict_key2 || null, sort || 0, display_style || null, existing.id]);
 
                 return {
                     success: true,
@@ -412,20 +406,17 @@ export async function addItem(itemData) {
         }
 
         // 不存在，正常插入
-        const now = new Date().toISOString();
         const result = insert(`
             INSERT INTO dictionary_item
-            (dict_type, dict_label, dict_key, dict_key2, sort, display_style, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (dict_type, dict_label, dict_key, dict_key2, sort, display_style)
+            VALUES (?, ?, ?, ?, ?, ?)
         `, [
             dict_type,
             dict_label,
             dict_key,
             dict_key2 || null,
             sort || 0,
-            display_style || null,
-            now,
-            now
+            display_style || null
         ]);
 
         return {
@@ -447,9 +438,9 @@ export async function deleteItem(itemId) {
     try {
         const result = update(`
             UPDATE dictionary_item
-            SET is_deleted = 1, updated_at = ?
+            SET is_deleted = 1
             WHERE id = ? AND is_deleted = 0
-        `, [new Date().toISOString(), Number(itemId)]);
+        `, [Number(itemId)]);
 
         if (result.changes === 0) {
             return {
@@ -500,12 +491,11 @@ export async function updateItem(data) {
     try {
         const setClause = fieldsToUpdate.map(f => `${f.key} = ?`).join(', ');
         const params = fieldsToUpdate.map(f => f.value);
-        params.push(new Date().toISOString());
         params.push(itemId);
 
         const result = update(`
             UPDATE dictionary_item
-            SET ${setClause}, updated_at = ?
+            SET ${setClause}
             WHERE id = ? AND is_deleted = 0
         `, params);
 

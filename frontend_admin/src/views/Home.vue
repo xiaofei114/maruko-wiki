@@ -18,6 +18,26 @@ const menuConfig = ref([
     },
     {
         type: 'submenu',
+        title: '内容管理',
+        icon: 'Folder',
+        index: 'content',
+        children: [
+            {
+                title: '相册管理',
+                icon: 'Picture',
+                index: 'album',
+                route: 'album'
+            },
+            {
+                title: '音声管理',
+                icon: 'Headset',
+                index: 'audio',
+                route: 'audio'
+            }
+        ]
+    },
+    {
+        type: 'submenu',
         title: '系统管理',
         icon: 'Setting',
         index: 'system',

@@ -1082,15 +1082,13 @@ onMounted(() => {
               title="管理后台"
               subtitle="守护方寸秩序，为你呈现此刻美好"
             />
-
-            <!-- TODO 还没做好，不急着上 -->
             <!-- 前往新版管理后台 -->
-            <!-- <div class="new-admin-entry">
+            <div class="new-admin-entry">
               <el-button type="success" plain @click="goToNewAdmin">
                 前往新版管理后台
                 <el-icon style="margin-left: 6px"><ArrowRight /></el-icon>
               </el-button>
-            </div> -->
+            </div>
 
             <!-- 统计卡片 -->
             <div class="stats-grid">

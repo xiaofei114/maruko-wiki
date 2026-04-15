@@ -17,7 +17,18 @@ const sidebar = [
     component: () => import('../components/Home/index.vue'),
     meta: { needLogin: true, cnname: "主页", }
   },
-
+  {
+    path: 'album',
+    name: 'album',
+    component: () => import('../components/Content/Album/index.vue'),
+    meta: { needLogin: true, name: "相册管理", cnname: "相册管理", }
+  },
+  {
+    path: 'audio',
+    name: 'audio',
+    component: () => import('../components/Content/Audio/index.vue'),
+    meta: { needLogin: true, name: "音声管理", cnname: "音声管理", }
+  },
   {
     path: 'user',
     name: 'user',

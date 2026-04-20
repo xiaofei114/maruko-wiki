@@ -2,6 +2,9 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRoomInfo, getMasterInfo, getTopListNew, getLiveDuration } from '@/api/bilibiliApis.js'
+import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock } from '@element-plus/icons-vue'
+import { getAnchorStats } from '@/api/anchorStats.js'
+import { getCurrentMonthGifts } from '@/api/captainGift.js'
 
 const router = useRouter()
 
@@ -46,6 +49,312 @@ const liveHours = computed(() => {
   return Math.round(totalMinutes / 60 * 100) / 100
 })
 
+// 图表配置
+const chartOption = computed(() => {
+  const dates = statsData.value.map(item => item.date)
+  
+  // 粉丝详细：显示粉丝数和粉丝团成员数两条折线
+  if (statsType.value === 'fans') {
+    const fansValues = statsData.value.map(item => item.fansCount)
+    const fansMemberValues = statsData.value.map(item => item.fansMemberCount)
+    
+    return {
+      tooltip: {
+        trigger: 'axis',
+        formatter: function(params) {
+          const item = statsData.value[params[0].dataIndex]
+          let html = `<div style="padding: 5px;"><div style="font-weight: bold; margin-bottom: 5px;">${params[0].name}</div>`
+          params.forEach(param => {
+            html += `<div style="color: ${param.color};">${param.seriesName}：${param.value.toLocaleString()}</div>`
+          })
+          html += '</div>'
+          return html
+        }
+      },
+      legend: {
+        data: ['粉丝数', '粉丝团成员'],
+        top: '2%'
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        top: '15%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: dates,
+        axisLabel: {
+          rotate: 45,
+          fontSize: 11
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          formatter: function(value) {
+            if (value >= 10000) {
+              return (value / 10000).toFixed(1) + 'w'
+            }
+            return value
+          }
+        }
+      },
+      series: [
+        {
+          name: '粉丝数',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: {
+            color: '#409EFF',
+            width: 3
+          },
+          itemStyle: {
+            color: '#409EFF'
+          },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: '#409EFF40' },
+                { offset: 1, color: '#409EFF05' }
+              ]
+            }
+          },
+          data: fansValues
+        },
+        {
+          name: '粉丝团成员',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: {
+            color: '#67C23A',
+            width: 3
+          },
+          itemStyle: {
+            color: '#67C23A'
+          },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: '#67C23A40' },
+                { offset: 1, color: '#67C23A05' }
+              ]
+            }
+          },
+          data: fansMemberValues
+        }
+      ]
+    }
+  }
+  
+  // 舰长详细：根据显示模式决定展示总数或详细
+  const commanderValues = statsData.value.map(item => item.commanderCount)
+  const viceCommanderValues = statsData.value.map(item => item.viceCommanderCount)
+  const captainValues = statsData.value.map(item => item.captainCount)
+  // 总数 = 总督 + 提督 + 舰长
+  const totalValues = statsData.value.map(item => 
+    (item.commanderCount || 0) + (item.viceCommanderCount || 0) + (item.captainCount || 0)
+  )
+  
+  // 总数模式：只显示一条总数折线
+  if (captainDisplayMode.value === 'total') {
+    return {
+      tooltip: {
+        trigger: 'axis',
+        formatter: function(params) {
+          const data = params[0]
+          return `
+            <div style="padding: 5px;">
+              <div style="font-weight: bold; margin-bottom: 5px;">${data.name}</div>
+              <div>大航海总数：${data.value.toLocaleString()}</div>
+            </div>
+          `
+        }
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        top: '10%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: dates,
+        axisLabel: {
+          rotate: 45,
+          fontSize: 11
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          formatter: function(value) {
+            if (value >= 10000) {
+              return (value / 10000).toFixed(1) + 'w'
+            }
+            return value
+          }
+        }
+      },
+      series: [
+        {
+          name: '大航海总数',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: {
+            color: '#E6A23C',
+            width: 3
+          },
+          itemStyle: {
+            color: '#E6A23C'
+          },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: '#E6A23C40' },
+                { offset: 1, color: '#E6A23C05' }
+              ]
+            }
+          },
+          data: totalValues
+        }
+      ]
+    }
+  }
+  
+  // 详细模式：显示总督、提督、舰长三条折线
+  return {
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        const item = statsData.value[params[0].dataIndex]
+        let html = `<div style="padding: 5px;"><div style="font-weight: bold; margin-bottom: 5px;">${params[0].name}</div>`
+        params.forEach(param => {
+          html += `<div style="color: ${param.color};">${param.seriesName}：${param.value.toLocaleString()}</div>`
+        })
+        html += '</div>'
+        return html
+      }
+    },
+    legend: {
+      data: ['总督', '提督', '舰长'],
+      top: '2%'
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '15%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: dates,
+      axisLabel: {
+        rotate: 45,
+        fontSize: 11
+      }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        formatter: function(value) {
+          if (value >= 10000) {
+            return (value / 10000).toFixed(1) + 'w'
+          }
+          return value
+        }
+      }
+    },
+    series: [
+      {
+        name: '总督',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: {
+          color: '#F56C6C',
+          width: 3
+        },
+        itemStyle: {
+          color: '#F56C6C'
+        },
+        data: commanderValues
+      },
+      {
+        name: '提督',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: {
+          color: '#E6A23C',
+          width: 3
+        },
+        itemStyle: {
+          color: '#E6A23C'
+        },
+        data: viceCommanderValues
+      },
+      {
+        name: '舰长',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: {
+          color: '#409EFF',
+          width: 3
+        },
+        itemStyle: {
+          color: '#409EFF'
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: '#409EFF40' },
+              { offset: 1, color: '#409EFF05' }
+            ]
+          }
+        },
+        data: captainValues
+      }
+    ]
+  }
+})
+
 // 直播详情弹窗相关
 const showLiveDetailDialog = ref(false)
 const currentYear = ref(new Date().getFullYear())
@@ -53,6 +362,88 @@ const currentMonth = ref(new Date().getMonth() + 1)
 const selectedDate = ref(null)
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 const calendarDays = ref([])
+
+// 主播统计数据弹窗相关
+const showStatsDetailDialog = ref(false)
+const statsType = ref('fans') // 'fans' 或 'captain'
+const statsTimeRange = ref('month') // 'week', 'month', 'year'
+const statsData = ref([])
+const statsLoading = ref(false)
+const captainDisplayMode = ref('total') // 'total'(总数) 或 'detail'(详细)
+
+// 舰礼相关
+const captainGifts = ref([]) // 当月舰礼列表
+const maxCaptainCount = ref(0) // 当月最高舰长数
+const showGiftsSection = computed(() => captainGifts.value.length > 0) // 是否有舰礼
+const showGiftsDetailDialog = ref(false) // 舰礼详情弹窗
+
+// 按目标舰长数排序的舰礼列表（基础舰礼排在最前面）
+const sortedGifts = computed(() => {
+  return [...captainGifts.value].sort((a, b) => {
+    // 基础舰礼（requiredFansCount === 0）排在最前面
+    if (a.requiredFansCount === 0) return -1
+    if (b.requiredFansCount === 0) return 1
+    return a.requiredFansCount - b.requiredFansCount
+  })
+})
+
+// 最大目标舰长数（用于计算进度条位置）
+const maxTargetCount = computed(() => {
+  if (sortedGifts.value.length === 0) return 0
+  const max = sortedGifts.value[sortedGifts.value.length - 1].requiredFansCount
+  return Math.max(max, maxCaptainCount.value)
+})
+
+// 总体进度百分比
+const overallProgress = computed(() => {
+  if (maxTargetCount.value === 0) return 0
+  return Math.min(100, Math.round((maxCaptainCount.value / maxTargetCount.value) * 100))
+})
+
+// 判断舰礼是否已解锁
+const isGiftUnlocked = (gift) => {
+  return gift.requiredFansCount === 0 || maxCaptainCount.value >= gift.requiredFansCount
+}
+
+// 判断是否是当前阶段（已解锁的最后一个或下一个目标）
+const isCurrentStage = (gift) => {
+  if (isGiftUnlocked(gift)) return false
+  // 找到第一个未解锁的
+  const firstUnlockedIndex = sortedGifts.value.findIndex(g => !isGiftUnlocked(g))
+  const currentIndex = sortedGifts.value.findIndex(g => g.id === gift.id)
+  return currentIndex === firstUnlockedIndex
+}
+
+// 获取阶段在进度条上的位置
+const getStagePosition = (gift) => {
+  if (maxTargetCount.value === 0) return 0
+  if (gift.requiredFansCount === 0) return 0
+  return Math.min(100, Math.round((gift.requiredFansCount / maxTargetCount.value) * 100))
+}
+
+// 判断是否是下一个目标（第一个未解锁的）
+const isNextTarget = (gift) => {
+  const firstUnlocked = sortedGifts.value.find(g => !isGiftUnlocked(g))
+  return firstUnlocked && firstUnlocked.id === gift.id
+}
+
+// 下一个目标舰礼
+const nextTargetGift = computed(() => {
+  return sortedGifts.value.find(g => !isGiftUnlocked(g))
+})
+
+// 当前步骤索引（用于 Step 步骤条）
+const currentStepIndex = computed(() => {
+  const index = sortedGifts.value.findIndex(g => !isGiftUnlocked(g))
+  return index === -1 ? sortedGifts.value.length : index
+})
+
+// 获取单个舰礼的进度百分比
+const getGiftProgress = (gift) => {
+  if (gift.requiredFansCount === 0) return 100
+  if (maxCaptainCount.value >= gift.requiredFansCount) return 100
+  return Math.round((maxCaptainCount.value / gift.requiredFansCount) * 100)
+}
 
 // 计算直播时长（分钟）
 const calculateSessionDuration = (startTime, endTime) => {
@@ -534,6 +925,60 @@ const getUserInfo = async (firstTime = false) => {
   loading.value = false
 }
 
+// 打开统计数据详情弹窗
+const openStatsDetail = async (type) => {
+  statsType.value = type
+  statsTimeRange.value = 'month'
+  showStatsDetailDialog.value = true
+  await fetchStatsData()
+  
+  // 如果是舰长详细，获取舰礼信息
+  if (type === 'captain') {
+    await fetchCaptainGifts()
+  }
+}
+
+// 获取舰礼信息
+const fetchCaptainGifts = async () => {
+  try {
+    const res = await getCurrentMonthGifts()
+    if (res.code === 200) {
+      captainGifts.value = res.data.gifts || []
+      // 使用当前实时舰长数
+      maxCaptainCount.value = captain.value
+    } else {
+      captainGifts.value = []
+    }
+  } catch (error) {
+    console.error('获取舰礼信息失败:', error)
+    captainGifts.value = []
+  }
+}
+
+// 获取统计数据
+const fetchStatsData = async () => {
+  statsLoading.value = true
+  try {
+    const res = await getAnchorStats(statsTimeRange.value)
+    if (res.code === 200) {
+      statsData.value = res.data.data || []
+    } else {
+      statsData.value = []
+    }
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+    statsData.value = []
+  } finally {
+    statsLoading.value = false
+  }
+}
+
+// 切换时间范围
+const changeStatsTimeRange = async (range) => {
+  statsTimeRange.value = range
+  await fetchStatsData()
+}
+
 // 组件挂载后获取直播间信息
 onMounted(async () => {
   // 获取当前月份的直播记录
@@ -544,7 +989,11 @@ onMounted(async () => {
   
   //每分钟获取一次
   setInterval(fetchRoomInfo, 60000)
-  getUserInfo(true)
+  await getUserInfo(true)
+  
+  // 获取舰礼信息（需要在 getUserInfo 之后，因为要用到 captain 值）
+  await fetchCaptainGifts()
+  
   generateCalendar()
 })
 </script>
@@ -586,6 +1035,7 @@ onMounted(async () => {
         <div class="module-card fans-module">
           <div class="module-header">
             <h2>粉丝数量</h2>
+            <el-button type="text" size="small" @click="openStatsDetail('fans')" style="color: var(--color-primary);">查看详细</el-button>
           </div>
           <div class="module-body">
             <div class="fans-count">
@@ -617,6 +1067,10 @@ onMounted(async () => {
         <div class="module-card revenue-module">
           <div class="module-header">
             <h2>舰长数量</h2>
+            <div class="header-actions">
+              <el-button v-if="showGiftsSection" type="text" size="small" @click="showGiftsDetailDialog = true" style="color: var(--color-primary);">本月舰礼</el-button>
+              <el-button type="text" size="small" @click="openStatsDetail('captain')" style="color: var(--color-primary);">查看详细</el-button>
+            </div>
           </div>
           <div class="module-body">
             <div class="fans-count">
@@ -750,6 +1204,255 @@ onMounted(async () => {
               </div>
             </div>
           </div>
+        </el-dialog>
+
+        <!-- 主播统计数据详情弹窗 -->
+        <el-dialog
+          v-model="showStatsDetailDialog"
+          :title="statsType === 'fans' ? '粉丝数量趋势' : '舰长数量趋势'"
+          width="800px"
+          :close-on-click-modal="false"
+          custom-class="stats-detail-dialog"
+          align-center
+        >
+          <div class="stats-detail-container">
+            <!-- 时间范围选择器 -->
+            <div class="time-range-selector">
+              <el-radio-group v-model="statsTimeRange" @change="changeStatsTimeRange">
+                <el-radio-button label="week">近1周</el-radio-button>
+                <el-radio-button label="month">近1月</el-radio-button>
+                <el-radio-button label="year">近1年</el-radio-button>
+              </el-radio-group>
+              <!-- 舰长显示模式切换 -->
+              <el-radio-group v-if="statsType === 'captain'" v-model="captainDisplayMode" style="margin-left: 16px;">
+                <el-radio-button label="total">总数</el-radio-button>
+                <el-radio-button label="detail">详细</el-radio-button>
+              </el-radio-group>
+            </div>
+
+            <!-- 加载状态 -->
+            <div v-if="statsLoading" class="stats-loading">
+              <el-skeleton :rows="6" animated />
+            </div>
+
+            <!-- 无数据提示 -->
+            <div v-else-if="statsData.length === 0" class="stats-empty">
+              <el-empty description="暂无统计数据" />
+            </div>
+
+            <!-- 图表区域 -->
+            <div v-else class="stats-chart-container">
+              <!-- 统计摘要 -->
+              <div class="stats-summary">
+                <!-- 粉丝详细：显示粉丝数和粉丝团数量的统计 -->
+                <template v-if="statsType === 'fans'">
+                  <div class="summary-item">
+                    <span class="summary-label">当前粉丝数：</span>
+                    <span class="summary-value">{{ formatNumber(statsData[statsData.length - 1]?.fansCount) }}</span>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">粉丝增长：</span>
+                    <span class="summary-value" :class="{
+                      'positive': (statsData[statsData.length - 1]?.fansCount - statsData[0]?.fansCount) > 0,
+                      'negative': (statsData[statsData.length - 1]?.fansCount - statsData[0]?.fansCount) < 0
+                    }">
+                      {{ (statsData[statsData.length - 1]?.fansCount - statsData[0]?.fansCount) > 0 ? '+' : '' }}{{ formatNumber(statsData[statsData.length - 1]?.fansCount - statsData[0]?.fansCount) }}
+                    </span>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">当前粉丝团成员：</span>
+                    <span class="summary-value">{{ formatNumber(statsData[statsData.length - 1]?.fansMemberCount) }}</span>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">粉丝团成员增长：</span>
+                    <span class="summary-value" :class="{
+                      'positive': (statsData[statsData.length - 1]?.fansMemberCount - statsData[0]?.fansMemberCount) > 0,
+                      'negative': (statsData[statsData.length - 1]?.fansMemberCount - statsData[0]?.fansMemberCount) < 0
+                    }">
+                      {{ (statsData[statsData.length - 1]?.fansMemberCount - statsData[0]?.fansMemberCount) > 0 ? '+' : '' }}{{ formatNumber(statsData[statsData.length - 1]?.fansMemberCount - statsData[0]?.fansMemberCount) }}
+                    </span>
+                  </div>
+                </template>
+                <!-- 舰长详细：根据显示模式展示总数或详细统计 -->
+                <template v-else>
+                  <!-- 总数模式 -->
+                  <template v-if="captainDisplayMode === 'total'">
+                    <div class="summary-item">
+                      <span class="summary-label">当前大航海总数：</span>
+                      <span class="summary-value">{{ formatNumber((statsData[statsData.length - 1]?.commanderCount || 0) + (statsData[statsData.length - 1]?.viceCommanderCount || 0) + (statsData[statsData.length - 1]?.captainCount || 0)) }}</span>
+                    </div>
+                    <div class="summary-item">
+                      <span class="summary-label">总数增长：</span>
+                      <span class="summary-value" :class="{
+                        'positive': ((statsData[statsData.length - 1]?.commanderCount + statsData[statsData.length - 1]?.viceCommanderCount + statsData[statsData.length - 1]?.captainCount) - (statsData[0]?.commanderCount + statsData[0]?.viceCommanderCount + statsData[0]?.captainCount)) > 0,
+                        'negative': ((statsData[statsData.length - 1]?.commanderCount + statsData[statsData.length - 1]?.viceCommanderCount + statsData[statsData.length - 1]?.captainCount) - (statsData[0]?.commanderCount + statsData[0]?.viceCommanderCount + statsData[0]?.captainCount)) < 0
+                      }">
+                        {{ ((statsData[statsData.length - 1]?.commanderCount + statsData[statsData.length - 1]?.viceCommanderCount + statsData[statsData.length - 1]?.captainCount) - (statsData[0]?.commanderCount + statsData[0]?.viceCommanderCount + statsData[0]?.captainCount)) > 0 ? '+' : '' }}{{ formatNumber((statsData[statsData.length - 1]?.commanderCount + statsData[statsData.length - 1]?.viceCommanderCount + statsData[statsData.length - 1]?.captainCount) - (statsData[0]?.commanderCount + statsData[0]?.viceCommanderCount + statsData[0]?.captainCount)) }}
+                      </span>
+                    </div>
+                  </template>
+                  <!-- 详细模式 -->
+                  <template v-else>
+                    <div class="summary-item">
+                      <span class="summary-label">当前总督：</span>
+                      <span class="summary-value">{{ formatNumber(statsData[statsData.length - 1]?.commanderCount) }}</span>
+                    </div>
+                    <div class="summary-item">
+                      <span class="summary-label">总督增长：</span>
+                      <span class="summary-value" :class="{
+                        'positive': (statsData[statsData.length - 1]?.commanderCount - statsData[0]?.commanderCount) > 0,
+                        'negative': (statsData[statsData.length - 1]?.commanderCount - statsData[0]?.commanderCount) < 0
+                      }">
+                        {{ (statsData[statsData.length - 1]?.commanderCount - statsData[0]?.commanderCount) > 0 ? '+' : '' }}{{ formatNumber(statsData[statsData.length - 1]?.commanderCount - statsData[0]?.commanderCount) }}
+                      </span>
+                    </div>
+                    <div class="summary-item">
+                      <span class="summary-label">当前提督：</span>
+                      <span class="summary-value">{{ formatNumber(statsData[statsData.length - 1]?.viceCommanderCount) }}</span>
+                    </div>
+                    <div class="summary-item">
+                      <span class="summary-label">提督增长：</span>
+                      <span class="summary-value" :class="{
+                        'positive': (statsData[statsData.length - 1]?.viceCommanderCount - statsData[0]?.viceCommanderCount) > 0,
+                        'negative': (statsData[statsData.length - 1]?.viceCommanderCount - statsData[0]?.viceCommanderCount) < 0
+                      }">
+                        {{ (statsData[statsData.length - 1]?.viceCommanderCount - statsData[0]?.viceCommanderCount) > 0 ? '+' : '' }}{{ formatNumber(statsData[statsData.length - 1]?.viceCommanderCount - statsData[0]?.viceCommanderCount) }}
+                      </span>
+                    </div>
+                    <div class="summary-item">
+                      <span class="summary-label">当前舰长：</span>
+                      <span class="summary-value">{{ formatNumber(statsData[statsData.length - 1]?.captainCount) }}</span>
+                    </div>
+                    <div class="summary-item">
+                      <span class="summary-label">舰长增长：</span>
+                      <span class="summary-value" :class="{
+                        'positive': (statsData[statsData.length - 1]?.captainCount - statsData[0]?.captainCount) > 0,
+                        'negative': (statsData[statsData.length - 1]?.captainCount - statsData[0]?.captainCount) < 0
+                      }">
+                        {{ (statsData[statsData.length - 1]?.captainCount - statsData[0]?.captainCount) > 0 ? '+' : '' }}{{ formatNumber(statsData[statsData.length - 1]?.captainCount - statsData[0]?.captainCount) }}
+                      </span>
+                    </div>
+                  </template>
+                </template>
+              </div>
+
+              <!-- 折线图 -->
+              <div class="chart-wrapper">
+                <v-chart class="stats-chart" :option="chartOption" autoresize />
+              </div>
+            </div>
+          </div>
+        </el-dialog>
+
+        <!-- 舰礼详情弹窗 -->
+        <el-dialog
+          v-model="showGiftsDetailDialog"
+          title="当月舰礼详情"
+          width="600px"
+          :close-on-click-modal="false"
+          custom-class="gifts-detail-dialog"
+          align-center
+        >
+          <el-scrollbar max-height="70vh">
+            <div class="gifts-detail-content">
+              <!-- 提示信息 -->
+              <el-alert
+                title="本舰礼进度仅供参考，具体以北立交桥官网为准"
+                type="info"
+                :closable="false"
+                show-icon
+                style="margin-bottom: 16px;"
+              />
+              
+              <!-- 进度概览 -->
+              <div class="gifts-overview">
+                <div class="overview-stat">
+                  <span class="overview-label">当前舰长</span>
+                  <span class="overview-value">{{ maxCaptainCount }}</span>
+                </div>
+                <div class="overview-progress">
+                  <el-progress 
+                    :percentage="overallProgress" 
+                    :stroke-width="12"
+                    :show-text="false"
+                    :color="overallProgress >= 100 ? '#67c23a' : '#e6a23c'"
+                  />
+                </div>
+                <div class="overview-target" v-if="nextTargetGift">
+                  <span class="overview-label">下一目标</span>
+                  <span class="overview-value">{{ nextTargetGift.requiredFansCount }}</span>
+                  <span class="overview-remain">(还差 {{ nextTargetGift.requiredFansCount - maxCaptainCount }})</span>
+                </div>
+              </div>
+
+              <!-- 单条多阶段进度条 -->
+              <div class="single-progress-bar">
+                <!-- 阶段节点 -->
+                <div class="stage-nodes">
+                  <div
+                    v-for="(gift, index) in sortedGifts"
+                    :key="gift.id"
+                    class="stage-node"
+                    :class="{
+                      'unlocked': isGiftUnlocked(gift),
+                      'current': isNextTarget(gift)
+                    }"
+                    :style="{ left: getStagePosition(gift) + '%' }"
+                  >
+                    <div class="node-badge">
+                      <el-icon v-if="isGiftUnlocked(gift)"><Check /></el-icon>
+                      <span v-else>{{ index + 1 }}</span>
+                    </div>
+                    <div class="node-label">{{ gift.requiredFansCount === 0 ? '基础' : gift.requiredFansCount }}</div>
+                  </div>
+                </div>
+
+                <!-- 进度条背景 -->
+                <div class="progress-track">
+                  <div class="progress-completed" :style="{ width: overallProgress + '%' }"></div>
+                </div>
+                
+                <!-- 当前位置标记（在进度条下方） -->
+                <div class="current-marker" :style="{ left: overallProgress + '%' }" v-if="overallProgress < 100">
+                  <div class="marker-triangle"></div>
+                  <div class="marker-label">{{ maxCaptainCount }}</div>
+                </div>
+              </div>
+
+              <!-- 舰礼卡片列表 -->
+              <div class="gifts-cards">
+                <div
+                  v-for="(gift, index) in sortedGifts"
+                  :key="gift.id"
+                  class="gift-card"
+                  :class="{
+                    'unlocked': isGiftUnlocked(gift),
+                    'current': isNextTarget(gift)
+                  }"
+                >
+                  <div class="gift-card-header">
+                    <div class="gift-step-num">{{ index + 1 }}</div>
+                    <div class="gift-status-icon">
+                      <el-icon v-if="isGiftUnlocked(gift)"><Check /></el-icon>
+                      <el-icon v-else-if="isNextTarget(gift)"><Loading /></el-icon>
+                      <el-icon v-else><Lock /></el-icon>
+                    </div>
+                  </div>
+                  <div class="gift-card-body">
+                    <div class="gift-name">{{ gift.giftName }}</div>
+                    <div class="gift-content" v-if="gift.giftContent">{{ gift.giftContent }}</div>
+                    <el-tag 
+                      :type="isGiftUnlocked(gift) ? 'success' : (isNextTarget(gift) ? 'warning' : 'info')" 
+                      size="small"
+                      class="gift-tag"
+                    >
+                      {{ gift.requiredFansCount === 0 ? '基础舰礼' : gift.requiredFansCount + '舰长解锁' }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </el-scrollbar>
         </el-dialog>
 
         <div class="module-card status-module">
@@ -1041,6 +1744,16 @@ onMounted(async () => {
 
 .module-header .el-button {
   margin-left: 10px;
+}
+
+/* 头部操作按钮组 */
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.header-actions .el-button {
+  margin-left: 0;
 }
 
 /* 直播详情弹窗样式 */
@@ -2085,5 +2798,458 @@ onMounted(async () => {
     font-size: 13px;
   }
 
+}
+
+/* 主播统计数据弹窗样式 */
+.stats-detail-container {
+  padding: 10px;
+}
+
+.time-range-selector {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.stats-loading {
+  padding: 20px;
+}
+
+.stats-empty {
+  padding: 40px 20px;
+}
+
+.stats-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-summary {
+  display: flex;
+  justify-content: space-around;
+  padding: 15px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.summary-item {
+  text-align: center;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #909399;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.summary-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.summary-value.positive {
+  color: #67c23a;
+}
+
+.summary-value.negative {
+  color: #f56c6c;
+}
+
+.chart-wrapper {
+  height: 300px;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.stats-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.stats-table-wrapper {
+  margin-top: 10px;
+}
+
+/* 舰礼进度条样式 - 与页面风格统一 */
+.gifts-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: #f5f7fa;
+  border-radius: 12px;
+}
+
+.gifts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e4e7ed;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gifts-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #303133;
+  font-weight: 600;
+}
+
+.gifts-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.stat-current {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.stat-remain {
+  color: #e6a23c;
+  font-weight: 500;
+}
+
+/* 单条多阶段进度条 */
+.single-progress-bar {
+  position: relative;
+  padding: 35px 20px 25px;
+  overflow: visible;
+}
+
+/* 阶段节点 */
+.stage-nodes {
+  position: relative;
+  height: 50px;
+  margin-bottom: -25px;
+  z-index: 10;
+}
+
+.stage-node {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.node-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #c0c4cc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  transition: all 0.3s ease;
+}
+
+.stage-node.unlocked .node-badge {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.stage-node.current .node-badge {
+  background: #fff;
+  border-color: #e6a23c;
+  color: #e6a23c;
+  box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.2);
+  animation: pulse-current 2s infinite;
+}
+
+@keyframes pulse-current {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(230, 162, 60, 0.1); }
+}
+
+.node-label {
+  font-size: 11px;
+  color: #606266;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.stage-node.unlocked .node-label {
+  color: var(--color-primary);
+}
+
+.stage-node.current .node-label {
+  color: #e6a23c;
+  font-weight: 600;
+}
+
+/* 进度条轨道 */
+.progress-track {
+  position: relative;
+  height: 10px;
+  background: #e4e7ed;
+  border-radius: 5px;
+  overflow: visible;
+}
+
+.progress-completed {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+
+/* 当前位置标记 - 在进度条下方 */
+.current-marker {
+  position: absolute;
+  top: 100%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 8px;
+  z-index: 20;
+  min-width: 40px;
+}
+
+/* 当标记在左侧边缘时，调整位置 */
+.current-marker[style*="left: 0%"] {
+  transform: translateX(0);
+  align-items: flex-start;
+}
+
+.current-marker[style*="left: 100%"] {
+  transform: translateX(-100%);
+  align-items: flex-end;
+}
+
+.marker-triangle {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 8px solid var(--color-primary);
+}
+
+.marker-label {
+  padding: 3px 10px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 舰礼详情 - 卡片式步骤 */
+.gifts-cards {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed #dcdfe6;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gift-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #f5f7fa;
+  border-radius: 10px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s ease;
+}
+
+.gift-card.unlocked {
+  background: #f0f9ff;
+  border-color: var(--color-primary);
+}
+
+.gift-card.current {
+  background: #fdf6ec;
+  border-color: #e6a23c;
+  box-shadow: 0 0 0 2px rgba(230, 162, 60, 0.2);
+}
+
+.gift-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.gift-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #dcdfe6;
+  color: #606266;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gift-card.unlocked .gift-step-num {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.gift-card.current .gift-step-num {
+  background: #e6a23c;
+  color: #fff;
+}
+
+.gift-status-icon {
+  font-size: 16px;
+  color: #c0c4cc;
+}
+
+.gift-card.unlocked .gift-status-icon {
+  color: var(--color-primary);
+}
+
+.gift-card.current .gift-status-icon {
+  color: #e6a23c;
+}
+
+.gift-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.gift-card-body .gift-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 6px;
+}
+
+.gift-card-body .gift-content {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.gift-card-body .gift-tag {
+  font-size: 12px;
+}
+
+/* 查看舰礼详情按钮 */
+.gifts-view-more {
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* 舰礼详情弹窗样式 */
+.gifts-detail-dialog {
+  max-height: 85vh !important;
+}
+
+.gifts-detail-dialog .el-dialog__body {
+  padding: 20px;
+  overflow: hidden;
+}
+
+.gifts-detail-content {
+  padding-right: 8px;
+}
+
+.gifts-overview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.overview-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+
+.overview-stat .overview-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.overview-stat .overview-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.overview-progress {
+  flex: 1;
+}
+
+.overview-target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.overview-target .overview-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.overview-target .overview-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e6a23c;
+}
+
+.overview-target .overview-remain {
+  font-size: 11px;
+  color: #f56c6c;
+}
+
+@media (max-width: 600px) {
+  .single-progress-bar {
+    padding: 35px 5px 25px;
+  }
+
+  .node-badge {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .node-label {
+    font-size: 10px;
+  }
+
+  .gifts-stats {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+  }
+
+  .gift-name {
+    font-size: 13px;
+  }
 }
 </style>

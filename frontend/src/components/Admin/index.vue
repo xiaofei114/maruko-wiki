@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause, ArrowRight } from '@element-plus/icons-vue'
+import { User, Picture, Files, VideoPlay, Edit, Delete, InfoFilled, VideoPause, ArrowRight, Plus, Present } from '@element-plus/icons-vue'
 import PageHero from '@/components/ComponentStyle/PageHero.vue'
 import {
     getAudioCategories,
@@ -24,6 +24,7 @@ import {
     resetUserPassword as resetUserPasswordAPI,
     deleteUser as deleteUserAPI
 } from '@/api/admin'
+import { getGiftsByMonth, addGift, updateGift, deleteGift, batchAddGifts } from '@/api/captainGift'
 
 // 用户状态
 const userStore = useUserStore()
@@ -36,6 +37,31 @@ const activeTab = ref('audio')
 const selectedAudio = ref(null)
 const selectedAlbum = ref(null)
 const selectedUser = ref(null)
+
+// 舰礼管理
+const giftYear = ref(String(new Date().getFullYear()))
+const giftMonth = ref(new Date().getMonth() + 1)
+const captainGifts = ref([])
+const giftLoading = ref(false)
+const giftDialogVisible = ref(false)
+const giftDialogTitle = ref('添加舰礼')
+const giftFormRef = ref(null)
+const giftForm = ref({
+    id: null,
+    giftName: '',
+    giftContent: '',
+    requiredFansCount: 0,
+    isLimited: false  // 是否限制舰长数
+})
+const giftFormRules = {
+    giftName: [
+        { required: true, message: '请输入礼物名称', trigger: 'blur' },
+        { min: 1, max: 50, message: '礼物名称长度应在1-50个字符', trigger: 'blur' }
+    ],
+    giftContent: [
+        { max: 200, message: '礼物内容描述不能超过200个字符', trigger: 'blur' }
+    ]
+}
 
 // 编辑对话框
 const editCategoryDialog = ref(false)
@@ -1072,6 +1098,146 @@ onMounted(() => {
     fetchAllData()
 })
 
+// ========== 舰礼管理方法 ==========
+
+// 获取舰礼列表
+const fetchCaptainGifts = async () => {
+    giftLoading.value = true
+    try {
+        const res = await getGiftsByMonth(parseInt(giftYear.value), giftMonth.value)
+        if (res.code === 200) {
+            captainGifts.value = res.data.gifts || []
+        } else {
+            ElMessage.error(res.message || '获取舰礼列表失败')
+            captainGifts.value = []
+        }
+    } catch (error) {
+        console.error('获取舰礼列表失败:', error)
+        ElMessage.error('获取舰礼列表失败')
+        captainGifts.value = []
+    } finally {
+        giftLoading.value = false
+    }
+}
+
+// 切换年月
+const handleGiftMonthChange = () => {
+    fetchCaptainGifts()
+}
+
+// 打开添加舰礼对话框
+const openAddGiftDialog = () => {
+    giftDialogTitle.value = '添加舰礼'
+    giftForm.value = {
+        id: null,
+        giftName: '',
+        giftContent: '',
+        requiredFansCount: 0,
+        isLimited: false
+    }
+    giftDialogVisible.value = true
+}
+
+// 打开编辑舰礼对话框
+const openEditGiftDialog = (gift) => {
+    giftDialogTitle.value = '编辑舰礼'
+    giftForm.value = {
+        id: gift.id,
+        giftName: gift.giftName,
+        giftContent: gift.giftContent,
+        requiredFansCount: gift.requiredFansCount,
+        isLimited: gift.requiredFansCount > 0
+    }
+    giftDialogVisible.value = true
+}
+
+// 保存舰礼
+const saveGift = async () => {
+    if (!giftFormRef.value) return
+    
+    await giftFormRef.value.validate(async (valid) => {
+        if (valid) {
+            try {
+                // 根据是否限制舰长数决定 requiredFansCount
+                const requiredFansCount = giftForm.value.isLimited 
+                    ? Number(giftForm.value.requiredFansCount) 
+                    : 0
+                
+                let res
+                if (giftForm.value.id) {
+                    // 编辑
+                    res = await updateGift(giftForm.value.id, {
+                        giftName: giftForm.value.giftName,
+                        giftContent: giftForm.value.giftContent,
+                        requiredFansCount: requiredFansCount
+                    })
+                } else {
+                    // 添加
+                    res = await addGift({
+                        year: parseInt(giftYear.value),
+                        month: giftMonth.value,
+                        giftName: giftForm.value.giftName,
+                        giftContent: giftForm.value.giftContent,
+                        requiredFansCount: requiredFansCount
+                    })
+                }
+                
+                if (res.code === 200) {
+                    ElMessage.success(giftForm.value.id ? '编辑成功' : '添加成功')
+                    giftDialogVisible.value = false
+                    await fetchCaptainGifts()
+                } else {
+                    ElMessage.error(res.message || (giftForm.value.id ? '编辑失败' : '添加失败'))
+                }
+            } catch (error) {
+                console.error('保存舰礼失败:', error)
+                ElMessage.error('保存失败')
+            }
+        }
+    })
+}
+
+// 删除舰礼
+const handleDeleteGift = async (gift) => {
+    try {
+        await ElMessageBox.confirm(
+            `确定要删除舰礼「${gift.giftName}」吗？`,
+            '确认删除',
+            {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            }
+        )
+        
+        const res = await deleteGift(gift.id)
+        if (res.code === 200) {
+            ElMessage.success('删除成功')
+            await fetchCaptainGifts()
+        } else {
+            ElMessage.error(res.message || '删除失败')
+        }
+    } catch (error) {
+        if (error !== 'cancel') {
+            console.error('删除舰礼失败:', error)
+            ElMessage.error('删除失败')
+        }
+    }
+}
+
+// 标签页切换处理
+const handleTabChange = (tabName) => {
+    if (tabName === 'gifts-full') {
+        fetchCaptainGifts()
+    }
+}
+
+// 切换到舰礼管理完整页面
+const switchToGiftFullPage = () => {
+    activeTab.value = 'gifts-full'
+    fetchCaptainGifts()
+}
+
 </script>
 
 <template>
@@ -1142,7 +1308,7 @@ onMounted(() => {
             <div class="management-layout">
                 <!-- 左侧：音频/相册标签列表 -->
                 <div class="left-panel">
-                    <el-tabs v-model="activeTab" class="category-tabs">
+                    <el-tabs v-model="activeTab" class="category-tabs" @tab-change="handleTabChange">
                         <!-- 音频分类 -->
                         <el-tab-pane label="音频管理" name="audio">
                             <div v-if="audioCategories.length === 0" class="empty-state">
@@ -1236,6 +1402,18 @@ onMounted(() => {
                                         {{ getPermissionLabel(user.permission) }}
                                     </el-tag>
                                 </div>
+                            </div>
+                        </el-tab-pane>
+
+                        <!-- 舰礼管理 -->
+                        <el-tab-pane label="舰礼管理" name="gifts-full" v-if="permission === 1">
+                            <div class="gift-management-compact" @click="switchToGiftFullPage">
+                                <div class="gift-compact-header">
+                                    <el-icon><Present /></el-icon>
+                                    <span>舰礼管理</span>
+                                    <el-tag size="small" type="info">{{ captainGifts.length }}个舰礼</el-tag>
+                                </div>
+                                <div class="gift-compact-desc">点击管理当月舰礼</div>
                             </div>
                         </el-tab-pane>
                     </el-tabs>
@@ -1341,6 +1519,35 @@ onMounted(() => {
                         <span class="dialog-footer">
                             <el-button @click="editPhotoDialog = false">取消</el-button>
                             <el-button type="primary" @click="handleEditPhoto" :loading="false">
+                                确定
+                            </el-button>
+                        </span>
+                    </template>
+                </el-dialog>
+
+                <!-- 舰礼编辑对话框 -->
+                <el-dialog v-model="giftDialogVisible" :title="giftDialogTitle" width="500px" :close-on-click-modal="false">
+                    <el-form :model="giftForm" :rules="giftFormRules" ref="giftFormRef" label-width="100px">
+                        <el-form-item label="礼物名称" prop="giftName">
+                            <el-input v-model="giftForm.giftName" placeholder="请输入礼物名称" maxlength="50" show-word-limit />
+                        </el-form-item>
+                        <el-form-item label="礼物内容" prop="giftContent">
+                            <el-input v-model="giftForm.giftContent" type="textarea" :rows="3" placeholder="请输入礼物内容描述（可选）" maxlength="200" show-word-limit />
+                        </el-form-item>
+                        <el-form-item label="解锁条件">
+                            <el-radio-group v-model="giftForm.isLimited">
+                                <el-radio :label="false">基础舰礼（无限制）</el-radio>
+                                <el-radio :label="true">达到指定舰长数</el-radio>
+                            </el-radio-group>
+                        </el-form-item>
+                        <el-form-item label="目标舰长数" v-if="giftForm.isLimited">
+                            <el-input-number v-model="giftForm.requiredFansCount" :min="1" :max="9999" />
+                        </el-form-item>
+                    </el-form>
+                    <template #footer>
+                        <span class="dialog-footer">
+                            <el-button @click="giftDialogVisible = false">取消</el-button>
+                            <el-button type="primary" @click="saveGift">
                                 确定
                             </el-button>
                         </span>
@@ -1589,6 +1796,74 @@ onMounted(() => {
                                     </div>
                                 </template>
                             </el-card>
+                        </div>
+
+                        <!-- 舰礼管理完整页面 -->
+                        <div v-else-if="activeTab === 'gifts-full'" class="gift-full-page">
+                            <div class="gift-full-header">
+                                <div class="gift-full-title">
+                                    <el-icon size="24"><Present /></el-icon>
+                                    <h3>舰礼管理</h3>
+                                </div>
+                                <div class="gift-full-actions">
+                                    <el-date-picker
+                                        v-model="giftYear"
+                                        type="year"
+                                        placeholder="选择年份"
+                                        @change="handleGiftMonthChange"
+                                        style="width: 120px;"
+                                        value-format="YYYY"
+                                    />
+                                    <el-select v-model="giftMonth" @change="handleGiftMonthChange" style="width: 100px; margin-left: 10px;">
+                                        <el-option
+                                            v-for="m in 12"
+                                            :key="m"
+                                            :label="m + '月'"
+                                            :value="m"
+                                        />
+                                    </el-select>
+                                    <el-button type="primary" @click="openAddGiftDialog" style="margin-left: 16px;">
+                                        <el-icon><Plus /></el-icon>
+                                        添加舰礼
+                                    </el-button>
+                                </div>
+                            </div>
+
+                            <div v-loading="giftLoading" class="gift-full-content">
+                                <el-empty v-if="captainGifts.length === 0" description="暂无舰礼，点击上方按钮添加" :image-size="120">
+                                    <template #image>
+                                        <el-icon size="80" color="#dcdfe6"><Present /></el-icon>
+                                    </template>
+                                </el-empty>
+                                <div v-else class="gift-full-list">
+                                    <el-table :data="captainGifts" style="width: 100%" stripe>
+                                        <el-table-column type="index" label="序号" width="60" align="center" />
+                                        <el-table-column prop="giftName" label="礼物名称" min-width="150" />
+                                        <el-table-column prop="giftContent" label="礼物内容" min-width="250">
+                                            <template #default="{ row }">
+                                                <span class="gift-content-text">{{ row.giftContent || '-' }}</span>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column label="解锁条件" width="150" align="center">
+                                            <template #default="{ row }">
+                                                <el-tag :type="row.requiredFansCount === 0 ? 'success' : 'warning'" size="small">
+                                                    {{ row.requiredFansCount === 0 ? '基础舰礼' : `${row.requiredFansCount}舰长` }}
+                                                </el-tag>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column label="操作" width="120" align="center" fixed="right">
+                                            <template #default="{ row }">
+                                                <el-button size="small" @click="openEditGiftDialog(row)" type="primary">
+                                                    <el-icon><Edit /></el-icon>
+                                                </el-button>
+                                                <el-button size="small" @click="handleDeleteGift(row)" type="danger">
+                                                    <el-icon><Delete /></el-icon>
+                                                </el-button>
+                                            </template>
+                                        </el-table-column>
+                                    </el-table>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- 未选择内容 -->
@@ -2658,4 +2933,180 @@ onMounted(() => {
 }
 
 /* 响应式按钮 */
+
+/* 舰礼管理样式 */
+.gift-management {
+    padding: 16px;
+}
+
+.gift-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.gift-date-selector {
+    display: flex;
+    align-items: center;
+}
+
+.gift-list {
+    min-height: 200px;
+}
+
+.gift-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gift-card {
+    background: #fff;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.3s ease;
+}
+
+.gift-card:hover {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.gift-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.gift-card-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #303133;
+}
+
+.gift-card-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.gift-card-content {
+    font-size: 13px;
+    color: #606266;
+    margin-bottom: 12px;
+    min-height: 20px;
+}
+
+.gift-card-footer {
+    display: flex;
+    justify-content: flex-start;
+}
+
+@media (max-width: 768px) {
+    .gift-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .gift-date-selector {
+        justify-content: center;
+    }
+}
+
+/* 舰礼管理紧凑版（左侧） */
+.gift-management-compact {
+    padding: 16px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid #bae6fd;
+}
+
+.gift-management-compact:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+}
+
+.gift-compact-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #0369a1;
+    margin-bottom: 4px;
+}
+
+.gift-compact-desc {
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* 舰礼管理完整页面 */
+.gift-full-page {
+    padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    min-height: 500px;
+}
+
+.gift-full-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e4e7ed;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.gift-full-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gift-full-title h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #303133;
+}
+
+.gift-full-actions {
+    display: flex;
+    align-items: center;
+}
+
+.gift-full-content {
+    min-height: 400px;
+}
+
+.gift-full-list {
+    width: 100%;
+}
+
+.gift-content-text {
+    color: #606266;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+    .gift-full-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .gift-full-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+}
 </style>

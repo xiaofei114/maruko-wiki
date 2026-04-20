@@ -30,6 +30,12 @@ const sidebar = [
     meta: { needLogin: true, name: "音声管理", cnname: "音声管理", }
   },
   {
+    path: 'captain-gift',
+    name: 'captain-gift',
+    component: () => import('../components/Content/CaptainGift/index.vue'),
+    meta: { needLogin: true, name: "舰礼管理", cnname: "舰礼管理", }
+  },
+  {
     path: 'user',
     name: 'user',
     component: () => import('../components/System/User/index.vue'),

@@ -29,11 +29,17 @@ const menuConfig = ref([
                 route: 'album'
             },
             {
-                title: '音声管理',
-                icon: 'Headset',
-                index: 'audio',
-                route: 'audio'
-            }
+            title: '音声管理',
+            icon: 'Headset',
+            index: 'audio',
+            route: 'audio'
+        },
+        {
+            title: '舰礼管理',
+            icon: 'Present',
+            index: 'captain-gift',
+            route: 'captain-gift'
+        }
         ]
     },
     {

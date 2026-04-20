@@ -126,3 +126,27 @@ dictionary_item:
   is_deleted: 是否删除
   created_at: 创建时间
   updated_at: 更新时间
+
+# 粉丝舰长记录表
+anchor_stats: 
+  id: 主键
+  record_date: 记录日期
+  fans_count: 粉丝数
+  captain_count: 舰长数（普通舰长）
+  commander_count: 总督数
+  vice_commander_count: 提督数
+  fans_member_count: 粉丝团成员数
+  create_time: 记录创建时间
+  update_time: 记录更新时间
+
+# 舰礼表
+captain_gifts:
+  id: 主键
+  year: 年份
+  month: 月份 (1-12)
+  gift_name: 礼物名称
+  gift_content: 礼物内容描述
+  required_fans_count: 解锁所需粉丝数 (0表示无限制，为基础舰礼)
+  sort_order: 排序顺序
+  create_time: 创建时间
+  update_time: 更新时间

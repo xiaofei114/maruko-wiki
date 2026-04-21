@@ -16,3 +16,14 @@ CREATE INDEX IF NOT EXISTS idx_captain_gifts_type ON captain_gifts(year, month, 
 
 -- 更新现有数据：默认都是舰长礼，显示进度条
 UPDATE captain_gifts SET gift_type = 1, includes = 0, show_progress = 1;
+
+INSERT INTO "dictionary_type" ("name", "dict_type") VALUES ('礼物类型', 'gift_type');
+INSERT INTO "dictionary_type" ("name", "dict_type") VALUES ('舰礼包含关系', 'includes_type');
+INSERT INTO "dictionary_type" ("name", "dict_type") VALUES ('舰礼显示进度', 'show_progress');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('gift_type', '舰长礼', '1', NULL, 1, 'primary');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('gift_type', '提督礼', '2', NULL, 2, 'warning');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('gift_type', '总督礼', '3', NULL, 3, 'danger');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('includes_type', '包含舰长礼', '1', NULL, 1, 'primary');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('includes_type', '包含提督礼', '2', NULL, 2, 'success');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('show_progress', '隐藏', '0', NULL, 1, 'info');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('show_progress', '显示', '1', NULL, 2, 'success');

@@ -2,7 +2,7 @@
 import * as icons from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { debounce } from 'lodash';
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getDateTime } from '@/utils/time.js'
 import { useUserStore } from '@/stores/user.js'
@@ -52,7 +52,8 @@ const menuConfig = ref([
                 title: '用户管理',
                 icon: 'User',
                 index: 'user',
-                route: 'user'
+                route: 'user',
+                permission: 1
             },
             {
                 title: '字典管理',
@@ -64,7 +65,8 @@ const menuConfig = ref([
                 title: '运行日志',
                 icon: 'Notebook',
                 index: 'logs',
-                route: 'logs'
+                route: 'logs',
+                permission: 1
             }
         ]
     }
@@ -147,6 +149,31 @@ const logOut = () => {
         userStore.loginOut()
     })
 }
+
+const goToHomePage = () => {
+    window.open(import.meta.env.VITE_APP_PAGE_URL, '_blank')
+}
+
+// 根据权限过滤菜单
+const filteredMenuConfig = computed(() => {
+    return menuConfig.value.map(item => {
+        if (item.type === 'submenu' && item.children) {
+            // 过滤子菜单
+            const filteredChildren = item.children.filter(child => {
+                // 如果没有权限要求，或者用户权限满足要求
+                if (!child.permission) return true
+                return userStore.permission === child.permission
+            })
+            // 如果子菜单为空，不显示该菜单组
+            if (filteredChildren.length === 0) return null
+            return {
+                ...item,
+                children: filteredChildren
+            }
+        }
+        return item
+    }).filter(item => item !== null)
+})
 </script>
 
 <template>
@@ -161,7 +188,7 @@ const logOut = () => {
                 <div class="title">
                     <span>后台管理</span>
                 </div>
-                <template v-for="item in menuConfig" :key="item.index">
+                <template v-for="item in filteredMenuConfig" :key="item.index">
                     <!-- 普通菜单项 -->
                     <el-menu-item v-if="item.type === 'item'" :index="item.route">
                         <el-icon>
@@ -207,7 +234,7 @@ const logOut = () => {
                         <span>管理</span>
                     </span>
                 </div>
-                <template v-for="item in menuConfig" :key="item.index">
+                <template v-for="item in filteredMenuConfig" :key="item.index">
                     <!-- 普通菜单项 -->
                     <el-menu-item v-if="item.type === 'item' " :index="item.index">
                         <el-icon>
@@ -258,7 +285,8 @@ const logOut = () => {
                     </el-breadcrumb-item>
                     <el-breadcrumb-item v-if="things.meta.name">{{ things.meta.name }}</el-breadcrumb-item>
                 </el-breadcrumb>
-                <div style="position: absolute; right: 40px;">
+                <div style="position: absolute; right: 40px; display: flex; gap: 10px;">
+                    <el-button type="primary" plain @click="goToHomePage">返回主页</el-button>
                     <el-button type="danger" plain @click="logOut">退出登录</el-button>
                 </div>
             </div>

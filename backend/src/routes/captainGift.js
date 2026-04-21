@@ -1,5 +1,6 @@
 import express from 'express';
 import { createPublicRoute, createValidatedRouteHandler } from '../method/route-helpers.js';
+import { addLog } from '../services/logs.js';
 import { 
     getGiftsByMonth, 
     getCurrentMonthGifts, 
@@ -10,6 +11,34 @@ import {
 } from '../services/captainGift.js';
 
 const router = express.Router();
+
+/**
+ * 记录舰礼操作日志
+ * @param {object} req - 请求对象
+ * @param {string} action - 操作名称
+ * @param {object} details - 操作详情
+ */
+const logGiftOperation = (req, action, details) => {
+    try {
+        const user = req.user || {};
+        addLog({
+            logType: req.method,
+            logName: `舰礼管理-${action}`,
+            logContent: req.originalUrl || req.url,
+            requestParams: JSON.stringify({
+                body: req.body,
+                params: req.params,
+                query: req.query,
+                details: details
+            }),
+            userName: user.username || user.name || '未知用户',
+            userIp: req.ip || req.connection?.remoteAddress || '',
+            logReturn: null
+        });
+    } catch (error) {
+        logger.error('记录舰礼操作日志失败:', error);
+    }
+};
 
 /**
  * 获取当前月份的舰礼列表（公开接口，用于前端展示）
@@ -26,7 +55,7 @@ router.post('/captain-gifts/batch', ...createValidatedRouteHandler({
     gifts: { source: 'body', type: 'array', required: true }
 }, async (req) => {
     const { year, month, gifts } = req.body;
-    
+
     // 验证月份
     if (month < 1 || month > 12) {
         return {
@@ -35,7 +64,7 @@ router.post('/captain-gifts/batch', ...createValidatedRouteHandler({
             code: 400
         };
     }
-    
+
     // 验证gifts数组
     if (!Array.isArray(gifts)) {
         return {
@@ -44,8 +73,20 @@ router.post('/captain-gifts/batch', ...createValidatedRouteHandler({
             code: 400
         };
     }
-    
-    return await batchAddGifts(year, month, gifts);
+
+    const result = await batchAddGifts(year, month, gifts);
+
+    // 记录高危操作日志
+    if (result.success) {
+        logGiftOperation(req, '批量更新', {
+            year,
+            month,
+            giftCount: gifts.length,
+            giftNames: gifts.map(g => g.giftName)
+        });
+    }
+
+    return result;
 }));
 
 /**
@@ -79,7 +120,10 @@ router.post('/captain-gifts', ...createValidatedRouteHandler({
     month: { source: 'body', type: 'number', required: true },
     giftName: { source: 'body', type: 'string', required: true },
     giftContent: { source: 'body', type: 'string', required: false },
-    requiredFansCount: { source: 'body', type: 'number', required: false }
+    requiredFansCount: { source: 'body', type: 'number', required: false },
+    giftType: { source: 'body', type: 'number', required: false },
+    includes: { source: 'body', type: 'number', required: false },
+    showProgress: { source: 'body', type: 'number', required: false }
 }, async (req) => {
     // 验证月份
     if (req.body.month < 1 || req.body.month > 12) {
@@ -89,8 +133,29 @@ router.post('/captain-gifts', ...createValidatedRouteHandler({
             code: 400
         };
     }
-    
-    return await addGift(req.body);
+
+    // 验证礼物类型
+    if (req.body.giftType && ![1, 2, 3].includes(req.body.giftType)) {
+        return {
+            success: false,
+            message: '礼物类型必须是1(舰长)、2(提督)或3(总督)',
+            code: 400
+        };
+    }
+
+    const result = await addGift(req.body);
+
+    // 记录高危操作日志
+    if (result.success) {
+        logGiftOperation(req, '添加', {
+            giftName: req.body.giftName,
+            year: req.body.year,
+            month: req.body.month,
+            giftType: req.body.giftType || 1
+        });
+    }
+
+    return result;
 }));
 
 /**
@@ -100,9 +165,33 @@ router.put('/captain-gifts/:id', ...createValidatedRouteHandler({
     id: { source: 'params', type: 'number', required: true },
     giftName: { source: 'body', type: 'string', required: true },
     giftContent: { source: 'body', type: 'string', required: false },
-    requiredFansCount: { source: 'body', type: 'number', required: false }
+    requiredFansCount: { source: 'body', type: 'number', required: false },
+    giftType: { source: 'body', type: 'number', required: false },
+    includes: { source: 'body', type: 'number', required: false },
+    showProgress: { source: 'body', type: 'number', required: false }
 }, async (req) => {
-    return await updateGift(parseInt(req.params.id), req.body);
+    // 验证礼物类型
+    if (req.body.giftType && ![1, 2, 3].includes(req.body.giftType)) {
+        return {
+            success: false,
+            message: '礼物类型必须是1(舰长)、2(提督)或3(总督)',
+            code: 400
+        };
+    }
+
+    logger.debug(`路由层 - req.body.showProgress: ${req.body.showProgress}, 类型: ${typeof req.body.showProgress}`);
+    const result = await updateGift(parseInt(req.params.id), req.body);
+
+    // 记录高危操作日志
+    if (result.success) {
+        logGiftOperation(req, '编辑', {
+            giftId: req.params.id,
+            giftName: req.body.giftName,
+            giftType: req.body.giftType
+        });
+    }
+
+    return result;
 }));
 
 /**
@@ -111,7 +200,22 @@ router.put('/captain-gifts/:id', ...createValidatedRouteHandler({
 router.delete('/captain-gifts/:id', ...createValidatedRouteHandler({
     id: { source: 'params', type: 'number', required: true }
 }, async (req) => {
-    return await deleteGift(parseInt(req.params.id));
+    // 先获取礼物信息用于日志记录
+    const giftInfo = await getGiftsByMonth(req.query?.year || new Date().getFullYear(), req.query?.month || new Date().getMonth() + 1);
+    const gift = giftInfo.data?.gifts?.find(g => g.id === parseInt(req.params.id));
+
+    const result = await deleteGift(parseInt(req.params.id));
+
+    // 记录高危操作日志
+    if (result.success) {
+        logGiftOperation(req, '删除', {
+            giftId: req.params.id,
+            giftName: gift?.giftName || '未知礼物',
+            giftType: gift?.giftType
+        });
+    }
+
+    return result;
 }));
 
 export default router;

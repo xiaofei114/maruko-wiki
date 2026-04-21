@@ -51,7 +51,11 @@ const giftForm = ref({
     giftName: '',
     giftContent: '',
     requiredFansCount: 0,
-    isLimited: false  // 是否限制舰长数
+    isLimited: false,  // 是否限制舰长数
+    giftType: 1,       // 礼物类型: 1=舰长礼, 2=提督礼, 3=总督礼
+    includesCaptain: false,   // 是否包含舰长礼
+    includesCommander: false, // 是否包含提督礼
+    showProgress: true  // 是否显示进度条
 })
 const giftFormRules = {
     giftName: [
@@ -61,6 +65,34 @@ const giftFormRules = {
     giftContent: [
         { max: 200, message: '礼物内容描述不能超过200个字符', trigger: 'blur' }
     ]
+}
+
+// 礼物类型选项
+const giftTypeOptions = [
+    { label: '舰长礼', value: 1, type: 'primary' },
+    { label: '提督礼', value: 2, type: 'warning' },
+    { label: '总督礼', value: 3, type: 'danger' }
+]
+
+// 获取礼物类型标签
+const getGiftTypeLabel = (type) => {
+    const option = giftTypeOptions.find(opt => opt.value === type)
+    return option ? option.label : '未知'
+}
+
+// 获取礼物类型标签样式
+const getGiftTypeTagType = (type) => {
+    const option = giftTypeOptions.find(opt => opt.value === type)
+    return option ? option.type : 'info'
+}
+
+// 获取包含关系显示文本
+const getIncludesText = (includes) => {
+    if (!includes || includes === 0) return ''
+    const parts = []
+    if (includes & 1) parts.push('含舰长礼')
+    if (includes & 2) parts.push('含提督礼')
+    return parts.join('、')
 }
 
 // 编辑对话框
@@ -1133,7 +1165,11 @@ const openAddGiftDialog = () => {
         giftName: '',
         giftContent: '',
         requiredFansCount: 0,
-        isLimited: false
+        isLimited: false,
+        giftType: 1,
+        includesCaptain: false,
+        includesCommander: false,
+        showProgress: true
     }
     giftDialogVisible.value = true
 }
@@ -1141,12 +1177,17 @@ const openAddGiftDialog = () => {
 // 打开编辑舰礼对话框
 const openEditGiftDialog = (gift) => {
     giftDialogTitle.value = '编辑舰礼'
+    const includes = gift.includes || 0
     giftForm.value = {
         id: gift.id,
         giftName: gift.giftName,
         giftContent: gift.giftContent,
         requiredFansCount: gift.requiredFansCount,
-        isLimited: gift.requiredFansCount > 0
+        isLimited: gift.requiredFansCount > 0,
+        giftType: gift.giftType || 1,
+        includesCaptain: !!(includes & 1),
+        includesCommander: !!(includes & 2),
+        showProgress: gift.showProgress === 0 ? false : true
     }
     giftDialogVisible.value = true
 }
@@ -1163,22 +1204,30 @@ const saveGift = async () => {
                     ? Number(giftForm.value.requiredFansCount) 
                     : 0
                 
+                // 计算包含关系 (bitmap)
+                let includes = 0
+                if (giftForm.value.includesCaptain) includes |= 1
+                if (giftForm.value.includesCommander) includes |= 2
+                
+                const giftData = {
+                    giftName: giftForm.value.giftName,
+                    giftContent: giftForm.value.giftContent,
+                    requiredFansCount: requiredFansCount,
+                    giftType: giftForm.value.giftType,
+                    includes: includes,
+                    showProgress: giftForm.value.showProgress ? 1 : 0
+                }
+                
                 let res
                 if (giftForm.value.id) {
                     // 编辑
-                    res = await updateGift(giftForm.value.id, {
-                        giftName: giftForm.value.giftName,
-                        giftContent: giftForm.value.giftContent,
-                        requiredFansCount: requiredFansCount
-                    })
+                    res = await updateGift(giftForm.value.id, giftData)
                 } else {
                     // 添加
                     res = await addGift({
                         year: parseInt(giftYear.value),
                         month: giftMonth.value,
-                        giftName: giftForm.value.giftName,
-                        giftContent: giftForm.value.giftContent,
-                        requiredFansCount: requiredFansCount
+                        ...giftData
                     })
                 }
                 
@@ -1406,7 +1455,7 @@ const switchToGiftFullPage = () => {
                         </el-tab-pane>
 
                         <!-- 舰礼管理 -->
-                        <el-tab-pane label="舰礼管理" name="gifts-full" v-if="permission === 1">
+                        <el-tab-pane label="舰礼管理" name="gifts-full">
                             <div class="gift-management-compact" @click="switchToGiftFullPage">
                                 <div class="gift-compact-header">
                                     <el-icon><Present /></el-icon>
@@ -1526,22 +1575,40 @@ const switchToGiftFullPage = () => {
                 </el-dialog>
 
                 <!-- 舰礼编辑对话框 -->
-                <el-dialog v-model="giftDialogVisible" :title="giftDialogTitle" width="500px" :close-on-click-modal="false">
+                <el-dialog v-model="giftDialogVisible" :title="giftDialogTitle" width="550px" :close-on-click-modal="false">
                     <el-form :model="giftForm" :rules="giftFormRules" ref="giftFormRef" label-width="100px">
                         <el-form-item label="礼物名称" prop="giftName">
                             <el-input v-model="giftForm.giftName" placeholder="请输入礼物名称" maxlength="50" show-word-limit />
+                        </el-form-item>
+                        <el-form-item label="礼物类型">
+                            <el-radio-group v-model="giftForm.giftType">
+                                <el-radio-button :value="1">舰长礼</el-radio-button>
+                                <el-radio-button :value="2">提督礼</el-radio-button>
+                                <el-radio-button :value="3">总督礼</el-radio-button>
+                            </el-radio-group>
                         </el-form-item>
                         <el-form-item label="礼物内容" prop="giftContent">
                             <el-input v-model="giftForm.giftContent" type="textarea" :rows="3" placeholder="请输入礼物内容描述（可选）" maxlength="200" show-word-limit />
                         </el-form-item>
                         <el-form-item label="解锁条件">
                             <el-radio-group v-model="giftForm.isLimited">
-                                <el-radio :label="false">基础舰礼（无限制）</el-radio>
-                                <el-radio :label="true">达到指定舰长数</el-radio>
+                                <el-radio :value="false">基础礼物（无数量要求）</el-radio>
+                                <el-radio :value="true">达到指定数量</el-radio>
                             </el-radio-group>
                         </el-form-item>
-                        <el-form-item label="目标舰长数" v-if="giftForm.isLimited">
+                        <el-form-item label="目标数量" v-if="giftForm.isLimited">
                             <el-input-number v-model="giftForm.requiredFansCount" :min="1" :max="9999" />
+                        </el-form-item>
+                        <el-form-item label="包含关系" v-if="giftForm.giftType > 1">
+                            <el-checkbox v-model="giftForm.includesCaptain" v-if="giftForm.giftType >= 2">包含舰长礼</el-checkbox>
+                            <el-checkbox v-model="giftForm.includesCommander" v-if="giftForm.giftType >= 3">包含提督礼</el-checkbox>
+                        </el-form-item>
+                        <el-form-item label="显示进度">
+                            <el-radio-group v-model="giftForm.showProgress">
+                                <el-radio :value="true">显示</el-radio>
+                                <el-radio :value="false">隐藏</el-radio>
+                            </el-radio-group>
+                            <el-text type="info" size="small" style="margin-left: 8px;">是否在进度条中显示</el-text>
                         </el-form-item>
                     </el-form>
                     <template #footer>
@@ -1838,16 +1905,38 @@ const switchToGiftFullPage = () => {
                                 <div v-else class="gift-full-list">
                                     <el-table :data="captainGifts" style="width: 100%" stripe>
                                         <el-table-column type="index" label="序号" width="60" align="center" />
-                                        <el-table-column prop="giftName" label="礼物名称" min-width="150" />
-                                        <el-table-column prop="giftContent" label="礼物内容" min-width="250">
+                                        <el-table-column label="类型" width="90" align="center">
+                                            <template #default="{ row }">
+                                                <el-tag :type="getGiftTypeTagType(row.giftType)" size="small">
+                                                    {{ getGiftTypeLabel(row.giftType) }}
+                                                </el-tag>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="giftName" label="礼物名称" min-width="120" />
+                                        <el-table-column prop="giftContent" label="礼物内容" min-width="200">
                                             <template #default="{ row }">
                                                 <span class="gift-content-text">{{ row.giftContent || '-' }}</span>
                                             </template>
                                         </el-table-column>
-                                        <el-table-column label="解锁条件" width="150" align="center">
+                                        <el-table-column label="解锁条件" width="120" align="center">
                                             <template #default="{ row }">
                                                 <el-tag :type="row.requiredFansCount === 0 ? 'success' : 'warning'" size="small">
-                                                    {{ row.requiredFansCount === 0 ? '基础舰礼' : `${row.requiredFansCount}舰长` }}
+                                                    {{ row.requiredFansCount === 0 ? '基础' : `${row.requiredFansCount}` }}
+                                                </el-tag>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column label="包含" width="120" align="center">
+                                            <template #default="{ row }">
+                                                <el-text type="info" size="small" v-if="getIncludesText(row.includes)">
+                                                    {{ getIncludesText(row.includes) }}
+                                                </el-text>
+                                                <span v-else>-</span>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column label="进度" width="80" align="center">
+                                            <template #default="{ row }">
+                                                <el-tag :type="row.showProgress !== 0 ? 'success' : 'info'" size="small">
+                                                    {{ row.showProgress !== 0 ? '显示' : '隐藏' }}
                                                 </el-tag>
                                             </template>
                                         </el-table-column>

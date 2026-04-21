@@ -377,14 +377,63 @@ const maxCaptainCount = ref(0) // 当月最高舰长数
 const showGiftsSection = computed(() => captainGifts.value.length > 0) // 是否有舰礼
 const showGiftsDetailDialog = ref(false) // 舰礼详情弹窗
 
-// 按目标舰长数排序的舰礼列表（基础舰礼排在最前面）
-const sortedGifts = computed(() => {
-  return [...captainGifts.value].sort((a, b) => {
-    // 基础舰礼（requiredFansCount === 0）排在最前面
-    if (a.requiredFansCount === 0) return -1
-    if (b.requiredFansCount === 0) return 1
-    return a.requiredFansCount - b.requiredFansCount
+// 礼物类型标签
+const giftTypeLabels = {
+  1: '舰长礼物',
+  2: '提督礼物',
+  3: '总督礼物'
+}
+
+const giftTypeColors = {
+  1: '#409eff',
+  2: '#e6a23c',
+  3: '#f56c6c'
+}
+
+// 按礼物类型分组的舰礼
+const groupedGifts = computed(() => {
+  const groups = { 1: [], 2: [], 3: [] }
+  captainGifts.value.forEach(gift => {
+    const type = parseInt(gift.giftType) || 1
+    if (groups[type]) {
+      groups[type].push(gift)
+    }
   })
+  // 每个组内按 requiredFansCount 排序
+  Object.keys(groups).forEach(key => {
+    groups[key].sort((a, b) => {
+      if (a.requiredFansCount === 0) return -1
+      if (b.requiredFansCount === 0) return 1
+      return a.requiredFansCount - b.requiredFansCount
+    })
+  })
+  return groups
+})
+
+// 按目标舰长数排序的舰礼列表（基础舰礼排在最前面）- 只包含显示进度条的舰礼
+const sortedGifts = computed(() => {
+  return [...captainGifts.value]
+    .filter(gift => parseInt(gift.showProgress) !== 0) // 只显示需要显示进度条的
+    .sort((a, b) => {
+      // 基础舰礼（requiredFansCount === 0）排在最前面
+      if (a.requiredFansCount === 0) return -1
+      if (b.requiredFansCount === 0) return 1
+      return a.requiredFansCount - b.requiredFansCount
+    })
+    .map((gift, index) => ({ ...gift, index })) // 添加索引
+})
+
+// 按位置分组的舰礼（用于进度条显示）
+const groupedGiftsByPosition = computed(() => {
+  const groups = {}
+  sortedGifts.value.forEach(gift => {
+    const position = getStagePosition(gift)
+    if (!groups[position]) {
+      groups[position] = []
+    }
+    groups[position].push(gift)
+  })
+  return groups
 })
 
 // 最大目标舰长数（用于计算进度条位置）
@@ -1387,24 +1436,64 @@ onMounted(async () => {
 
               <!-- 单条多阶段进度条 -->
               <div class="single-progress-bar">
-                <!-- 阶段节点 -->
+                <!-- 阶段节点 - 按位置分组显示 -->
                 <div class="stage-nodes">
-                  <div
-                    v-for="(gift, index) in sortedGifts"
-                    :key="gift.id"
-                    class="stage-node"
-                    :class="{
-                      'unlocked': isGiftUnlocked(gift),
-                      'current': isNextTarget(gift)
-                    }"
-                    :style="{ left: getStagePosition(gift) + '%' }"
-                  >
-                    <div class="node-badge">
-                      <el-icon v-if="isGiftUnlocked(gift)"><Check /></el-icon>
-                      <span v-else>{{ index + 1 }}</span>
-                    </div>
-                    <div class="node-label">{{ gift.requiredFansCount === 0 ? '基础' : gift.requiredFansCount }}</div>
-                  </div>
+                  <template v-for="(group, position) in groupedGiftsByPosition" :key="position">
+                    <el-tooltip
+                      placement="top"
+                      :show-after="200"
+                    >
+                      <template #content>
+                        <div class="gift-tooltip-multi">
+                          <div class="tooltip-title">该节点包含 {{ group.length }} 个礼物</div>
+                          <div class="tooltip-gifts-list">
+                            <div v-for="gift in group" :key="gift.id" class="tooltip-gift-item">
+                              <div class="tooltip-header" :style="{ color: giftTypeColors[gift.giftType] }">
+                                <el-icon size="14"><Present /></el-icon>
+                                <span>{{ giftTypeLabels[gift.giftType] }}</span>
+                                <el-tag size="small" :type="isGiftUnlocked(gift) ? 'success' : 'info'" class="tooltip-status-tag">
+                                  {{ gift.requiredFansCount === 0 ? '基础' : gift.requiredFansCount + '舰长' }}
+                                </el-tag>
+                              </div>
+                              <div class="tooltip-gift-name">{{ gift.giftName }}</div>
+                              <div class="tooltip-gift-content" v-if="gift.giftContent">{{ gift.giftContent }}</div>
+                              <div class="tooltip-gift-tags" v-if="parseInt(gift.includes) > 0">
+                                <el-tag v-if="parseInt(gift.includes) & 1" type="info" size="small">含舰长礼</el-tag>
+                                <el-tag v-if="parseInt(gift.includes) & 2" type="info" size="small">含提督礼</el-tag>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                      <div
+                        class="stage-node"
+                        :class="{
+                          'unlocked': group.some(g => isGiftUnlocked(g)),
+                          'current': group.some(g => isNextTarget(g)),
+                          'multi-gifts': group.length > 1,
+                          'multi-2': group.length === 2,
+                          'multi-3': group.length >= 3,
+                          'type-captain': group.length === 1 && group[0].giftType === 1,
+                          'type-commander': group.length === 1 && group[0].giftType === 2,
+                          'type-governor': group.length === 1 && group[0].giftType === 3
+                        }"
+                        :style="{ left: position + '%' }"
+                      >
+                        <div class="node-badge" :class="{ 'multi-badge': group.length > 1 }">
+                          <template v-if="group.length > 1">
+                            <div class="multi-indicator">
+                              <span class="multi-count">{{ group.length }}</span>
+                            </div>
+                          </template>
+                          <template v-else>
+                            <el-icon v-if="isGiftUnlocked(group[0])"><Check /></el-icon>
+                            <span v-else>{{ group[0].index + 1 }}</span>
+                          </template>
+                        </div>
+                        <div class="node-label">{{ group[0].requiredFansCount === 0 ? '基础' : group[0].requiredFansCount }}</div>
+                      </div>
+                    </el-tooltip>
+                  </template>
                 </div>
 
                 <!-- 进度条背景 -->
@@ -1419,37 +1508,70 @@ onMounted(async () => {
                 </div>
               </div>
 
-              <!-- 舰礼卡片列表 -->
-              <div class="gifts-cards">
-                <div
-                  v-for="(gift, index) in sortedGifts"
-                  :key="gift.id"
-                  class="gift-card"
-                  :class="{
-                    'unlocked': isGiftUnlocked(gift),
-                    'current': isNextTarget(gift)
-                  }"
-                >
-                  <div class="gift-card-header">
-                    <div class="gift-step-num">{{ index + 1 }}</div>
-                    <div class="gift-status-icon">
-                      <el-icon v-if="isGiftUnlocked(gift)"><Check /></el-icon>
-                      <el-icon v-else-if="isNextTarget(gift)"><Loading /></el-icon>
-                      <el-icon v-else><Lock /></el-icon>
+              <!-- 图例 -->
+              <div class="progress-legend">
+                <div class="legend-item">
+                  <div class="legend-dot type-captain"></div>
+                  <span>舰长礼</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot type-commander"></div>
+                  <span>提督礼</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-dot type-governor"></div>
+                  <span>总督礼</span>
+                </div>
+              </div>
+
+              <!-- 舰礼卡片列表 - 按类型分组 -->
+              <div class="gifts-by-type">
+                <template v-for="type in [1, 2, 3]" :key="type">
+                  <div v-if="groupedGifts[type]?.length > 0" class="gift-type-section" :style="{ borderLeftColor: giftTypeColors[type] }">
+                    <div class="gift-type-header" :style="{ color: giftTypeColors[type] }">
+                      <el-icon size="18"><Present /></el-icon>
+                      <span class="type-name">{{ giftTypeLabels[type] }}</span>
+                      <el-tag size="small" :type="type === 1 ? 'primary' : (type === 2 ? 'warning' : 'danger')" effect="light" class="count-tag">
+                        {{ groupedGifts[type].length }}
+                      </el-tag>
+                    </div>
+                    <div class="gifts-cards">
+                      <div
+                        v-for="(gift, index) in groupedGifts[type]"
+                        :key="gift.id"
+                        class="gift-card"
+                        :class="{
+                          'unlocked': isGiftUnlocked(gift),
+                          'current': isNextTarget(gift)
+                        }"
+                      >
+                        <div class="gift-card-header">
+                          <div class="gift-step-num">{{ index + 1 }}</div>
+                          <div class="gift-status-icon">
+                            <el-icon v-if="isGiftUnlocked(gift)"><Check /></el-icon>
+                            <el-icon v-else-if="isNextTarget(gift)"><Loading /></el-icon>
+                            <el-icon v-else><Lock /></el-icon>
+                          </div>
+                        </div>
+                        <div class="gift-card-body">
+                          <div class="gift-name">{{ gift.giftName }}</div>
+                          <div class="gift-content" v-if="gift.giftContent">{{ gift.giftContent }}</div>
+                          <div class="gift-tags-row">
+                            <el-tag 
+                              :type="isGiftUnlocked(gift) ? 'success' : (isNextTarget(gift) ? 'warning' : 'info')" 
+                              size="small"
+                              class="gift-tag"
+                            >
+                              {{ gift.requiredFansCount === 0 ? '基础' : gift.requiredFansCount + '解锁' }}
+                            </el-tag>
+                            <el-tag v-if="parseInt(gift.includes) & 1" type="info" size="small" class="gift-tag">含舰长礼</el-tag>
+                            <el-tag v-if="parseInt(gift.includes) & 2" type="info" size="small" class="gift-tag">含提督礼</el-tag>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div class="gift-card-body">
-                    <div class="gift-name">{{ gift.giftName }}</div>
-                    <div class="gift-content" v-if="gift.giftContent">{{ gift.giftContent }}</div>
-                    <el-tag 
-                      :type="isGiftUnlocked(gift) ? 'success' : (isNextTarget(gift) ? 'warning' : 'info')" 
-                      size="small"
-                      class="gift-tag"
-                    >
-                      {{ gift.requiredFansCount === 0 ? '基础舰礼' : gift.requiredFansCount + '舰长解锁' }}
-                    </el-tag>
-                  </div>
-                </div>
+                </template>
               </div>
             </div>
           </el-scrollbar>
@@ -2750,6 +2872,77 @@ onMounted(async () => {
     padding: 8px 16px;
     font-size: 13px;
   }
+
+  /* 小屏幕进度条优化 */
+  .single-progress-bar {
+    padding: 30px 4px 20px;
+  }
+
+  .stage-nodes {
+    height: 35px;
+    margin-bottom: -18px;
+  }
+
+  .node-badge {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+
+  .node-label {
+    font-size: 8px;
+    max-width: 35px;
+  }
+
+  .multi-count {
+    font-size: 9px;
+  }
+
+  .progress-legend {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    font-size: 10px;
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-width: 1px;
+  }
+
+  /* 小屏幕悬浮提示 */
+  .gift-tooltip-multi {
+    max-width: 200px;
+  }
+
+  .tooltip-title {
+    font-size: 11px;
+  }
+
+  .tooltip-gift-item {
+    padding: 6px 8px;
+  }
+
+  .tooltip-gift-item .tooltip-header {
+    font-size: 10px;
+  }
+
+  .tooltip-gift-name {
+    font-size: 11px;
+  }
+
+  .tooltip-gift-content {
+    font-size: 9px;
+  }
+
+  .tooltip-status-tag {
+    font-size: 9px;
+    height: 16px;
+    padding: 0 4px;
+  }
 }
 
 /* 横屏手机适配 */
@@ -2934,8 +3127,8 @@ onMounted(async () => {
 
 .stage-node {
   position: absolute;
-  top: 0;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translateX(-50%) translateY(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2990,6 +3183,206 @@ onMounted(async () => {
 .stage-node.current .node-label {
   color: #e6a23c;
   font-weight: 600;
+}
+
+/* 礼物类型颜色区分 */
+/* 礼物类型颜色区分 - 未解锁状态 */
+.stage-node.type-captain .node-badge {
+  border-color: #409eff;
+  color: #409eff;
+  background: #ecf5ff;
+}
+
+.stage-node.type-commander .node-badge {
+  border-color: #e6a23c;
+  color: #e6a23c;
+  background: #fdf6ec;
+}
+
+.stage-node.type-governor .node-badge {
+  border-color: #f56c6c;
+  color: #f56c6c;
+  background: #fef0f0;
+}
+
+/* 礼物类型颜色区分 - 已解锁状态 */
+.stage-node.type-captain.unlocked .node-badge {
+  background: #409eff;
+  border-color: #409eff;
+  color: #fff;
+}
+
+.stage-node.type-commander.unlocked .node-badge {
+  background: #e6a23c;
+  border-color: #e6a23c;
+  color: #fff;
+}
+
+.stage-node.type-governor.unlocked .node-badge {
+  background: #f56c6c;
+  border-color: #f56c6c;
+  color: #fff;
+}
+
+/* 多礼物节点样式 */
+.stage-node.multi-gifts .node-badge {
+  background: linear-gradient(135deg, #409eff 33%, #e6a23c 33%, #e6a23c 66%, #f56c6c 66%);
+  border-color: #909399;
+  color: #fff;
+}
+
+.stage-node.multi-gifts.unlocked .node-badge {
+  background: linear-gradient(135deg, #409eff 33%, #e6a23c 33%, #e6a23c 66%, #f56c6c 66%);
+  border-color: #67c23a;
+}
+
+.multi-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.multi-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* 多礼物悬浮提示 */
+.gift-tooltip-multi {
+  max-width: 280px;
+}
+
+.gift-tooltip-multi > .tooltip-title {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+
+
+.tooltip-gift-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.tooltip-gift-item .tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tooltip-status-tag {
+  margin-left: auto;
+  font-size: 10px;
+  height: 18px;
+  padding: 0 6px;
+}
+
+.tooltip-gift-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.tooltip-gift-content {
+  font-size: 11px;
+  color: #606266;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+/* 图例 */
+.progress-legend {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #e4e7ed;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #606266;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid;
+}
+
+.legend-dot.type-captain {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.legend-dot.type-commander {
+  border-color: #e6a23c;
+  background: #fdf6ec;
+}
+
+.legend-dot.type-governor {
+  border-color: #f56c6c;
+  background: #fef0f0;
+}
+
+/* 礼物悬浮提示 */
+.gift-tooltip-multi {
+  max-width: 280px;
+}
+
+.gift-tooltip-multi > .tooltip-title {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.tooltip-gifts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.tooltip-gift-item {
+  padding: 10px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border-left: 3px solid #dcdfe6;
+}
+
+.tooltip-gift-item:nth-child(3n+1) {
+  border-left-color: #409eff;
+}
+
+.tooltip-gift-item:nth-child(3n+2) {
+  border-left-color: #e6a23c;
+}
+
+.tooltip-gift-item:nth-child(3n+3) {
+  border-left-color: #f56c6c;
 }
 
 /* 进度条轨道 */
@@ -3229,17 +3622,52 @@ onMounted(async () => {
 
 @media (max-width: 600px) {
   .single-progress-bar {
-    padding: 35px 5px 25px;
+    padding: 35px 8px 25px;
+  }
+
+  .stage-nodes {
+    height: 40px;
+    margin-bottom: -20px;
   }
 
   .node-badge {
-    width: 28px;
-    height: 28px;
-    font-size: 12px;
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
   }
 
   .node-label {
+    font-size: 9px;
+    max-width: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .multi-count {
+    font-size: 11px;
+  }
+
+  .current-marker {
+    margin-top: 6px;
+  }
+
+  .marker-label {
     font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .progress-legend {
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .legend-item {
+    font-size: 11px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
   }
 
   .gifts-stats {
@@ -3251,5 +3679,61 @@ onMounted(async () => {
   .gift-name {
     font-size: 13px;
   }
+
+  /* 手机端悬浮提示优化 */
+  .gift-tooltip-multi {
+    max-width: 240px;
+  }
+
+  .tooltip-gifts-list {
+    max-height: 200px;
+  }
+
+  .tooltip-gift-item {
+    padding: 8px 10px;
+  }
+
+  .tooltip-gift-name {
+    font-size: 12px;
+  }
+
+  .tooltip-gift-content {
+    font-size: 10px;
+  }
+}
+
+/* 舰礼类型分组样式 */
+.gifts-by-type {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.gift-type-section {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 16px;
+  border-left: 4px solid;
+}
+
+.gift-type-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.gift-type-header .type-name {
+  flex: 1;
+}
+
+.gift-type-header .count-tag {
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 0 10px;
+  height: 22px;
+  line-height: 20px;
 }
 </style>

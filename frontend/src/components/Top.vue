@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { ElMessageBox } from 'element-plus'
+import { Close } from '@element-plus/icons-vue'
 import img from '@/assets/猫玩伴.png'
 
 
@@ -331,27 +332,29 @@ const openLink = (url) => {
       </div>
 
       <!-- 移动端侧边栏菜单 -->
-      <div v-show="showMobileMenu || isSidebarClosing" class="mobile-sidebar-overlay" @click="closeMobileMenu">
-        <div class="mobile-sidebar" :class="{ 'sidebar-closing': isSidebarClosing }" @click.stop>
+      <div v-show="showMobileMenu || isSidebarClosing" class="mobile-sidebar-overlay" @click="closeMobileMenu" @touchmove.prevent>
+        <div class="mobile-sidebar" :class="{ 'sidebar-closing': isSidebarClosing }" @click.stop @touchmove.stop>
           <div class="mobile-sidebar-header">
             <h3>小猫丸子Wiki</h3>
           </div>
-          <el-menu :default-active="activeNavIndex" class="mobile-sidebar-menu" @select="handleMenuSelect">
-            <template v-for="item in navItems" :key="item.path">
-              <el-sub-menu v-if="item.isDropdown" :index="item.name">
-                <template #title>
+          <el-scrollbar class="sidebar-scrollbar">
+            <el-menu :default-active="activeNavIndex" class="mobile-sidebar-menu" @select="handleMenuSelect">
+              <template v-for="item in navItems" :key="item.path">
+                <el-sub-menu v-if="item.isDropdown" :index="item.name">
+                  <template #title>
+                    <span>{{ item.name }}</span>
+                  </template>
+                  <el-menu-item v-for="link in friendlyLinks" :key="link.url" :index="link.url"
+                    @click="openLink(link.url)">
+                    <span>{{ link.name }}</span>
+                  </el-menu-item>
+                </el-sub-menu>
+                <el-menu-item v-else :index="item.path">
                   <span>{{ item.name }}</span>
-                </template>
-                <el-menu-item v-for="link in friendlyLinks" :key="link.url" :index="link.url"
-                  @click="openLink(link.url)">
-                  <span>{{ link.name }}</span>
                 </el-menu-item>
-              </el-sub-menu>
-              <el-menu-item v-else :index="item.path">
-                <span>{{ item.name }}</span>
-              </el-menu-item>
-            </template>
-          </el-menu>
+              </template>
+            </el-menu>
+          </el-scrollbar>
         </div>
       </div>
     </div>
@@ -818,11 +821,13 @@ const openLink = (url) => {
   left: 0;
   width: 280px;
   height: 100vh;
+  max-height: 100vh;
   background: white;
   box-shadow: 2px 0 20px rgba(0, 0, 0, 0.15);
   animation: slideInLeft 0.3s ease;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .mobile-sidebar.sidebar-closing {
@@ -831,10 +836,17 @@ const openLink = (url) => {
 
 /* 移动端侧边栏菜单 */
 .mobile-sidebar-menu {
-  flex: 1;
   background: transparent;
   border: none;
   padding: 0;
+  width: 100%;
+}
+
+/* 侧边栏滚动区域 */
+.sidebar-scrollbar {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .mobile-sidebar-header {
@@ -845,12 +857,22 @@ const openLink = (url) => {
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
   color: white;
   height: 60px;
+  flex-shrink: 0;
 }
 
 .mobile-sidebar-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+}
+
+.close-btn {
+  color: white !important;
+  padding: 8px !important;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
 }
 
 

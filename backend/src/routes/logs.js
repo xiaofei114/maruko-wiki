@@ -20,6 +20,6 @@ router.get('/logs', ...createAdminRoute(async (req) => {
         pageSize: parseInt(pageSize) || 10,
         showUserIp: showUserIp === 'true' || showUserIp === true
     });
-}, 2));
+}, 1));
 
 export default router;

@@ -21,12 +21,15 @@ export async function getGiftsByMonth(year, month) {
                 gift_name,
                 gift_content,
                 required_fans_count,
+                gift_type,
+                includes,
+                show_progress,
                 sort_order,
                 create_time,
                 update_time
             FROM captain_gifts 
             WHERE year = ? AND month = ?
-            ORDER BY required_fans_count ASC, id ASC`,
+            ORDER BY gift_type ASC, required_fans_count ASC, id ASC`,
             [year, month]
         );
 
@@ -40,6 +43,9 @@ export async function getGiftsByMonth(year, month) {
                 giftName: item.gift_name,
                 giftContent: item.gift_content,
                 requiredFansCount: item.required_fans_count,
+                giftType: item.gift_type || 1,
+                includes: item.includes || 0,
+                showProgress: item.show_progress !== undefined && item.show_progress !== null ? item.show_progress : 1,
                 sortOrder: item.sort_order,
                 createTime: item.create_time,
                 updateTime: item.update_time
@@ -69,7 +75,7 @@ export async function getCurrentMonthGifts() {
  */
 export async function addGift(giftData) {
     try {
-        const { year, month, giftName, giftContent, requiredFansCount, sortOrder } = giftData;
+        const { year, month, giftName, giftContent, requiredFansCount, giftType, includes, showProgress, sortOrder } = giftData;
 
         // 检查是否已存在
         const existing = queryOne(
@@ -81,10 +87,13 @@ export async function addGift(giftData) {
             return createErrorResponse('该月份已存在同名舰礼');
         }
 
+        // 处理 showProgress，确保能正确保存 0 值
+        const finalShowProgress = showProgress !== undefined && showProgress !== null ? Number(showProgress) : 1;
+
         const id = insert(
-            `INSERT INTO captain_gifts (year, month, gift_name, gift_content, required_fans_count, sort_order) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [year, month, giftName, giftContent || '', requiredFansCount || 0, sortOrder || 0]
+            `INSERT INTO captain_gifts (year, month, gift_name, gift_content, required_fans_count, gift_type, includes, show_progress, sort_order) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [year, month, giftName, giftContent || '', requiredFansCount || 0, giftType || 1, includes || 0, finalShowProgress, sortOrder || 0]
         );
 
         logger.info(`添加舰礼成功: ${giftName}, ${year}年${month}月`);
@@ -103,7 +112,7 @@ export async function addGift(giftData) {
  */
 export async function updateGift(id, giftData) {
     try {
-        const { giftName, giftContent, requiredFansCount, sortOrder } = giftData;
+        const { giftName, giftContent, requiredFansCount, giftType, includes, showProgress, sortOrder } = giftData;
 
         // 检查是否存在
         const existing = queryOne(
@@ -127,14 +136,19 @@ export async function updateGift(id, giftData) {
             }
         }
 
-        update(
+        // 处理 showProgress，确保能正确保存 0 值
+        logger.debug(`更新舰礼 - 接收到的 showProgress: ${showProgress}, 类型: ${typeof showProgress}`);
+        const finalShowProgress = showProgress !== undefined && showProgress !== null ? Number(showProgress) : 1;
+        logger.debug(`更新舰礼 - 处理后的 finalShowProgress: ${finalShowProgress}`);
+
+        const updateResult = update(
             `UPDATE captain_gifts 
-             SET gift_name = ?, gift_content = ?, required_fans_count = ?, sort_order = ?
+             SET gift_name = ?, gift_content = ?, required_fans_count = ?, gift_type = ?, includes = ?, show_progress = ?, sort_order = ?
              WHERE id = ?`,
-            [giftName, giftContent || '', requiredFansCount || 0, sortOrder || 0, id]
+            [giftName, giftContent || '', requiredFansCount || 0, giftType || 1, includes || 0, finalShowProgress, sortOrder || 0, id]
         );
 
-        logger.info(`更新舰礼成功: ID ${id}`);
+        logger.info(`更新舰礼成功: ID ${id}, 影响行数: ${updateResult.changes}`);
         return createSuccessResponse('更新舰礼成功');
     } catch (error) {
         logger.error('更新舰礼失败:', error);
@@ -184,9 +198,9 @@ export async function batchAddGifts(year, month, gifts) {
         for (let i = 0; i < gifts.length; i++) {
             const gift = gifts[i];
             insert(
-                `INSERT INTO captain_gifts (year, month, gift_name, gift_content, required_fans_count, sort_order) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [year, month, gift.giftName, gift.giftContent || '', gift.requiredFansCount || 0, i]
+                `INSERT INTO captain_gifts (year, month, gift_name, gift_content, required_fans_count, gift_type, includes, show_progress, sort_order) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [year, month, gift.giftName, gift.giftContent || '', gift.requiredFansCount || 0, gift.giftType || 1, gift.includes || 0, gift.showProgress !== undefined ? gift.showProgress : 1, i]
             );
         }
 

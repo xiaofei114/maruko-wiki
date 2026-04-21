@@ -16,7 +16,7 @@ const router = express.Router();
 // 获取仪表盘数据
 router.get('/dashboard', ...createAdminRoute(async () => {
     return await getDashboardStats();
-}, 1, { logName: '获取仪表盘数据' }));
+}, 2, { logName: '获取仪表盘数据' }));
 
 // 获取用户列表
 router.get('/users', ...createAdminRoute(async (req) => {

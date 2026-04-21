@@ -78,7 +78,7 @@ onMounted(() => {
         <!-- 欢迎区域 -->
         <div class="welcome-section">
             <div class="welcome-content">
-                <h1 class="welcome-title">欢迎回来，{{ userStore.userInfo?.name || '管理员' }}</h1>
+                <h1 class="welcome-title">欢迎回来，{{ userStore?.user || '管理员' }}</h1>
                 <p class="welcome-subtitle">这是您的管理后台仪表盘</p>
             </div>
             <div class="welcome-decoration"></div>

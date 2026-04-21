@@ -147,6 +147,34 @@ captain_gifts:
   gift_name: 礼物名称
   gift_content: 礼物内容描述
   required_fans_count: 解锁所需粉丝数 (0表示无限制，为基础舰礼)
+  gift_type: 礼物类型 (1=舰长礼, 2=提督礼, 3=总督礼)
+  includes: 礼物包含内容 1=包含舰长礼, 2=包含提督礼, 4=包含总督礼
+  show_progress: 是否显示进度条
   sort_order: 排序顺序
   create_time: 创建时间
   update_time: 更新时间
+
+
+# ==================== 说明 ====================
+# gift_type: 礼物类型
+#   1 = 舰长礼 (普通舰长可解锁)
+#   2 = 提督礼 (提督可解锁)
+#   3 = 总督礼 (总督可解锁)
+#
+# includes: 包含关系 (bitmap)
+#   0 = 不包含其他礼物
+#   1 = 包含舰长礼 (提督礼/总督礼包含舰长礼)
+#   2 = 包含提督礼 (总督礼包含提督礼)
+#   3 = 同时包含舰长礼和提督礼 (总督礼包含两者)
+#   4 = 包含总督礼 (预留)
+#
+# show_progress: 是否显示进度条
+#   0 = 不显示进度条 (如总督礼、提督礼通常不显示)
+#   1 = 显示进度条 (如舰长礼通常显示)
+#
+# 使用示例:
+# 1. 基础舰长礼: gift_type=1, includes=0, show_progress=1
+# 2. 提督礼(包含舰长礼): gift_type=2, includes=1, show_progress=0
+# 3. 总督礼(包含提督和舰长): gift_type=3, includes=3, show_progress=0
+# 4. 特殊提督礼(不包含舰长礼): gift_type=2, includes=0, show_progress=0
+# 5. 带进度条的总督礼: gift_type=3, includes=3, show_progress=1

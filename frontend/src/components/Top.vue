@@ -14,6 +14,8 @@ const showMobileMenu = ref(false)
 const isSidebarClosing = ref(false)
 const sidebarTimer = ref(null)
 
+const title = import.meta.env.VITE_APP_TITLE
+
 // 点击外部关闭下拉菜单
 const handleClickOutside = (e) => {
   const userArea = document.querySelector('.user-area')
@@ -68,7 +70,7 @@ const getPermissionName = () => {
       type: 'warning'
     },
     3: {
-      name: '猫丸伴',
+      name: `${import.meta.env.VITE_APP_DD_NAME}`,
       type: 'primary'
     },
   }
@@ -274,7 +276,7 @@ const openLink = (url) => {
       <div class="brand">
         <el-avatar :size="28" :src="img" class="brand-avatar" @click="onBrandClick" />
         <router-link to="/" class="brand-link" @keydown="onBrandKeydown">
-          <span class="brand-text">小猫丸子Wiki</span>
+          <span class="brand-text">{{ title }}</span>
         </router-link>
       </div>
 
@@ -335,7 +337,7 @@ const openLink = (url) => {
       <div v-show="showMobileMenu || isSidebarClosing" class="mobile-sidebar-overlay" @click="closeMobileMenu" @touchmove.prevent>
         <div class="mobile-sidebar" :class="{ 'sidebar-closing': isSidebarClosing }" @click.stop @touchmove.stop>
           <div class="mobile-sidebar-header">
-            <h3>小猫丸子Wiki</h3>
+            <h3>{{ title }}</h3>
           </div>
           <el-scrollbar class="sidebar-scrollbar">
             <el-menu :default-active="activeNavIndex" class="mobile-sidebar-menu" @select="handleMenuSelect">

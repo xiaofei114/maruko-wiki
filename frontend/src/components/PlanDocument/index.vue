@@ -11,6 +11,8 @@ import DocxPreview from '@/components/ComponentStyle/DocxPreview.vue'
 const userStore = useUserStore()
 const { isAuthenticated } = storeToRefs(userStore)
 
+const nickName = import.meta.env.VITE_APP_NICK_NAME;
+
 const planDocuments = ref([])
 const loading = ref(false)
 const error = ref(null)
@@ -219,7 +221,7 @@ onMounted(() => {
 <template>
   <div class="plan-document-page">
     <div class="container">
-      <PageHero title="丸子企划" subtitle="绘出明日蓝图，邀你共同执笔未来" />
+      <PageHero :title="`${nickName}企划`" subtitle="绘出明日蓝图，邀你共同执笔未来" />
 
       <div class="controls-card" v-if="isAuthenticated">
         <div class="controls-main">

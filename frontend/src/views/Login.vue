@@ -35,6 +35,9 @@ const codeCountdown = ref(0)
 const codeButtonText = ref('发送验证码')
 const verificationSent = ref(false) // 标记是否已发送过验证码
 
+const ddName = import.meta.env.VITE_APP_DD_NAME
+const hostName = import.meta.env.VITE_APP_HOST_NAME
+
 // 登录表单验证规则
 const loginRules = {
   email: [
@@ -247,11 +250,12 @@ const goBack = () => {
       </div>
 
       <div class="login-header">
-        <h2>猫丸子Maruko</h2>
-        <p>{{ isLoginMode ? '猫丸伴，欢迎回家！' : '是新的猫丸伴吗！？' }}</p>
+        <h2>{{ hostName }}</h2>
+        <p>{{ isLoginMode ? `${ddName}，欢迎回家！` : `是新的${ddName}吗！？` }}</p>
       </div>
 
-      <div class="form-flipper" :class="{ 'flipped': !isLoginMode }" :style="{ height: isLoginMode ? '160px' : '310px' }">
+      <div class="form-flipper" :class="{ 'flipped': !isLoginMode }"
+        :style="{ height: isLoginMode ? '160px' : '310px' }">
         <!-- 登录表单 -->
         <div class="form-panel login-panel">
           <el-form class="login-form" ref="loginFormRef" :model="loginForm" :rules="loginRules">

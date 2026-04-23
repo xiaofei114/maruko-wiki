@@ -11,11 +11,14 @@ const router = useRouter()
 // 响应式数据
 const loading = ref(true)
 const error = ref(null)
-const anchorName = ref('猫丸子Maruko') // 可以在这里修改为主播名字
+const anchorName = ref(import.meta.env.VITE_APP_HOST_NAME) // 可以在这里修改为主播名字
 const defaultAvatar = ref("")
 const roomInfo = ref({})
 const captain = ref(0)
 const requiredEffectiveDays = 22 // 每月需要的有效天数
+const userId = import.meta.env.VITE_APP_USER_ID;
+const roomId = import.meta.env.VITE_APP_ROOM_ID;
+const nickName = import.meta.env.VITE_APP_NICK_NAME;
 
 // 计算本月总直播时长（精确到分钟）
 const liveHours = computed(() => {
@@ -1062,7 +1065,7 @@ onMounted(async () => {
           </div>
         </div>
         <el-button type="primary" plain
-          @click="goTo('https://space.bilibili.com/3546938511198692', false)">进入主页</el-button>
+          @click="goTo(`https://space.bilibili.com/${userId}`, false)">进入主页</el-button>
       </div>
 
       <!-- 加载状态 -->
@@ -1584,7 +1587,7 @@ onMounted(async () => {
           <img class="module-img" :src="roomInfo.user_cover" alt="直播封面">
           <div class="module-body">
             <div class="status-content">
-              <div class="status-indicator clickable" @click="goTo('https://live.bilibili.com/1929354869', false)">
+              <div class="status-indicator clickable" @click="goTo(`https://live.bilibili.com/${roomId}`, false)">
                 {{ getStatusText(roomInfo.live_status) }}
               </div>
               <div v-if="roomInfo.live_status === 1" class="online-count">
@@ -1602,13 +1605,12 @@ onMounted(async () => {
       <!-- 分隔线 -->
       <hr class="section-divider">
 
-      <!-- 丸子专区 -->
       <div class="maruko-section">
         <div class="maruko-content">
 
           <div class="module-card photo-album-module" @click="goTo('/photo-album', true)" style="cursor: pointer;">
             <div class="module-header">
-              <h2>丸子相簿</h2>
+              <h2>{{ nickName }}相簿</h2>
             </div>
             <div class="module-body">
               <div class="album-content">
@@ -1621,7 +1623,7 @@ onMounted(async () => {
 
           <div class="module-card message-module" @click="goTo('/audio', true)" style="cursor: pointer;">
             <div class="module-header">
-              <h2>丸子音声</h2>
+              <h2>{{ nickName }}音声</h2>
             </div>
             <div class="module-body">
               <div class="message-content">
@@ -1634,7 +1636,7 @@ onMounted(async () => {
 
           <div class="module-card message-module" @click="goTo('/plan-document', true)" style="cursor: pointer;">
             <div class="module-header">
-              <h2>丸子企划</h2>
+              <h2>{{ nickName }}企划</h2>
             </div>
             <div class="module-body">
               <div class="message-content">
@@ -2563,7 +2565,7 @@ onMounted(async () => {
   color: #d9d9d9;
 }
 
-/* 丸子相簿样式 */
+/* 主播相簿样式 */
 .album-content,
 .message-content {
   min-height: 150px;
@@ -2613,7 +2615,7 @@ onMounted(async () => {
   opacity: 0.3;
 }
 
-/* 丸子专区样式 */
+/* 主播专区样式 */
 .maruko-section {
   margin-top: 20px;
 }

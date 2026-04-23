@@ -10,6 +10,8 @@ import { getAlbums, createAlbum } from '@/api/album'
 import PageHero from '@/components/ComponentStyle/PageHero.vue'
 import img from '@/assets/背景图.jpg'
 
+const nickName = import.meta.env.VITE_APP_NICK_NAME;
+
 const router = useRouter()
 
 // 用户状态
@@ -142,7 +144,7 @@ onMounted(() => {
 <template>
   <div class="photo-album-page">
     <div class="content-wrapper">
-      <PageHero title="丸子相簿" subtitle="记录精彩时刻，与你分享美好时光" />
+      <PageHero :title="`${nickName}相簿`" subtitle="记录精彩时刻，与你分享美好时光" />
       <div v-if="loading" class="loading-container">
         <div class="loading-spinner"></div>
         <p>正在加载相册...</p>

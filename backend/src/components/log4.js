@@ -150,7 +150,7 @@ export default async function () {
     }
 
     // 蓝色前缀（保留原始设计）
-    const prefix = chalk.blue('[maruko-node]')
+    const prefix = chalk.blue(`[${log.prefix}]`)
 
     // 动态绑定日志方法并添加颜色
     for (const level of Object.keys(LEVEL_COLORS)) {

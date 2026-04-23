@@ -9,6 +9,8 @@ const platformLinks = [
     { name: '爱发电', icon: aifadian, url: 'https://afdian.com/a/xiaofeiqwq/' }
 ]
 
+const title = import.meta.env.VITE_APP_TITLE
+
 const currentYear = new Date().getFullYear()
 </script>
 
@@ -20,7 +22,7 @@ const currentYear = new Date().getFullYear()
                 <!-- 左侧：品牌 -->
                 <div class="footer-brand">
                     <div class="brand-text">
-                        <span class="brand-name">小猫丸子Wiki</span>
+                        <span class="brand-name">{{ title }}</span>
                         <span class="brand-tag">分享奇妙回响</span>
                     </div>
                 </div>
@@ -35,7 +37,7 @@ const currentYear = new Date().getFullYear()
 
                 <!-- 右侧：版权 -->
                 <div class="footer-copyright">
-                    <div>&copy; {{ currentYear }} 小猫丸子Wiki</div>
+                    <div>&copy; {{ currentYear }} {{ title }}</div>
                     <a href="https://beian.miit.gov.cn" target="_blank" class="beian-link">辽ICP备2024032879号</a>
                 </div>
             </div>

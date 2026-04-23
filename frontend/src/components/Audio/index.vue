@@ -7,6 +7,8 @@ import { storeToRefs } from 'pinia'
 import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios, recordAudioPlay, getWeeklyPopularAudios, getTotalPopularAudios } from '@/api/audio'
 import PageHero from '@/components/ComponentStyle/PageHero.vue'
 
+const nickName = import.meta.env.VITE_APP_NICK_NAME;
+
 // 音声数据
 const audioSections = ref([])
 const loading = ref(false)
@@ -1150,7 +1152,7 @@ onBeforeUnmount(() => {
 <template>
     <div class="audio-page" @click="unlockAudio">
         <div class="container">
-            <PageHero title="丸子音声" subtitle="聆听奇妙回响，与你分享此刻欢愉" />
+            <PageHero :title="`${nickName}音声`" subtitle="聆听奇妙回响，与你分享此刻欢愉" />
 
             <div class="controls-card">
                 <div class="controls-main">

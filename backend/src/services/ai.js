@@ -38,7 +38,7 @@ export async function matchAudiosByDescription(audioList, userInput) {
     try {
         // 1. 准备系统角色设定
         const systemMessage =
-            `你是一个音频匹配助手，请根据用户描述，从猫丸子的音频库中挑选最合适的音频。
+            `你是一个音频匹配助手，请根据用户描述，请从音频库中挑选最合适的音频。
 
             你的任务：
             1. 理解用户想要表达的内容、情感或场景

@@ -24,7 +24,7 @@ INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2
 INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('sys_display_style', '危险', 'danger', NULL, 5, 'danger');
 INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('sys_user_permission', '超级管理员', '1', NULL, 0, 'danger');
 INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('sys_user_permission', '管理员', '2', NULL, 1, 'warning');
-INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('sys_user_permission', '猫丸伴', '3', NULL, 2, 'primary');
+INSERT INTO "dictionary_item" ("dict_type", "dict_label", "dict_key", "dict_key2", "sort", "display_style") VALUES ('sys_user_permission', '游客', '3', NULL, 2, 'primary');
 
 -- ==================== 字典表更新时间触发器 ====================
 

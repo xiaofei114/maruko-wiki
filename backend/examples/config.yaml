@@ -6,6 +6,7 @@ token: maruko # token密钥
 log: # 日志级别
   cmd: info # 命令行日志级别
   file: all # 文件日志级别
+  prefix: maruko-node # 日志前缀
 redis: # redis配置
   host: localhost # redis地址
   port: 6379 # redis端口

@@ -375,7 +375,7 @@ const fetchAllData = async () => {
 
 // 方法
 const getPermissionLabel = (permission) => {
-    const labels = { 1: '超级管理员', 2: '管理员', 3: '猫丸伴' }
+    const labels = { 1: '超级管理员', 2: '管理员', 3: `${import.meta.env.VITE_APP_DD_NAME}` }
     return labels[permission] || '未知'
 }
 

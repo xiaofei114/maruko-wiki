@@ -230,35 +230,35 @@ export async function register(username, password, email, verificationCode) {
         return createErrorResponse('验证码验证失败: ' + codeResult.message, 400);
     }
 
-        try {
-            // 检查用户名是否已存在（排除软删除）
-            const usernameExists = queryOne('SELECT 1 FROM user WHERE name = ? AND is_deleted = 0 LIMIT 1', [username]);
-            if (usernameExists) {
-                return createErrorResponse('用户名已存在', 400);
-            }
+    try {
+        // 检查用户名是否已存在（排除软删除）
+        const usernameExists = queryOne('SELECT 1 FROM user WHERE name = ? AND is_deleted = 0 LIMIT 1', [username]);
+        if (usernameExists) {
+            return createErrorResponse('用户名已存在', 400);
+        }
 
-            // 检查邮箱是否已被注册（排除软删除）
-            const emailExists = queryOne('SELECT 1 FROM user WHERE account_number = ? AND is_deleted = 0 LIMIT 1', [email]);
-            if (emailExists) {
-                return createErrorResponse('该邮箱已被注册', 400);
-            }
+        // 检查邮箱是否已被注册（排除软删除）
+        const emailExists = queryOne('SELECT 1 FROM user WHERE account_number = ? AND is_deleted = 0 LIMIT 1', [email]);
+        if (emailExists) {
+            return createErrorResponse('该邮箱已被注册', 400);
+        }
 
-            // 密码加密
-            const hashedPassword = await hashPassword(password);
+        // 密码加密
+        const hashedPassword = await hashPassword(password);
 
-            // 创建用户记录
-            const result = insert(`
+        // 创建用户记录
+        const result = insert(`
                 INSERT INTO user (name, account_number, password, permission, is_banned, create_time, update_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `, [username, email, hashedPassword, PERMISSIONS.USER, 0, getCurrentTimestamp(), getCurrentTimestamp()]);
 
-            logger.info(`新用户注册成功: ${username} (${email})`);
-            return createSuccessResponse('注册成功', { userId: result.lastInsertRowid });
+        logger.info(`新用户注册成功: ${username} (${email})`);
+        return createSuccessResponse('注册成功', { userId: result.lastInsertRowid });
 
-        } catch (error) {
-            logger.error('注册失败:', error);
-            return createErrorResponse('注册失败，请稍后重试', 500);
-        }
+    } catch (error) {
+        logger.error('注册失败:', error);
+        return createErrorResponse('注册失败，请稍后重试', 500);
+    }
 }
 
 /**
@@ -501,10 +501,10 @@ export async function resetUserPassword(userId, adminId) {
             const mailOptions = {
                 from: config.email.from,
                 to: user.account_number,
-                subject: 'MarukoNode 密码重置通知',
+                subject: `${config.email.subject || '默认标题'} 密码重置通知`,
                 html: `
                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                        <h2 style="color: #333;">MarukoNode 密码重置通知</h2>
+                        <h2 style="color: #333;">${config.email.subject || ''} 密码重置通知</h2>
                         <p>您好，${user.name}！</p>
                         <p>您的密码已被管理员重置，新密码是：<strong style="font-size: 24px; color: #007bff;">${newPassword}</strong></p>
                         <p>请及时登录并修改密码。</p>

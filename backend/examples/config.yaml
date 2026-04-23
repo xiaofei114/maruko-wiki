@@ -2,6 +2,7 @@ httpPort: 6660 # http服务端口
 domainName: # 允许的域名
   - http://localhost:6660
   - http://localhost:5173
+  - http://localhost:5174
 token: maruko # token密钥
 log: # 日志级别
   cmd: info # 命令行日志级别
@@ -11,6 +12,7 @@ redis: # redis配置
   host: localhost # redis地址
   port: 6379 # redis端口
   password: null # redis密码
+  keyPrefix: maruko # redis键前缀
 email: # 邮件配置
   host: smtp.qq.com # 邮件服务器地址
   port: 587 # 邮件服务器端口

@@ -9,7 +9,7 @@ export default async () => {
         host: redisdata.host,
         port: redisdata.port,
         password: redisdata.password,
-        keyPrefix: "maruko:", // 自动键前缀
+        keyPrefix: `${keyPrefix}:`, // 自动键前缀
         enableReadyCheck: true,
         connectTimeout: 5000
     });

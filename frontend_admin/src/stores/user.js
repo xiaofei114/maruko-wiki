@@ -3,14 +3,14 @@ import { defineStore } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 
 export const useUserStore = defineStore('user', () => {
-    const token = ref(localStorage.getItem("maruko_token") || null)
+    const token = ref(localStorage.getItem(import.meta.env.VITE_APP_TOKEN) || null)
     const user = ref(null)
     const permission = ref(null)
     const router = useRouter()
 
     const loginIn = (newToken, newUser,newPermission) => {
         // 先保存原始 token 到 localStorage
-        localStorage.setItem("maruko_token", newToken)
+        localStorage.setItem(import.meta.env.VITE_APP_TOKEN, newToken)
         // 设置带 Bearer 前缀的 token
         token.value = newToken
         user.value = newUser
@@ -19,7 +19,7 @@ export const useUserStore = defineStore('user', () => {
 
     const loginOut = () => {
         token.value = null
-        localStorage.removeItem("maruko_token")
+        localStorage.removeItem(import.meta.env.VITE_APP_TOKEN)
         user.value = null
         router.push('/')
     }

@@ -3,8 +3,8 @@ import { ref, computed } from 'vue'
 import { login as loginApi, refreshToken as refreshTokenApi } from '@/api/auth'
 
 // 本地存储的key
-const TOKEN_KEY = 'maruko_token'
-const USER_KEY = 'maruko_user'
+const TOKEN_KEY = import.meta.env.VITE_APP_TOKEN
+const USER_KEY = import.meta.env.VITE_APP_USER
 
 export const useUserStore = defineStore('user', () => {
     // 状态

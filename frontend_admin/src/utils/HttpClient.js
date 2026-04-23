@@ -15,7 +15,7 @@ class HttpClient {
 
         // 添加请求拦截器 - 每次请求时动态从 localStorage 获取最新的 token
         this.instance.interceptors.request.use(config => {
-            const token = localStorage.getItem('maruko_token')
+            const token = localStorage.getItem(import.meta.env.VITE_APP_TOKEN)
             if (token) {
                 config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`
             }

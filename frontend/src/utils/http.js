@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 
 // 创建统一的 axios 实例
 const http = axios.create({
-    baseURL: import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api',
+    baseURL: import.meta.env.VITE_APP_BASE_URL,
     timeout: 10000,
     headers: {
         'Content-Type': 'application/json'
@@ -14,7 +14,7 @@ const http = axios.create({
 http.interceptors.request.use(
     config => {
         // 添加JWT认证头（如果有token）
-        const token = localStorage.getItem('maruko_token')
+        const token = localStorage.getItem(import.meta.env.VITE_APP_TOKEN)
         if (token && config.url !== '/login') { // 登录接口不需要token
             config.headers.Authorization = `Bearer ${token}`
         }
@@ -35,8 +35,8 @@ http.interceptors.response.use(
     error => {
         // 认证错误时清除本地存储的token和用户信息
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            localStorage.removeItem('maruko_token')
-            localStorage.removeItem('maruko_user')
+            localStorage.removeItem(import.meta.env.VITE_APP_TOKEN)
+            localStorage.removeItem(import.meta.env.VITE_APP_USER)
         }
 
         // 可以在这里统一处理错误

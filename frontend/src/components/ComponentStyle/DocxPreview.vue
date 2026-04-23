@@ -26,7 +26,7 @@ async function renderDocx() {
     loading.value = true
     containerRef.value.innerHTML = ''
 
-    const token = localStorage.getItem('maruko_token')
+    const token = localStorage.getItem(import.meta.env.VITE_APP_TOKEN)
     const headers = {}
     if (token) {
       headers['Authorization'] = `Bearer ${token}`

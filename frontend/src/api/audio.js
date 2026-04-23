@@ -38,7 +38,7 @@ export function matchAudiosByAI(description) {
  */
 export function downloadAudios(classificationId) {
     const params = classificationId ? `classification_id=${classificationId}` : '';
-    const token = localStorage.getItem('maruko_token');
+    const token = localStorage.getItem(import.meta.env.VITE_APP_TOKEN);
     const url = `${import.meta.env.VITE_APP_BASE_URL}/api/audios/download/${token}?${params}`;
     
     // 创建隐藏的链接并触发下载

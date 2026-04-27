@@ -82,7 +82,11 @@ router.get('/audios/download/:token', async (req, res) => {
             const config = read_json('configs', 'config');
             const jwtSecret = config.token;
             const decoded = jwt.verify(token, jwtSecret);
-            userId = decoded.id;
+            userId = decoded.userId;
+            if (!userId) {
+                logger.warn('Token中未包含用户ID');
+                return res.status(401).json({ success: false, message: 'Token无效', code: 401 });
+            }
         } catch (error) {
             logger.warn('Token验证失败:', error.message);
             return res.status(401).json({ success: false, message: 'Token无效或已过期', code: 401 });

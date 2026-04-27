@@ -62,6 +62,13 @@ const menuConfig = ref([
                 route: 'dictionary'
             },
             {
+                title: 'Redis管理',
+                icon: 'Coin',
+                index: 'redis-admin',
+                route: 'redis-admin',
+                permission: 1
+            },
+            {
                 title: '运行日志',
                 icon: 'Notebook',
                 index: 'logs',

@@ -27,11 +27,13 @@ export function refreshToken(token) {
 /**
  * 发送验证码
  * @param {string} email - 邮箱地址
+ * @param {string} scene - 场景：'register' | 'resetPassword'
  * @returns {Promise}
  */
-export function sendVerification(email) {
+export function sendVerification(email, scene = 'register') {
     return http.post('/sendVerification', {
-        email
+        email,
+        scene
     })
 }
 
@@ -62,5 +64,20 @@ export function register(username, password, email, verificationCode) {
         password,
         email,
         verificationCode
+    })
+}
+
+/**
+ * 重置密码
+ * @param {string} email - 邮箱地址
+ * @param {string} verificationCode - 验证码
+ * @param {string} newPassword - 新密码
+ * @returns {Promise}
+ */
+export function resetPassword(email, verificationCode, newPassword) {
+    return http.post('/resetPassword', {
+        email,
+        verificationCode,
+        newPassword
     })
 }

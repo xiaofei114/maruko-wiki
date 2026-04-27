@@ -15,6 +15,7 @@ import logsRoutes from '../routes/logs.js';
 import dictionaryRoutes from '../routes/dictionary.js';
 import anchorStatsRoutes from '../routes/anchorStats.js';
 import captainGiftRoutes from '../routes/captainGift.js';
+import redisAdminRoutes from '../routes/redisAdmin.js';
 import chalk from 'chalk';
 
 export default async () => {
@@ -59,6 +60,7 @@ export default async () => {
     App.use('/api/ai', aiRoutes); // AI相关路由
     App.use('/api', anchorStatsRoutes); // 主播统计数据路由
     App.use('/api', captainGiftRoutes); // 舰长礼物路由
+    App.use('/api', redisAdminRoutes); // Redis 管理路由（超级管理员）
 
     // 通过url获取/data/document下的文件 - 必须在用户路由之前
     App.get('/api/file/*', async (req, res) => {

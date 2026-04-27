@@ -3,7 +3,7 @@ import { ref, reactive, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, ArrowRight, ArrowLeft, Message } from '@element-plus/icons-vue'
-import { sendVerification, verifyCode, register } from '@/api/auth'
+import { sendVerification, verifyCode, register, resetPassword } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 import img from '@/assets/登录页背景图.jpg'
 
@@ -23,20 +23,31 @@ const bindForm = reactive({
   verificationCode: ''
 })
 
+const forgotForm = reactive({
+  email: '',
+  verificationCode: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
 const loginFormRef = ref(null)
 const bindFormRef = ref(null)
+const forgotFormRef = ref(null)
 
 const loading = ref(false)
 
 const isHovered = ref(false)
 const isLoginMode = ref(true)
+const isForgotPasswordMode = ref(false)
 const sendingCode = ref(false)
 const codeCountdown = ref(0)
 const codeButtonText = ref('发送验证码')
+const forgotCodeButtonText = ref('发送验证码')
 const verificationSent = ref(false) // 标记是否已发送过验证码
+const forgotVerificationSent = ref(false)
 
 const ddName = import.meta.env.VITE_APP_DD_NAME
-const hostName = import.meta.env.VITE_APP_HOST_NAME
+const hostName = import.meta.env.VITE_APP_TITLE
 
 // 登录表单验证规则
 const loginRules = {
@@ -97,6 +108,53 @@ const bindRules = {
           } catch (error) {
             callback(new Error('验证码错误，请输入正确的验证码'))
           }
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+
+// 忘记密码表单验证规则
+const forgotRules = {
+  email: [
+    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
+    {
+      pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      message: '请输入正确的邮箱格式',
+      trigger: 'blur'
+    }
+  ],
+  verificationCode: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    {
+      validator: async (rule, value, callback) => {
+        if (forgotVerificationSent.value && value && value.length > 0) {
+          try {
+            await verifyCode(forgotForm.email, value)
+            callback()
+          } catch (error) {
+            callback(new Error('验证码错误，请输入正确的验证码'))
+          }
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== forgotForm.newPassword) {
+          callback(new Error('两次输入的密码不一致'))
         } else {
           callback()
         }
@@ -219,6 +277,7 @@ const startCountdown = () => {
 
 const toggleMode = () => {
   isLoginMode.value = !isLoginMode.value
+  isForgotPasswordMode.value = false
   bindForm.name = ''
   bindForm.email = ''
   bindForm.password = ''
@@ -228,6 +287,89 @@ const toggleMode = () => {
   codeCountdown.value = 0
   codeButtonText.value = '发送验证码'
   verificationSent.value = false
+}
+
+const showForgotPassword = () => {
+  isForgotPasswordMode.value = true
+  isLoginMode.value = false
+}
+
+const backToLogin = () => {
+  isForgotPasswordMode.value = false
+  isLoginMode.value = true
+  forgotForm.email = ''
+  forgotForm.verificationCode = ''
+  forgotForm.newPassword = ''
+  forgotForm.confirmPassword = ''
+  forgotCodeButtonText.value = '发送验证码'
+  forgotVerificationSent.value = false
+}
+
+// 发送忘记密码验证码
+const sendForgotVerificationCode = async () => {
+  if (!forgotForm.email) {
+    ElMessage.warning('请输入邮箱地址')
+    return
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(forgotForm.email)) {
+    ElMessage.warning('请输入正确的邮箱格式')
+    return
+  }
+
+  if (codeCountdown.value > 0) return
+
+  sendingCode.value = true
+
+  try {
+    await sendVerification(forgotForm.email, 'resetPassword')
+    ElMessage.success('验证码已发送，请查收邮件')
+    forgotVerificationSent.value = true
+    codeCountdown.value = 60
+    startForgotCountdown()
+  } catch (error) {
+    ElMessage.error('发送验证码失败，请重试')
+  } finally {
+    sendingCode.value = false
+  }
+}
+
+// 忘记密码倒计时
+const startForgotCountdown = () => {
+  const timer = setInterval(() => {
+    codeCountdown.value--
+    forgotCodeButtonText.value = `${codeCountdown.value}s`
+
+    if (codeCountdown.value <= 0) {
+      clearInterval(timer)
+      forgotCodeButtonText.value = '发送验证码'
+      codeCountdown.value = 0
+    }
+  }, 1000)
+}
+
+// 处理重置密码
+const handleResetPassword = async () => {
+  if (!forgotFormRef.value) return
+
+  try {
+    await forgotFormRef.value.validate()
+    loading.value = true
+
+    await resetPassword(
+      forgotForm.email,
+      forgotForm.verificationCode,
+      forgotForm.newPassword
+    )
+
+    ElMessage.success('密码重置成功，请使用新密码登录')
+    backToLogin()
+  } catch (error) {
+    ElMessage.error('密码重置失败，请检查输入信息')
+  } finally {
+    loading.value = false
+  }
 }
 
 const goBack = () => {
@@ -251,11 +393,12 @@ const goBack = () => {
 
       <div class="login-header">
         <h2>{{ hostName }}</h2>
-        <p>{{ isLoginMode ? `${ddName}，欢迎回家！` : `是新的${ddName}吗！？` }}</p>
+        <p v-if="!isForgotPasswordMode">{{ isLoginMode ? `${ddName}，欢迎回家！` : `是新的${ddName}嘛！？` }}</p>
+        <p v-else>是忘记密码了嘛？</p>
       </div>
 
-      <div class="form-flipper" :class="{ 'flipped': !isLoginMode }"
-        :style="{ height: isLoginMode ? '160px' : '310px' }">
+      <div class="form-flipper" :class="{ 'flipped': !isLoginMode, 'forgot-flipped': isForgotPasswordMode }"
+        :style="{ height: isForgotPasswordMode ? '280px' : (isLoginMode ? '200px' : '310px') }">
         <!-- 登录表单 -->
         <div class="form-panel login-panel">
           <el-form class="login-form" ref="loginFormRef" :model="loginForm" :rules="loginRules">
@@ -266,6 +409,9 @@ const goBack = () => {
               <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" :prefix-icon="Lock"
                 show-password clearable />
             </el-form-item>
+            <div class="forgot-password-link">
+              <el-button type="text" size="small" @click="showForgotPassword">忘记密码？</el-button>
+            </div>
             <el-button type="primary" class="login-button" :loading="loading" @click="handleLogin">
               登录
               <el-icon class="button-icon">
@@ -309,10 +455,45 @@ const goBack = () => {
             </el-button>
           </el-form>
         </div>
+
+        <!-- 忘记密码表单 -->
+        <div class="form-panel forgot-panel">
+          <el-form ref="forgotFormRef" :model="forgotForm" :rules="forgotRules">
+            <div class="email-row">
+              <el-form-item prop="email" class="email-item">
+                <el-input v-model="forgotForm.email" placeholder="请输入邮箱" :prefix-icon="Message" clearable />
+              </el-form-item>
+              <el-button class="send-code-btn" :loading="sendingCode" :disabled="codeCountdown > 0"
+                @click="sendForgotVerificationCode">
+                {{ forgotCodeButtonText }}
+              </el-button>
+            </div>
+            <el-form-item prop="verificationCode">
+              <el-input v-model="forgotForm.verificationCode" placeholder="请输入验证码" :prefix-icon="Lock" clearable />
+            </el-form-item>
+            <el-form-item prop="newPassword">
+              <el-input v-model="forgotForm.newPassword" type="password" placeholder="请输入新密码" :prefix-icon="Lock"
+                show-password clearable />
+            </el-form-item>
+            <el-form-item prop="confirmPassword">
+              <el-input v-model="forgotForm.confirmPassword" type="password" placeholder="确认新密码" :prefix-icon="Lock"
+                show-password clearable />
+            </el-form-item>
+            <el-button type="primary" class="login-button" :loading="loading" @click="handleResetPassword">
+              重置密码
+              <el-icon class="button-icon">
+                <ArrowRight />
+              </el-icon>
+            </el-button>
+          </el-form>
+        </div>
       </div>
 
       <div class="mode-switch">
-        <el-button class="switch-button" @click="toggleMode">
+        <el-button v-if="isForgotPasswordMode" class="switch-button" @click="backToLogin">
+          返回登录
+        </el-button>
+        <el-button v-else class="switch-button" @click="toggleMode">
           {{ isLoginMode ? '没有账号？点击注册！' : '已有账号？点击登录！' }}
         </el-button>
       </div>
@@ -351,7 +532,7 @@ const goBack = () => {
 .login-box {
   width: 100%;
   max-width: 420px;
-  padding: 50px 40px;
+  padding: 50px 40px 30px 40px;
   background: rgba(255, 255, 255, 0.381);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1),
@@ -405,7 +586,7 @@ const goBack = () => {
 /* 表单翻转容器 */
 .form-flipper {
   position: relative;
-  height: 160px;
+  height: 200px;
   perspective: 1000px;
   transition: height 0.4s ease;
 }
@@ -428,12 +609,28 @@ const goBack = () => {
   transform: rotateY(180deg);
 }
 
+.forgot-panel {
+  transform: rotateY(180deg);
+}
+
 .form-flipper.flipped .login-panel {
   transform: rotateY(-180deg);
 }
 
 .form-flipper.flipped .register-panel {
   transform: rotateY(0deg);
+}
+
+.form-flipper.forgot-flipped .login-panel {
+  transform: rotateY(-180deg);
+}
+
+.form-flipper.forgot-flipped .forgot-panel {
+  transform: rotateY(0deg);
+}
+
+.form-flipper.forgot-flipped .register-panel {
+  transform: rotateY(180deg);
 }
 
 .login-form,
@@ -494,6 +691,7 @@ const goBack = () => {
   justify-content: center;
   height: 40px;
   margin-top: 12px;
+  margin-bottom: 16px;
   box-shadow: 0 4px 15px var(--color-primary-alpha-30);
 }
 
@@ -512,5 +710,21 @@ const goBack = () => {
 
 .back-button:hover {
   color: var(--color-primary-light);
+}
+
+/* 忘记密码链接 */
+.forgot-password-link {
+  text-align: right;
+  margin-bottom: 10px;
+}
+
+.forgot-password-link .el-button {
+  color: var(--color-primary);
+  font-size: 13px;
+}
+
+/* 忘记密码表单 */
+.forgot-password-form {
+  margin-bottom: 20px;
 }
 </style>

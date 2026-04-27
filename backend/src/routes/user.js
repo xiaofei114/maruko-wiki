@@ -1,6 +1,6 @@
 import express from 'express';
 import { createRouteHandler } from '../method/route-helpers.js';
-import { sendVerificationCode, verifyCode, register, login } from '../services/user.js';
+import { sendVerificationCode, verifyCode, register, login, resetPasswordByEmail } from '../services/user.js';
 import { read_json } from '../method/read.js';
 
 const router = express.Router();
@@ -30,14 +30,20 @@ router.post('/sendVerification', createRouteHandler(async (req, res) => {
         };
     }
 
-    const { email } = req.body;
-    return await sendVerificationCode(email, global.emailTransporter, appConfig);
+    const { email, scene = 'register' } = req.body;
+    return await sendVerificationCode(email, global.emailTransporter, appConfig, scene);
 }));
 
 // 验证验证码接口
 router.post('/verifyCode', createRouteHandler(async (req, res) => {
     const { email, code } = req.body;
     return await verifyCode(email, code);
+}));
+
+// 重置密码接口
+router.post('/resetPassword', createRouteHandler(async (req, res) => {
+    const { email, verificationCode, newPassword } = req.body;
+    return await resetPasswordByEmail(email, verificationCode, newPassword);
 }));
 
 export default router;

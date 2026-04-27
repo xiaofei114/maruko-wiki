@@ -34,6 +34,11 @@ export const useUserStore = defineStore('user', () => {
         return permission.value <= 2
     })
 
+    //是否是超级管理员（权限为 1）
+    const isSuperAdmin = computed(() => {
+        return permission.value === 1
+    })
+
     return {
         token,
         user,
@@ -42,5 +47,6 @@ export const useUserStore = defineStore('user', () => {
         loginOut,
         isAuthenticated,
         isAdmin,
+        isSuperAdmin,
     }
 })

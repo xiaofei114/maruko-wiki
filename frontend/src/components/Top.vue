@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { ElMessageBox } from 'element-plus'
-import { Close } from '@element-plus/icons-vue'
+import { Close, User, HomeFilled, Star, SwitchButton } from '@element-plus/icons-vue'
 import img from '@/assets/猫玩伴.png'
 
 
@@ -125,6 +125,20 @@ const handleMenuSelect = (index) => {
   // 如果是友情链接的URL，直接打开外部链接
   if (index.startsWith('http')) return
 
+  // 如果是管理页面，根据用户设置决定跳转
+  if (index === '/admin') {
+    const adminVersion = localStorage.getItem('adminDefaultVersion') || 'new'
+    if (adminVersion === 'new') {
+      // 跳转到新版管理后台
+      const token = userStore.token
+      if (token) {
+        window.open(`${import.meta.env.VITE_APP_ADMIN_URL}/?token=${token}`, '_blank')
+        return
+      }
+    }
+    // 否则跳转到旧版管理后台（/admin）
+  }
+
   // 否则进行路由跳转
   navigateTo(index)
 }
@@ -135,14 +149,6 @@ const navigateTo = (path) => {
   showDropdown.value = false
   showMobileMenu.value = false
 }
-
-// 用户菜单项
-const userMenuItems = [
-  // { name: '个人中心', action: 'profile' },
-  // { name: '设置', action: 'settings' },
-  { name: '退出登录', action: 'logout' }
-]
-
 
 // 登录处理
 const handleLogin = () => {
@@ -163,6 +169,24 @@ const toggleDropdown = () => {
 // 点击其他地方关闭下拉菜单
 const closeDropdown = () => {
   showDropdown.value = false
+}
+
+// 延迟隐藏下拉菜单的定时器
+const hideDropdownTimer = ref(null)
+
+// 隐藏下拉菜单（带延迟）
+const hideDropdown = () => {
+  hideDropdownTimer.value = setTimeout(() => {
+    showDropdown.value = false
+  }, 150)
+}
+
+// 取消隐藏
+const cancelHide = () => {
+  if (hideDropdownTimer.value) {
+    clearTimeout(hideDropdownTimer.value)
+    hideDropdownTimer.value = null
+  }
 }
 
 // 切换移动菜单
@@ -306,29 +330,46 @@ const openLink = (url) => {
         </el-button>
 
         <!-- 已登录状态 -->
-        <div v-else class="user-info" @click.stop="toggleDropdown">
-          <span class="user-name">{{ username }}</span>
-
-          <!-- 用户下拉菜单 -->
-          <div v-if="showDropdown" class="user-dropdown" @click.stop>
-            <div class="dropdown-header">
-              <el-avatar :size="45" :src="img" />
-              <div class="dropdown-info">
-                <div class="dropdown-name">{{ username }}</div>
-                <el-tag :type="getPermissionName().type" style="padding: 0;">
+        <div v-else class="user-info-combo" :class="{ 'expanded': showDropdown }" @mouseenter="showDropdown = true" @mouseleave="hideDropdown">
+          <!-- 默认状态：小头像 -->
+          <div class="default-avatar-wrapper" :class="{ 'hidden': showDropdown }">
+            <el-avatar :size="36" :src="img" class="default-avatar" />
+            <div class="default-status-dot"></div>
+          </div>
+          
+          <!-- 展开状态：放大的头像与卡片 -->
+          <div class="combo-container" :class="{ 'visible': showDropdown }">
+            <div class="combo-avatar-section" @click.stop @mouseenter="cancelHide" @mouseleave="hideDropdown">
+              <div class="combo-avatar-wrapper">
+                <el-avatar :size="72" :src="img" class="combo-avatar" />
+                <div class="combo-status-dot"></div>
+              </div>
+            </div>
+            
+            <div class="combo-card" @click.stop @mouseenter="cancelHide" @mouseleave="hideDropdown">
+              <!-- 用户信息 -->
+              <div class="combo-user-info">
+                <div class="combo-username">{{ username }}</div>
+                <el-tag :type="getPermissionName().type" size="small" effect="light" class="combo-role-tag">
+                  <el-icon v-if="permission === 1"><Star /></el-icon>
                   {{ getPermissionName().name }}
                 </el-tag>
               </div>
+
+              <!-- 快捷操作 -->
+              <!-- <div class="combo-actions">
+                <div class="combo-action-btn" @click="handleUserMenuClick('profile')">
+                  <el-icon><User /></el-icon>
+                  <span>个人中心</span>
+                </div>
+              </div> -->
+
+              <!-- 退出按钮 -->
+              <div class="combo-logout" @click="handleUserMenuClick('logout')">
+                <el-icon><SwitchButton /></el-icon>
+                <span>退出登录</span>
+              </div>
             </div>
-
-            <div class="dropdown-divider"></div>
-
-            <ul class="dropdown-menu">
-              <li v-for="item in userMenuItems" :key="item.action" class="dropdown-item"
-                @click="handleUserMenuClick(item.action)">
-                <span>{{ item.name }}</span>
-              </li>
-            </ul>
           </div>
         </div>
       </div>
@@ -494,125 +535,201 @@ const openLink = (url) => {
 }
 
 /* 用户信息 */
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  cursor: pointer;
+/* 用户信息和卡片组合 */
+.user-info-combo {
   position: relative;
-  transition: background-color 0.3s ease;
+  display: flex;
+  align-items: flex-start;
+  cursor: pointer;
+  width: 100px;
+  height: 100px;
+  margin: -26px -26px -26px 0;
 }
 
-.user-info:hover {
-  background: rgba(255, 255, 255, 0.1);
+/* 默认小头像 */
+.default-avatar-wrapper {
+  position: absolute;
+  top: 26px;
+  left: 26px;
+  padding: 6px;
+  border-radius: 50%;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
-.user-avatar i {
-  color: white;
-  font-size: 18px;
+.default-avatar-wrapper.hidden {
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
 }
 
-.user-name {
-  color: white;
-  font-weight: 500;
-  max-width: 80px;
+.user-info-combo:hover .default-avatar-wrapper:not(.hidden) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.default-avatar {
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.user-info-combo:hover .default-avatar {
+  border-color: white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.default-status-dot {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 10px;
+  height: 10px;
+  background: #67c23a;
+  border: 2px solid var(--color-primary);
+  border-radius: 50%;
+}
+
+/* 展开状态容器 */
+.combo-container {
+  position: absolute;
+  top: 25px;
+  left: -14px;
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 1000;
+}
+
+.combo-container.visible {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.combo-avatar-section {
+  position: relative;
+  z-index: 10;
+  padding: 4px;
+  background: white;
+  border-radius: 50%;
+}
+
+.combo-avatar-wrapper {
+  position: relative;
+  padding: 3px;
+  background: white;
+  border-radius: 50%;
+}
+
+.combo-avatar {
+  border: 3px solid white;
+}
+
+.combo-status-dot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  background: #67c23a;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 卡片内容区（与头像拼接） */
+.combo-card {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 200px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.08s, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s;
+}
+
+.combo-container.visible .combo-card {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.combo-user-info {
+  margin-bottom: 16px;
+}
+
+.combo-username {
+  font-weight: 600;
+  color: #303133;
+  font-size: 16px;
+  margin-bottom: 6px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* 下拉菜单 */
-.user-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 8px;
-  width: 220px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  animation: dropdownSlide 0.3s ease;
+.combo-role-tag {
+  font-size: 11px;
 }
 
-@keyframes dropdownSlide {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* 卡片操作按钮 */
+.combo-actions {
+  margin-bottom: 12px;
 }
 
-.dropdown-header {
-  padding: 5px 16px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+.combo-action-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.dropdown-avatar i {
-  color: white;
-  font-size: 20px;
-}
-
-.dropdown-info {
-  flex: 1;
-}
-
-.dropdown-name {
-  font-weight: 600;
-  color: #333;
-  font-size: 14px;
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: #e9ecef;
-  margin: 0;
-}
-
-.dropdown-menu {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
   padding: 12px 16px;
+  background: var(--color-primary-alpha-10);
+  border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  color: #333;
+  transition: all 0.3s ease;
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.dropdown-item:hover {
-  background: #f8f9fa;
+.combo-action-btn:hover {
+  background: var(--color-primary-alpha-20);
+  transform: translateY(-1px);
 }
 
-.dropdown-item i {
-  width: 16px;
-  color: #666;
+.combo-action-btn .el-icon {
+  font-size: 16px;
 }
 
-/* 退出登录项特殊样式 */
-.dropdown-item:last-child {
-  color: #F56C6C;
-  border-top: 1px solid #999;
-  background: #fef0f0;
+/* 退出按钮 */
+.combo-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(245, 108, 108, 0.1);
+  color: #f56c6c;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
 }
 
-.dropdown-item:last-child:hover {
-  background: rgb(252, 211, 211);
+.combo-logout:hover {
+  background: rgba(245, 108, 108, 0.2);
+}
+
+.combo-logout .el-icon {
+  font-size: 14px;
 }
 
 /* 退出登录确认对话框样式 */
@@ -728,48 +845,68 @@ const openLink = (url) => {
     min-width: auto;
   }
 
-  .user-info {
-    padding: 5px 8px;
-    border-radius: 16px;
+  /* 移动端用户头像组合适配 */
+  .user-info-combo {
+    width: 100px;
+    height: 100px;
+    position: relative;
   }
 
-  .user-dropdown {
-    width: 200px;
-    right: -8px;
-    top: 100%;
-    margin-top: 6px;
+  .default-avatar-wrapper {
+    top: 26px;
+    left: 26px;
+    padding: 6px;
   }
 
-  .dropdown-header {
-    padding: 12px;
+  .default-avatar {
+    width: 36px !important;
+    height: 36px !important;
   }
 
-  .dropdown-avatar i {
-    font-size: 16px;
+  .default-status-dot {
+    width: 10px;
+    height: 10px;
+    bottom: 6px;
+    right: 6px;
   }
 
-  .dropdown-name {
-    font-size: 12px;
+  .combo-container {
+    top: 32px;
+    left: -14px;
   }
 
-  .dropdown-item {
+  .combo-avatar-section {
+    padding: 4px;
+  }
+
+  .combo-avatar {
+    width: 72px !important;
+    height: 72px !important;
+  }
+
+  .combo-status-dot {
+    width: 12px;
+    height: 12px;
+    bottom: 4px;
+    right: 4px;
+  }
+
+  .combo-card {
+    top: 50px;
+    right: 0;
+    width: 180px;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .combo-username {
+    font-size: 14px;
+  }
+
+  .combo-action-btn,
+  .combo-logout {
     padding: 10px 12px;
     font-size: 13px;
-  }
-
-  .dropdown-item i {
-    width: 12px;
-    font-size: 11px;
-  }
-
-  /* 移动端优化用户下拉菜单 */
-  .user-dropdown {
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  }
-
-  .dropdown-header {
-    border-radius: 8px 8px 0 0;
   }
 }
 
@@ -792,12 +929,42 @@ const openLink = (url) => {
     font-size: 16px;
   }
 
-  .user-info {
-    padding: 4px 6px;
+  /* 超小屏幕用户头像适配 */
+  .user-info-combo {
+    width: 90px;
+    height: 90px;
   }
 
-  .user-dropdown {
+  .default-avatar-wrapper {
+    top: 22px;
+    left: 22px;
+    padding: 6px;
+  }
+
+  .default-avatar {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .combo-container {
+    top: 14px;
+    left: -12px;
+  }
+
+  .combo-avatar {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .combo-card {
+    top: 44px;
+    right: 0;
     width: 160px;
+    padding: 14px;
+  }
+
+  .combo-username {
+    font-size: 13px;
   }
 }
 

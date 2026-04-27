@@ -102,8 +102,15 @@ class HttpClient {
         }
 
         // 根据请求类型分配参数位置
-        if (['get', 'delete', 'head'].includes(method)) {
+        if (['get', 'head'].includes(method)) {
             requestConfig.params = data
+        } else if (method === 'delete') {
+            // delete 请求支持 params 或 data
+            if (config.data) {
+                requestConfig.data = config.data
+            } else {
+                requestConfig.params = data
+            }
         } else {
             requestConfig.data = data
         }

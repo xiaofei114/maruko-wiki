@@ -14,9 +14,10 @@ import { queryOne, queryAll, insert, update, exists } from '../method/database.j
  * @param {string} email - 邮箱地址
  * @param {object} emailTransporter - 邮件传输器
  * @param {object} appConfig - 应用配置
+ * @param {string} scene - 场景：'register' | 'resetPassword'
  * @returns {object} 发送结果
  */
-export async function sendVerificationCode(email, emailTransporter, appConfig) {
+export async function sendVerificationCode(email, emailTransporter, appConfig, scene = 'register') {
     // 验证邮箱格式
     if (!validateEmailFormat(email)) {
         return createErrorResponse('请提供有效的邮箱地址', 400);
@@ -29,14 +30,31 @@ export async function sendVerificationCode(email, emailTransporter, appConfig) {
     const redisKey = `verification_code:${email}`;
     await global.redis.setex(redisKey, 300, verificationCode);
 
+    // 根据场景设置邮件文案
+    const sceneConfig = {
+        register: {
+            title: '注册验证',
+            greeting: '欢迎注册！',
+            description: '您正在进行账号注册，请使用以下验证码完成验证。'
+        },
+        resetPassword: {
+            title: '密码重置验证',
+            greeting: '您好！',
+            description: '您正在申请重置密码，请使用以下验证码完成验证。'
+        }
+    };
+
+    const config = sceneConfig[scene] || sceneConfig.register;
+
     // 发送邮件
     const mailOptions = {
         from: appConfig.email.from,
         to: email,
-        subject: appConfig.email.subject || '默认标题',
+        subject: `${appConfig.email.subject || '默认标题'} - ${config.title}`,
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <p>您好！</p>
+                <p>${config.greeting}</p>
+                <p>${config.description}</p>
                 <p>您的验证码是：<strong style="font-size: 24px; color: #007bff;">${verificationCode}</strong></p>
                 <p>验证码将在3分钟后过期，请及时使用。</p>
                 <p>如果这不是您的操作，请忽略此邮件。</p>
@@ -48,7 +66,7 @@ export async function sendVerificationCode(email, emailTransporter, appConfig) {
 
     await emailTransporter.sendMail(mailOptions);
 
-    logger.info(`验证码已发送到邮箱: ${email}`);
+    logger.info(`验证码已发送到邮箱: ${email}, 场景: ${scene}`);
     return createSuccessResponse('验证码已发送到您的邮箱');
 }
 
@@ -612,5 +630,65 @@ export async function deleteUser(userId, adminId) {
             message: '删除用户失败',
             code: 500
         };
+    }
+}
+
+/**
+ * 重置密码（通过邮箱验证码）
+ * @param {string} email - 邮箱地址
+ * @param {string} verificationCode - 验证码
+ * @param {string} newPassword - 新密码
+ * @returns {object} 重置结果
+ */
+export async function resetPasswordByEmail(email, verificationCode, newPassword) {
+    try {
+        // 验证邮箱格式
+        if (!validateEmailFormat(email)) {
+            return createErrorResponse('请提供有效的邮箱地址', 400);
+        }
+
+        // 验证必填字段
+        if (!validateRequired(verificationCode, '验证码')) {
+            return createErrorResponse('验证码不能为空', 400);
+        }
+
+        if (!validateRequired(newPassword, '新密码')) {
+            return createErrorResponse('新密码不能为空', 400);
+        }
+
+        // 验证密码长度
+        if (!validateStringLength(newPassword, 6, 128, '新密码')) {
+            return createErrorResponse('新密码长度必须在6-128个字符之间', 400);
+        }
+
+        // 验证验证码
+        const verifyResult = await verifyCode(email, verificationCode);
+        if (!verifyResult.success) {
+            return verifyResult;
+        }
+
+        // 查找用户
+        const user = queryOne('SELECT id FROM user WHERE account_number = ? AND is_deleted = 0', [email]);
+        if (!user) {
+            return createErrorResponse('该邮箱未注册', 404);
+        }
+
+        // 生成新密码哈希
+        const hashedPassword = await hashPassword(newPassword);
+
+        // 更新密码
+        const result = update('UPDATE user SET password = ?, update_time = ? WHERE id = ?', [hashedPassword, getCurrentTimestamp(), user.id]);
+
+        if (result.changes === 0) {
+            return createErrorResponse('密码重置失败', 500);
+        }
+
+        logger.info(`用户 ${email} 通过邮箱验证码重置密码成功`);
+
+        return createSuccessResponse('密码重置成功', { userId: user.id });
+
+    } catch (error) {
+        logger.error('重置密码失败:', error);
+        return createErrorResponse('重置密码失败: ' + error.message, 500);
     }
 }

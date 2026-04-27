@@ -52,6 +52,12 @@ const sidebar = [
     name: 'logs',
     component: () => import('../components/System/logs/index.vue'),
     meta: { needLogin: true, name: "运行日志", cnname: "运行日志", }
+  },
+  {
+    path: 'redis-admin',
+    name: 'redis-admin',
+    component: () => import('../components/System/RedisAdmin/index.vue'),
+    meta: { needLogin: true, name: "Redis管理", cnname: "Redis管理", needSuperAdmin: true }
   }
 ]
 

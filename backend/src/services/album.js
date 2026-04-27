@@ -1,6 +1,7 @@
 import path from 'path';
 import { fileExists } from '../method/file-utils.js';
 import { queryOne, queryAll, insert, update, remove, softDelete } from '../method/database.js';
+import { createNotification, notifyAdminsForReview } from '../method/notification.js';
 
 /**
  * 相册服务 - 处理相册和照片相关的业务逻辑
@@ -111,14 +112,14 @@ export async function getAlbumsWithLatestPhotos() {
 
 /**
  * 获取指定相册的照片列表
- * @param {number} albumId - 相册ID (必需)
+ * @param {number} albumId - 相册ID
  * @returns {object} 照片列表
  */
 export async function getPhotos(albumId) {
     try {
         // 验证相册是否存在且审核通过
         const album = queryOne(`
-            SELECT id, name, introduction, is_deleted, is_review
+            SELECT id, name, is_deleted, is_review
             FROM photo_album
             WHERE id = ? AND is_deleted = 0 AND is_review = 1
         `, [albumId]);
@@ -126,33 +127,38 @@ export async function getPhotos(albumId) {
         if (!album) {
             return {
                 success: false,
-                message: '相册不存在或未审核通过',
-                code: 404
+                message: '相册不存在或未审核通过'
             };
         }
 
-        // 获取相册中的所有审核通过的照片
+        // 获取该相册下所有审核通过且未删除的照片
         const photos = queryAll(`
             SELECT
                 p.id,
+                p.album_id,
                 p.name,
-                p.url
+                p.url,
+                p.is_review,
+                p.create_time,
+                u.name as user_name
             FROM photo p
-            WHERE p.album_id = ?
-            AND p.is_deleted = 0 AND p.is_review = 1
+            LEFT JOIN user u ON p.user_id = u.id
+            WHERE p.album_id = ? AND p.is_deleted = 0 AND p.is_review = 1
             ORDER BY p.create_time DESC
         `, [albumId]);
 
-        // 处理照片URL，确保文件存在
+        // 处理照片数据
         const processedPhotos = photos
             .filter(photo => fileExists(photo.url))
             .map(photo => ({
                 id: photo.id,
-                name: photo.name,
-                url: `/api/file/${photo.url}`
+                photoAlbumId: photo.album_id,
+                title: photo.name,
+                img: `/api/file/${photo.url}`,
+                is_review: photo.is_review,
+                create_time: photo.create_time,
+                user_name: photo.user_name
             }));
-
-        logger.info(`获取照片列表: 相册 ${albumId}(${album.name}), 共${processedPhotos.length}张照片`);
 
         return {
             success: true,
@@ -160,8 +166,7 @@ export async function getPhotos(albumId) {
             data: {
                 album: {
                     id: album.id,
-                    name: album.name,
-                    introduction: album.introduction || ''
+                    name: album.name
                 },
                 photos: processedPhotos
             }
@@ -182,14 +187,14 @@ export async function getPhotos(albumId) {
  * @param {object} albumData - 相册数据
  * @param {string} albumData.name - 相册名称
  * @param {string} albumData.introduction - 相册简介
- * @param {number} userId - 创建者用户ID
+ * @param {number} userId - 用户ID
  * @returns {object} 创建结果
  */
 export async function createAlbum(albumData, userId) {
-    const { name, introduction } = albumData;
-
     try {
-        // 验证参数
+        const { name, introduction } = albumData;
+
+        // 验证相册名称
         if (!name || name.trim().length === 0) {
             return {
                 success: false,
@@ -197,45 +202,37 @@ export async function createAlbum(albumData, userId) {
             };
         }
 
-        if (name.length > 100) {
-            return {
-                success: false,
-                message: '相册名称不能超过100个字符'
-            };
-        }
-
-        if (introduction && introduction.length > 500) {
-            return {
-                success: false,
-                message: '相册简介不能超过500个字符'
-            };
-        }
-
-        // 检查用户是否已经创建过同名相册
+        // 检查相册名称是否已存在
         const existingAlbum = queryOne(`
             SELECT id FROM photo_album
-            WHERE name = ? AND user_id = ? AND is_deleted = 0
-        `, [name.trim(), userId]);
+            WHERE name = ? AND is_deleted = 0
+        `, [name.trim()]);
 
         if (existingAlbum) {
             return {
                 success: false,
-                message: '您已经创建过同名的相册'
+                message: '相册名称已存在'
             };
         }
 
-        // 创建相册
         const currentTime = Math.floor(Date.now() / 1000);
+
+        // 创建相册，默认需要审核
         const result = insert(`
             INSERT INTO photo_album (user_id, name, introduction, is_review, create_time, update_time)
-            VALUES (?, ?, ?, 1, ?, ?)
+            VALUES (?, ?, ?, 0, ?, ?)
         `, [userId, name.trim(), introduction?.trim() || '', currentTime, currentTime]);
 
         logger.info(`相册创建成功: ${name} by user ${userId}`);
 
+        // 通知管理员有新相册待审核
+        notifyAdminsForReview('相册', name.trim()).catch(err => {
+            logger.error('发送管理员审核通知失败:', err);
+        });
+
         return {
             success: true,
-            message: '相册创建成功',
+            message: '相册创建成功，等待审核',
             data: {
                 albumId: result.lastInsertRowid,
                 name: name.trim(),
@@ -247,7 +244,7 @@ export async function createAlbum(albumData, userId) {
         logger.error('相册创建失败:', error);
         return {
             success: false,
-            message: '相册创建失败，请稍后重试',
+            message: '相册创建失败',
             code: 500
         };
     }
@@ -259,22 +256,23 @@ export async function createAlbum(albumData, userId) {
  * @param {object} photoData - 照片数据
  * @param {number} photoData.albumId - 相册ID
  * @param {string} photoData.name - 照片名称
- * @param {number} userId - 上传者用户ID
- * @param {number} userPermission - 上传者权限等级
+ * @param {number} userId - 用户ID
+ * @param {number} userPermission - 用户权限
  * @returns {object} 上传结果
  */
 export async function uploadPhoto(file, photoData, userId, userPermission) {
-    const { albumId, name } = photoData;
-
     try {
-        // 验证参数
+        const { albumId, name } = photoData;
+
+        // 验证相册ID
         if (!albumId) {
             return {
                 success: false,
-                message: '相册ID不能为空'
+                message: '请选择相册'
             };
         }
 
+        // 验证照片名称
         if (!name || name.trim().length === 0) {
             return {
                 success: false,
@@ -332,6 +330,13 @@ export async function uploadPhoto(file, photoData, userId, userPermission) {
 
         logger.info(`照片上传成功: ${name} (${fileName}) to album ${albumId} by user ${userId} (审核状态: ${isReview})`);
 
+        // 如果需要审核，通知管理员
+        if (isReview === 0) {
+            notifyAdminsForReview('照片', name.trim()).catch(err => {
+                logger.error('发送管理员审核通知失败:', err);
+            });
+        }
+
         return {
             success: true,
             message: message,
@@ -377,13 +382,13 @@ export async function getAlbumsForAdmin() {
             ORDER BY pa.create_time DESC
         `);
 
-        // 为每个相册获取其照片
+        // 为每个相册获取照片列表
         const albumTags = [];
         for (const album of albums) {
+            // 获取该相册下的所有照片（包括待审核的）
             const photos = queryAll(`
                 SELECT
                     p.id,
-                    p.album_id,
                     p.user_id,
                     p.name,
                     p.url,
@@ -460,7 +465,7 @@ export async function reviewAlbum(albumId, isReview, adminId) {
 
         // 检查相册是否存在
         const album = queryOne(`
-            SELECT id, name, is_review
+            SELECT id, name, is_review, user_id
             FROM photo_album
             WHERE id = ? AND is_deleted = 0
         `, [albumId]);
@@ -488,6 +493,20 @@ export async function reviewAlbum(albumId, isReview, adminId) {
         }
 
         logger.info(`相册审核: ID ${albumId} 状态 ${album.is_review} -> ${isReview} by admin ${adminId}`);
+
+        // 发送审核通知给用户
+        const statusDesc = {
+            0: '您的相册已撤销审核，请修改后重新提交',
+            1: '恭喜！您的相册已通过审核，现在可以被其他用户查看',
+            2: '您的相册未通过审核，请修改后重新提交'
+        };
+
+        await createNotification(
+            album.user_id,
+            '相册审核通知',
+            `您的相册「${album.name}」${statusDesc[isReview]}`,
+            'review'
+        );
 
         return {
             success: true,
@@ -522,17 +541,9 @@ export async function updateAlbum(albumId, updateData, adminId) {
     try {
         const { name, introduction } = updateData;
 
-        // 验证参数
-        if (!name || name.trim().length === 0) {
-            return {
-                success: false,
-                message: '相册名称不能为空'
-            };
-        }
-
         // 检查相册是否存在
         const album = queryOne(`
-            SELECT id, name, introduction
+            SELECT id, name
             FROM photo_album
             WHERE id = ? AND is_deleted = 0
         `, [albumId]);
@@ -545,7 +556,22 @@ export async function updateAlbum(albumId, updateData, adminId) {
             };
         }
 
-        // 更新相册信息
+        // 如果要修改名称，检查新名称是否已存在
+        if (name && name.trim() !== album.name) {
+            const existingAlbum = queryOne(`
+                SELECT id FROM photo_album
+                WHERE name = ? AND id != ? AND is_deleted = 0
+            `, [name.trim(), albumId]);
+
+            if (existingAlbum) {
+                return {
+                    success: false,
+                    message: '相册名称已存在'
+                };
+            }
+        }
+
+        // 构建更新字段
         const updateFields = [];
         const updateValues = [];
 
@@ -614,7 +640,7 @@ export async function deleteAlbum(albumId, adminId) {
     try {
         // 检查相册是否存在
         const album = queryOne(`
-            SELECT id, name, is_deleted
+            SELECT id, name, is_deleted, user_id
             FROM photo_album
             WHERE id = ?
         `, [albumId]);
@@ -652,6 +678,14 @@ export async function deleteAlbum(albumId, adminId) {
 
         logger.info(`相册软删除: ID ${albumId} (${album.name}) by admin ${adminId}`);
 
+        // 通知用户相册被删除
+        await createNotification(
+            album.user_id,
+            '内容删除通知',
+            `您的相册「${album.name}」已被管理员删除`,
+            'admin'
+        );
+
         return {
             success: true,
             message: '相册删除成功'
@@ -686,7 +720,7 @@ export async function reviewPhoto(photoId, isReview, adminId) {
 
         // 检查照片是否存在
         const photo = queryOne(`
-            SELECT id, name, is_review
+            SELECT id, name, is_review, user_id
             FROM photo
             WHERE id = ? AND is_deleted = 0
         `, [photoId]);
@@ -714,6 +748,20 @@ export async function reviewPhoto(photoId, isReview, adminId) {
         }
 
         logger.info(`照片审核: ID ${photoId} 状态 ${photo.is_review} -> ${isReview} by admin ${adminId}`);
+
+        // 发送审核通知给用户
+        const statusDesc = {
+            0: '您的照片已撤销审核，请修改后重新提交',
+            1: '恭喜！您的照片已通过审核，现在可以被其他用户查看',
+            2: '您的照片未通过审核，请修改后重新提交'
+        };
+
+        await createNotification(
+            photo.user_id,
+            '照片审核通知',
+            `您的照片「${photo.name}」${statusDesc[isReview]}`,
+            'review'
+        );
 
         return {
             success: true,
@@ -855,7 +903,7 @@ export async function deletePhoto(photoId, adminId) {
     try {
         // 检查照片是否存在
         const photo = queryOne(`
-            SELECT id, name, is_deleted
+            SELECT id, name, is_deleted, user_id
             FROM photo
             WHERE id = ?
         `, [photoId]);
@@ -887,6 +935,14 @@ export async function deletePhoto(photoId, adminId) {
 
         logger.info(`照片软删除: ID ${photoId} (${photo.name}) by admin ${adminId}`);
 
+        // 通知用户照片被删除
+        await createNotification(
+            photo.user_id,
+            '内容删除通知',
+            `您的照片「${photo.name}」已被管理员删除`,
+            'admin'
+        );
+
         return {
             success: true,
             message: '照片删除成功'
@@ -897,6 +953,47 @@ export async function deletePhoto(photoId, adminId) {
         return {
             success: false,
             message: '照片删除失败',
+            code: 500
+        };
+    }
+}
+
+/**
+ * 获取用户的相册列表（用于个人中心编辑）
+ * @param {number} userId - 用户ID
+ * @returns {object} 相册列表
+ */
+export async function getUserAlbums(userId) {
+    try {
+        // 获取所有审核通过的相册（用户可以移动到任何已审核的相册）
+        const albums = queryAll(`
+            SELECT
+                id,
+                name,
+                introduction,
+                is_review,
+                create_time
+            FROM photo_album
+            WHERE is_deleted = 0 AND is_review = 1
+            ORDER BY create_time DESC
+        `);
+
+        return {
+            success: true,
+            data: albums.map(album => ({
+                id: album.id,
+                name: album.name,
+                introduction: album.introduction,
+                isReview: album.is_review,
+                createTime: album.create_time
+            }))
+        };
+
+    } catch (error) {
+        logger.error('获取相册列表失败:', error);
+        return {
+            success: false,
+            message: '获取相册列表失败',
             code: 500
         };
     }

@@ -8,6 +8,9 @@ import {
     PERMISSIONS, getUserInfo, isUserBanned
 } from '../method/business-utils.js';
 import { queryOne, queryAll, insert, update, exists } from '../method/database.js';
+import { createNotification } from '../method/notification.js';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * 发送验证码服务
@@ -137,7 +140,8 @@ export async function login(accountNumber, password, token) {
             return createSuccessResponse('登录成功', {
                 token: newToken,
                 permission: user.permission,
-                name: user.name
+                name: user.name,
+                avatar: user.avatar
             });
 
         } catch (error) {
@@ -186,7 +190,8 @@ export async function login(accountNumber, password, token) {
         return createSuccessResponse('登录成功', {
             token: token,
             permission: user.permission,
-            name: user.name
+            name: user.name,
+            avatar: user.avatar
         });
 
     } catch (error) {
@@ -271,6 +276,15 @@ export async function register(username, password, email, verificationCode) {
             `, [username, email, hashedPassword, PERMISSIONS.USER, 0, getCurrentTimestamp(), getCurrentTimestamp()]);
 
         logger.info(`新用户注册成功: ${username} (${email})`);
+
+        // 发送欢迎消息
+        await createNotification(
+            result.lastInsertRowid,
+            '欢迎加入',
+            `亲爱的 ${username}，欢迎加入${appConfig.siteName || '我们的网站'}！在这里你可以上传音声、照片，参与企划，与其他粉丝一起交流。如有任何问题，请联系管理员。`,
+            'system'
+        );
+
         return createSuccessResponse('注册成功', { userId: result.lastInsertRowid });
 
     } catch (error) {
@@ -543,6 +557,14 @@ export async function resetUserPassword(userId, adminId) {
 
         logger.info(`重置用户密码成功: ${user.name}(${userId}) by admin ${adminId}`);
 
+        // 发送通知给用户
+        await createNotification(
+            userId,
+            '账号安全提醒',
+            '管理员已重置您的登录密码，新密码已发送到您的邮箱，请及时登录并修改密码。',
+            'admin'
+        );
+
         return {
             success: true,
             message: '重置用户密码成功，新密码已发送到用户邮箱',
@@ -630,6 +652,109 @@ export async function deleteUser(userId, adminId) {
             message: '删除用户失败',
             code: 500
         };
+    }
+}
+
+/**
+ * 管理员重置用户名称
+ * @param {number} userId - 用户ID
+ * @param {string} newName - 新用户名
+ * @param {number} adminId - 操作管理员ID
+ * @returns {object} 操作结果
+ */
+export async function adminResetUserName(userId, newName, adminId) {
+    try {
+        // 验证参数
+        if (!newName || newName.trim().length === 0) {
+            return { success: false, message: '用户名不能为空', code: 400 };
+        }
+        if (newName.trim().length > 20) {
+            return { success: false, message: '用户名不能超过20个字符', code: 400 };
+        }
+
+        // 检查用户是否存在
+        const user = queryOne('SELECT id, name FROM user WHERE id = ? AND is_deleted = 0', [userId]);
+        if (!user) {
+            return { success: false, message: '用户不存在', code: 404 };
+        }
+
+        const oldName = user.name;
+        const currentTime = getCurrentTimestamp();
+
+        update(
+            'UPDATE user SET name = ?, update_time = ? WHERE id = ?',
+            [newName.trim(), currentTime, userId]
+        );
+
+        logger.info(`管理员重置用户名称: ${oldName} -> ${newName} by admin ${adminId}`);
+
+        // 发送通知给用户
+        await createNotification(
+            userId,
+            '账号信息变更',
+            `管理员已将您的用户名从「${oldName}」修改为「${newName.trim()}」`,
+            'admin'
+        );
+
+        return {
+            success: true,
+            message: '重置用户名成功',
+            data: { userId, oldName, newName: newName.trim() }
+        };
+    } catch (error) {
+        logger.error('管理员重置用户名失败:', error);
+        return { success: false, message: '重置用户名失败', code: 500 };
+    }
+}
+
+/**
+ * 管理员重置用户头像
+ * @param {number} userId - 用户ID
+ * @param {object} file - multer文件对象
+ * @param {number} adminId - 操作管理员ID
+ * @returns {object} 操作结果
+ */
+export async function adminResetUserAvatar(userId, file, adminId) {
+    try {
+        if (!file) {
+            return { success: false, message: '请选择头像文件', code: 400 };
+        }
+
+        // 检查用户是否存在
+        const user = queryOne('SELECT id, name FROM user WHERE id = ? AND is_deleted = 0', [userId]);
+        if (!user) {
+            return { success: false, message: '用户不存在', code: 404 };
+        }
+
+        // multer已经保存文件到 data/document/avatar 目录
+        // 构建数据库路径: avatar/xxx.jpg
+        const avatarFileName = file.filename;
+        const filePath = path.join('avatar', avatarFileName).replace(/\\/g, '/');
+
+        const currentTime = getCurrentTimestamp();
+        update(
+            'UPDATE user SET avatar = ?, update_time = ? WHERE id = ?',
+            [filePath, currentTime, userId]
+        );
+
+        logger.info(`管理员重置用户头像: ${user.name}(${userId}) by admin ${adminId}`);
+
+        // 发送通知给用户
+        await createNotification(
+            userId,
+            '账号信息变更',
+            '管理员已重置您的头像',
+            'admin'
+        );
+
+        return {
+            success: true,
+            message: '重置头像成功',
+            data: { userId, avatar: `/file/${filePath}` }
+        };
+    } catch (error) {
+        logger.error('管理员重置头像失败:', error);
+        return { success: false, message: '重置头像失败', code: 500 };
     }
 }
 

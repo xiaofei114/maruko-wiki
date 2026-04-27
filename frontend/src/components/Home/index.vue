@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRoomInfo, getMasterInfo, getTopListNew, getLiveDuration } from '@/api/bilibiliApis.js'
-import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock } from '@element-plus/icons-vue'
+import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock, Switch } from '@element-plus/icons-vue'
 import { getAnchorStats, getCurrentMonthMaxCaptainCount } from '@/api/anchorStats.js'
 import { getCurrentMonthGifts } from '@/api/captainGift.js'
 
@@ -20,34 +20,57 @@ const userId = import.meta.env.VITE_APP_USER_ID;
 const roomId = import.meta.env.VITE_APP_ROOM_ID;
 const nickName = import.meta.env.VITE_APP_NICK_NAME;
 
+// 定时器引用
+const roomInfoInterval = ref(null)
+
 // 计算本月总直播时长（精确到分钟）
 const liveHours = computed(() => {
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth() // 0-based
-  
+
   // 本月开始和结束时间戳
   const monthStart = new Date(currentYear, currentMonth, 1, 0, 0, 0).getTime()
   const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).getTime()
-  
+
   let totalMinutes = 0
-  
-  liveRecords.value.forEach(session => {
+
+  // 使用 currentMonthLiveRecords 计算，不受弹窗切换月份影响
+  currentMonthLiveRecords.value.forEach(session => {
     // 处理正在直播的情况（endTime为null）
     const sessionEndTime = session.endTime || Date.now()
-    
+
     // 计算该直播在本月内的实际时间段
     // 取直播时间段和本月时间段的交集
     const effectiveStartTime = Math.max(session.startTime, monthStart)
     const effectiveEndTime = Math.min(sessionEndTime, monthEnd)
-    
+
     // 如果直播在本月内有有效时间段
     if (effectiveStartTime < effectiveEndTime) {
-      const duration = Math.floor((effectiveEndTime - effectiveStartTime) / (1000 * 60))
+      let duration = Math.floor((effectiveEndTime - effectiveStartTime) / (1000 * 60))
+
+      // 如果不计算跨日直播，需要进一步处理
+      if (liveHoursMode.value === 'sameDay') {
+        const startDate = new Date(effectiveStartTime)
+        const endDate = new Date(effectiveEndTime)
+
+        // 判断是否跨日（日期不同）
+        if (startDate.getDate() !== endDate.getDate()) {
+          // 只计算到当天 23:59:59 的时长
+          const endOfStartDay = new Date(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            startDate.getDate(),
+            23, 59, 59
+          ).getTime()
+          duration = Math.floor((Math.min(endOfStartDay, effectiveEndTime) - effectiveStartTime) / (1000 * 60))
+        }
+      }
+
       totalMinutes += duration
     }
   })
-  
+
   // 转换为小时（保留两位小数，精确到分钟）
   return Math.round(totalMinutes / 60 * 100) / 100
 })
@@ -541,6 +564,12 @@ const timestampToTimeString = (timestamp) => {
 const liveRecords = ref([])
 const liveRecordsLoading = ref(false)
 
+// 当前月直播记录数据（用于liveHours计算，不受弹窗切换月份影响）
+const currentMonthLiveRecords = ref([])
+
+// 直播时长计算模式：'all'(全算，默认) 或 'sameDay'(不计算跨日直播)
+const liveHoursMode = ref('all')
+
 // 获取直播记录数据
 const fetchLiveRecords = async (month) => {
   liveRecordsLoading.value = true
@@ -710,6 +739,21 @@ const calculateMonthTotal = () => {
     }
   })
   return totalHours
+}
+
+// 获取显示用的月份总时长（当前月使用liveHours，其他月使用calculateMonthTotal）
+const getDisplayMonthTotal = () => {
+  const now = new Date()
+  const nowYear = now.getFullYear()
+  const nowMonth = now.getMonth() + 1
+
+  // 如果查看的是当前月，使用liveHours（支持模式切换）
+  if (currentYear.value === nowYear && currentMonth.value === nowMonth) {
+    return liveHours.value
+  }
+
+  // 其他月份使用原来的计算方式
+  return calculateMonthTotal()
 }
 
 // 计算本月有效天数
@@ -923,6 +967,11 @@ const formatNumber = (num) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+// 切换直播时长计算模式
+const toggleLiveHoursMode = () => {
+  liveHoursMode.value = liveHoursMode.value === 'all' ? 'sameDay' : 'all'
+}
+
 const goTo = (url, isRoute) => {
   if (isRoute) router.push(url)
   else window.open(url, '_blank')
@@ -1056,9 +1105,11 @@ onMounted(async () => {
   const currentMonth = new Date().getMonth() + 1
   const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
   await fetchLiveRecords(monthStr)
+  // 同时保存到 currentMonthLiveRecords，用于 liveHours 计算
+  currentMonthLiveRecords.value = [...liveRecords.value]
 
   //每分钟获取一次
-  setInterval(fetchRoomInfo, 60000)
+  roomInfoInterval.value = setInterval(fetchRoomInfo, 60000)
   await getUserInfo(true)
 
   // 获取本月最高舰长数
@@ -1068,6 +1119,14 @@ onMounted(async () => {
   await fetchCaptainGifts()
 
   generateCalendar()
+})
+
+// 组件卸载时清除定时器
+onUnmounted(() => {
+  if (roomInfoInterval.value) {
+    clearInterval(roomInfoInterval.value)
+    roomInfoInterval.value = null
+  }
 })
 </script>
 
@@ -1211,15 +1270,36 @@ onMounted(async () => {
           <div class="live-detail-container">
             <!-- 月份和总时长信息 -->
             <div class="month-info">
-              <div class="month-selector">
-                <el-button @click="changeMonth(-1)">上一月</el-button>
-                <span class="current-month">{{ currentYear }}年{{ currentMonth }}月</span>
-                <el-button @click="changeMonth(1)">下一月</el-button>
+              <div class="month-header">
+                <div class="month-selector">
+                  <el-button @click="changeMonth(-1)">上一月</el-button>
+                  <span class="current-month">{{ currentYear }}年{{ currentMonth }}月</span>
+                  <el-button @click="changeMonth(1)">下一月</el-button>
+                </div>
+                <el-tooltip :content="liveHoursMode === 'all' ? '当前计算跨日直播的全时长' : '当前只计算单天直播时长（跨日直播只算当天）'" placement="top">
+                  <el-button type="primary" size="small" @click="toggleLiveHoursMode" plain>
+                    <el-icon><Switch /></el-icon>
+                    <span style="margin-left: 4px;">{{ liveHoursMode === 'all' ? '全算时长' : '不跨日时长' }}</span>
+                  </el-button>
+                </el-tooltip>
               </div>
               <div class="month-stats">
-                <div class="month-total">本月总时长：{{ formatLiveTime(calculateMonthTotal()) }}</div>
-                <div class="month-effective">有效天数：{{ calculateEffectiveDays() }}/{{ requiredEffectiveDays }}</div>
-                <div class="month-remaining">还差：{{ calculateRemainingEffectiveDays() }} 天有效天</div>
+                <div class="stat-item">
+                  <span class="stat-label">本月总时长</span>
+                  <span class="stat-value">{{ formatLiveTime(getDisplayMonthTotal()) }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">有效天数</span>
+                  <span class="stat-value">{{ calculateEffectiveDays() }}/{{ requiredEffectiveDays }}</span>
+                </div>
+                <div v-if="calculateRemainingEffectiveDays() > 0" class="stat-item">
+                  <span class="stat-label">还差有效天</span>
+                  <span class="stat-value">{{ calculateRemainingEffectiveDays() }} 天</span>
+                </div>
+                <div v-if="90 - liveHours > 0" class="stat-item">
+                  <span class="stat-label">还差时长</span>
+                  <span class="stat-value">{{ formatHoursToHM(90 - liveHours) }}</span>
+                </div>
               </div>
             </div>
             
@@ -1930,10 +2010,16 @@ onMounted(async () => {
 /* 月份和总时长信息 */
 .month-info {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 15px;
   padding-bottom: 15px;
   border-bottom: 1px solid #e4e7ed;
+}
+
+.month-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .month-selector {
@@ -1950,7 +2036,23 @@ onMounted(async () => {
   text-align: center;
 }
 
-.month-total {
+.month-stats {
+  display: flex;
+  gap: 30px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.stat-value {
   font-size: 16px;
   color: var(--color-primary);
   font-weight: 600;
@@ -2158,28 +2260,44 @@ onMounted(async () => {
   }
   
   .month-info {
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding-bottom: 10px;
   }
-  
+
+  .month-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
   .month-selector {
     gap: 8px;
   }
-  
+
   .month-selector .el-button {
     padding: 6px 12px;
     font-size: 12px;
   }
-  
+
   .current-month {
     font-size: 14px;
     min-width: 100px;
   }
-  
-  .month-total {
-    font-size: 13px;
+
+  .month-stats {
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .stat-item {
+    align-items: center;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .stat-value {
+    font-size: 14px;
   }
   
   .calendar {

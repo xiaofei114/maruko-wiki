@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
@@ -9,11 +9,51 @@ import {
   Document, Picture, Headset, Edit, Bell, HomeFilled,
   InfoFilled, Message, ArrowLeft, Delete, More, ZoomIn, ArrowRight, Lock, Star, Link, Plus, Setting
 } from '@element-plus/icons-vue'
-import { getPlanDocuments } from '@/api/planDocument'
+import defaultAvatar from '@/assets/猫玩伴.png'
+import {
+  getUserProfile,
+  getUserPhotos,
+  getUserAudios,
+  getUserPlans,
+  updatePhoto,
+  updateAudio,
+  updatePlan,
+  deletePhoto,
+  deleteAudio,
+  deletePlan,
+  updateUserAvatar,
+  updateUserName,
+  updateUserPassword,
+  getBilibiliBindInfo,
+  bindBilibiliAccount,
+  unbindBilibiliAccount,
+  getUserNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  getUnreadNotificationCount,
+  getUserAlbums,
+  getUserAudioClassifications
+} from '@/api/userProfile'
 
 const router = useRouter()
 const userStore = useUserStore()
 const { user, isAuthenticated } = storeToRefs(userStore)
+
+// 构建文件URL（根据环境添加/api前缀）
+const baseUrl = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : (import.meta.env.VITE_APP_BASE_URL?.replace(/\/api\/?$/, '') || '')
+const apiPrefix = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : '/api'
+function buildFileUrl(path) {
+  if (!path) return defaultAvatar
+  // blob: 开头的临时URL直接返回（用于预览）
+  if (path.startsWith('blob:')) return path
+  // 完整http URL直接返回
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  // 如果路径已经以/api开头，不再添加前缀
+  if (path.startsWith('/api/')) return `${baseUrl}${path}`
+  // 确保路径以 / 开头
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${baseUrl}${apiPrefix}${normalizedPath}`
+}
 
 // 当前选中的菜单
 const activeMenu = ref('home')
@@ -22,7 +62,9 @@ const activeMenu = ref('home')
 const userInfo = ref({
   name: '',
   email: '',
-  avatar: ''
+  avatar: '',
+  permission: 3,
+  createTime: ''
 })
 
 const uploads = ref({
@@ -65,6 +107,7 @@ const isEditingName = ref(false)
 const editingName = ref('')
 const originalName = ref('')
 const nameInput = ref(null)
+const isSavingName = ref(false) // 防止重复提交
 
 // 编辑对话框
 const editDialogVisible = ref(false)
@@ -91,6 +134,33 @@ const bilibiliForm = ref({
   uid: '',
   agreed: false
 })
+
+// 修改密码对话框
+const passwordDialogVisible = ref(false)
+const passwordForm = ref({
+  newPassword: '',
+  confirmPassword: ''
+})
+const passwordFormRef = ref(null)
+const passwordRules = {
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== passwordForm.value.newPassword) {
+          callback(new Error('两次输入的密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
 
 // 头像来源
 const avatarSource = ref('custom') // 'custom' | 'bilibili'
@@ -157,38 +227,9 @@ function toggleAudioPlay(audio) {
   }
 }
 
-// 模拟数据
-const mockUserInfo = {
-  name: user.value?.name || '用户',
-  email: 'user@example.com',
-  avatar: 'https://i2.hdslb.com/bfs/face/037080004e33990818de22a63394c7de53c0e92c.jpg'
-}
-
-const mockUploads = {
-  photos: Array.from({ length: 12 }, (_, i) => ({
-    id: i + 1,
-    name: `照片${i + 1}`,
-    url: 'https://i2.hdslb.com/bfs/face/037080004e33990818de22a63394c7de53c0e92c.jpg',
-    album_id: 1,
-    album_name: '日常',
-    upload_time: `2024-01-${String(i % 30 + 1).padStart(2, '0')} 12:00:00`,
-    status: i % 3
-  })),
-  audios: Array.from({ length: 8 }, (_, i) => ({
-    id: i + 1,
-    name: `音声${i + 1}`,
-    url: '/api/audio/1',
-    classification_id: 1,
-    classification_name: '日常',
-    upload_time: `2024-01-${String(i % 30 + 1).padStart(2, '0')} 12:00:00`,
-    status: i % 3
-  })),
-  plans: [
-    { id: 1, title: '2024年春季企划', fileName: 'spring_plan_2024.docx', uploadTime: 1704067200, isCurrent: true },
-    { id: 2, title: '夏季活动策划', fileName: 'summer_activity.docx', uploadTime: 1706745600, isCurrent: false },
-    { id: 3, title: '秋季企划案', fileName: 'autumn_plan.docx', uploadTime: 1709424000, isCurrent: false }
-  ]
-}
+// 相册/分类列表（用于编辑选择）
+const albums = ref([])
+const classifications = ref([])
 
 // 获取状态文本
 const getStatusText = (status) => {
@@ -213,25 +254,93 @@ async function fetchUserInfo() {
   try {
     loading.value = true
     error.value = null
-    await new Promise(resolve => setTimeout(resolve, 500))
 
-    userInfo.value = mockUserInfo
-    uploads.value = mockUploads
-    photoTotal.value = uploads.value.photos.length
-    audioTotal.value = uploads.value.audios.length
-    planTotal.value = uploads.value.plans.length
-    messageTotal.value = messages.value.length
+    // 并行获取所有数据
+    const [profileRes, photosRes, audiosRes, plansRes, notificationsRes, bilibiliRes] = await Promise.all([
+      getUserProfile(),
+      getUserPhotos({ page: photoPagination.value.currentPage, pageSize: photoPagination.value.pageSize }),
+      getUserAudios({ page: audioPagination.value.currentPage, pageSize: audioPagination.value.pageSize }),
+      getUserPlans({ page: planPagination.value.currentPage, pageSize: planPagination.value.pageSize }),
+      getUserNotifications({ page: messagePagination.value.currentPage, pageSize: messagePagination.value.pageSize }),
+      getBilibiliBindInfo()
+    ])
 
-    try {
-      const planRes = await getPlanDocuments()
-      if (planRes.success && planRes.data) {
-        uploads.value.plans = planRes.data.filter(p => p.uploaderId === user.value?.id)
-        planTotal.value = uploads.value.plans.length
+    // 处理用户信息
+    if (profileRes.code === 200) {
+      userInfo.value = {
+        name: profileRes.data.name,
+        email: profileRes.data.accountNumber, // 临时使用账号作为邮箱前缀
+        avatar: buildFileUrl(profileRes.data.avatar),
+        permission: profileRes.data.permission || 3,
+        createTime: profileRes.data.createTime
       }
-    } catch (e) { console.log('使用模拟企划数据') }
+    }
+
+    // 处理照片列表
+    if (photosRes.code === 200) {
+      uploads.value.photos = photosRes.data.list.map(p => ({
+        id: p.id,
+        name: p.name,
+        url: buildFileUrl(p.url),
+        album_id: p.albumId,
+        album_name: p.albumName,
+        upload_time: formatTime(p.uploadTime),
+        status: p.status
+      }))
+      photoTotal.value = photosRes.data.pagination?.total || 0
+    }
+
+    // 处理音声列表
+    if (audiosRes.code === 200) {
+      uploads.value.audios = audiosRes.data.list.map(a => ({
+        id: a.id,
+        name: a.name,
+        url: buildFileUrl(a.url),
+        classification_id: a.classificationId,
+        classification_name: a.classificationName,
+        upload_time: formatTime(a.uploadTime),
+        status: a.status
+      }))
+      audioTotal.value = audiosRes.data.pagination?.total || 0
+    }
+
+    // 处理企划列表
+    if (plansRes.code === 200) {
+      uploads.value.plans = plansRes.data.list.map(p => ({
+        id: p.id,
+        title: p.title,
+        fileName: p.fileName,
+        uploadTime: p.uploadTime,
+        isCurrent: p.isCurrent,
+        status: p.status
+      }))
+      planTotal.value = plansRes.data.pagination?.total || 0
+    }
+
+    // 处理消息列表
+    if (notificationsRes.code === 200) {
+      messages.value = notificationsRes.data.map(m => ({
+        id: m.id,
+        title: m.title,
+        content: m.content,
+        time: formatTime(m.time),
+        read: m.read,
+        type: m.type
+      }))
+      messageTotal.value = notificationsRes.pagination?.total || 0
+    }
+
+    // 处理B站绑定信息
+    if (bilibiliRes.code === 200) {
+      bilibiliBind.value = {
+        ...bilibiliRes.data,
+        avatar: buildFileUrl(bilibiliRes.data.avatar)
+      }
+    }
   } catch (err) {
     error.value = '获取用户信息失败'
     ElMessage.error('获取用户信息失败')
+    console.error(err)
   } finally {
     loading.value = false
   }
@@ -255,17 +364,24 @@ function handleAvatarChange(file) {
 async function saveAvatar() {
   try {
     loading.value = true
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    if (avatarSource.value === 'bilibili' && bilibiliBind.value.isBound) {
-      userInfo.value.avatar = bilibiliBind.value.avatar
-    } else {
-      userInfo.value.avatar = avatarPreviewUrl.value
+
+    // 检查是否有选择文件
+    if (!avatarFile.value) {
+      ElMessage.error('请选择头像文件')
+      loading.value = false
+      return
     }
-    
-    ElMessage.success('头像更新成功')
-    avatarDialogVisible.value = false
-    avatarFile.value = null
+
+    const res = await updateUserAvatar(avatarFile.value)
+    if (res.code === 200) {
+      userInfo.value.avatar = buildFileUrl(res.data.avatar)
+      ElMessage.success('头像更新成功')
+      avatarDialogVisible.value = false
+      avatarFile.value = null
+      avatarPreviewUrl.value = ''
+    } else {
+      ElMessage.error(res.message || '头像更新失败')
+    }
   } catch (error) {
     ElMessage.error('头像更新失败')
   } finally {
@@ -282,23 +398,33 @@ function startEditName() {
 }
 
 async function saveName() {
+  // 防止重复提交
+  if (isSavingName.value) return
+  
   if (editingName.value.trim() === originalName.value) {
     isEditingName.value = false
     return
   }
+  
+  isSavingName.value = true
   try {
     await ElMessageBox.confirm(`确定要修改为"${editingName.value.trim()}"吗？`, '确认修改', {
       confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
     })
     loading.value = true
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    userInfo.value.name = editingName.value.trim()
-    ElMessage.success('修改成功')
-    isEditingName.value = false
+    const res = await updateUserName(editingName.value.trim())
+    if (res.code === 200) {
+      userInfo.value.name = editingName.value.trim()
+      ElMessage.success('修改成功')
+      isEditingName.value = false
+    } else {
+      ElMessage.error(res.message || '修改失败')
+    }
   } catch (error) {
     if (error !== 'cancel') ElMessage.error('修改失败')
   } finally {
     loading.value = false
+    isSavingName.value = false
   }
 }
 
@@ -307,17 +433,52 @@ function cancelEditName() {
   editingName.value = originalName.value
 }
 
+// 刷新未读消息数（通知Top组件更新）
+async function refreshUnreadCount() {
+  try {
+    const res = await getUnreadNotificationCount()
+    if (res.code === 200) {
+      // 触发自定义事件通知Top组件更新
+      window.dispatchEvent(new CustomEvent('refresh-unread-count', { detail: res.data.count || 0 }))
+    }
+  } catch (error) {
+    console.error('刷新未读消息数失败:', error)
+  }
+}
+
 // 标记消息已读
-function markAsRead(msg) {
-  msg.read = true
+async function markAsRead(msg) {
+  try {
+    const res = await markNotificationAsRead(msg.id)
+    if (res.code === 200) {
+      msg.read = true
+      // 刷新未读消息数
+      await refreshUnreadCount()
+    } else {
+      ElMessage.error(res.message || '标记失败')
+    }
+  } catch (error) {
+    ElMessage.error('标记失败')
+  }
 }
 
 // 标记所有消息已读
-function markAllAsRead() {
-  messages.value.forEach(msg => {
-    msg.read = true
-  })
-  ElMessage.success('已全部标记为已读')
+async function markAllAsRead() {
+  try {
+    const res = await markAllNotificationsAsRead()
+    if (res.code === 200) {
+      messages.value.forEach(msg => {
+        msg.read = true
+      })
+      ElMessage.success('已全部标记为已读')
+      // 刷新未读消息数
+      await refreshUnreadCount()
+    } else {
+      ElMessage.error(res.message || '标记失败')
+    }
+  } catch (error) {
+    ElMessage.error('标记失败')
+  }
 }
 
 // 获取角色标签
@@ -333,16 +494,48 @@ function getPermissionType(permission) {
 }
 
 // 打开编辑对话框
-function openEditDialog(type, item) {
+async function openEditDialog(type, item) {
   editType.value = type
   editForm.value = {
     id: item.id,
-    name: item.name || '',
+    name: type === 'plan' ? (item.title || '') : (item.name || ''),
     title: item.title || '',
     albumId: item.album_id || null,
     classificationId: item.classification_id || null
   }
+  
+  // 根据类型获取分类或相册列表
+  if (type === 'audio') {
+    await fetchAudioClassifications()
+  } else if (type === 'photo') {
+    await fetchUserAlbums()
+  }
+  
   editDialogVisible.value = true
+}
+
+// 获取用户的音声分类列表
+async function fetchAudioClassifications() {
+  try {
+    const res = await getUserAudioClassifications()
+    if (res.code === 200) {
+      classifications.value = res.data || []
+    }
+  } catch (error) {
+    console.error('获取音声分类失败:', error)
+  }
+}
+
+// 获取用户的相册列表
+async function fetchUserAlbums() {
+  try {
+    const res = await getUserAlbums()
+    if (res.code === 200) {
+      albums.value = res.data || []
+    }
+  } catch (error) {
+    console.error('获取相册列表失败:', error)
+  }
 }
 
 // 保存编辑
@@ -351,30 +544,52 @@ async function saveEdit() {
     await editFormRef.value.validate()
     loading.value = true
 
-    // 模拟API请求
-    await new Promise(resolve => setTimeout(resolve, 500))
-
+    let res
     if (editType.value === 'audio') {
-      const index = uploads.value.audios.findIndex(a => a.id === editForm.value.id)
-      if (index !== -1) {
-        uploads.value.audios[index].name = editForm.value.name
-        uploads.value.audios[index].classification_id = editForm.value.classificationId
+      res = await updateAudio(editForm.value.id, {
+        name: editForm.value.name,
+        classificationId: editForm.value.classificationId
+      })
+      if (res.code === 200) {
+        const index = uploads.value.audios.findIndex(a => a.id === editForm.value.id)
+        if (index !== -1) {
+          uploads.value.audios[index].name = editForm.value.name
+          uploads.value.audios[index].classification_id = editForm.value.classificationId
+          uploads.value.audios[index].isReview = res.data?.isReview ?? 1
+        }
       }
     } else if (editType.value === 'photo') {
-      const index = uploads.value.photos.findIndex(p => p.id === editForm.value.id)
-      if (index !== -1) {
-        uploads.value.photos[index].name = editForm.value.name
-        uploads.value.photos[index].album_id = editForm.value.albumId
+      res = await updatePhoto(editForm.value.id, {
+        name: editForm.value.name,
+        albumId: editForm.value.albumId
+      })
+      if (res.code === 200) {
+        const index = uploads.value.photos.findIndex(p => p.id === editForm.value.id)
+        if (index !== -1) {
+          uploads.value.photos[index].name = editForm.value.name
+          uploads.value.photos[index].album_id = editForm.value.albumId
+          uploads.value.photos[index].isReview = res.data?.isReview ?? 1
+        }
       }
     } else if (editType.value === 'plan') {
-      const index = uploads.value.plans.findIndex(p => p.id === editForm.value.id)
-      if (index !== -1) {
-        uploads.value.plans[index].title = editForm.value.name
+      res = await updatePlan(editForm.value.id, {
+        title: editForm.value.name
+      })
+      if (res.code === 200) {
+        const index = uploads.value.plans.findIndex(p => p.id === editForm.value.id)
+        if (index !== -1) {
+          uploads.value.plans[index].title = editForm.value.name
+          uploads.value.plans[index].isReview = res.data?.isReview ?? 1
+        }
       }
     }
 
-    ElMessage.success('修改成功')
-    editDialogVisible.value = false
+    if (res.code === 200) {
+      ElMessage.success(res.message || '修改成功')
+      editDialogVisible.value = false
+    } else {
+      ElMessage.error(res.message || '修改失败')
+    }
   } catch (error) {
     if (error !== 'cancel') ElMessage.error('修改失败')
   } finally {
@@ -384,8 +599,49 @@ async function saveEdit() {
 
 // 打开B站绑定对话框
 function openBilibiliDialog() {
+  ElMessage.info('开发中...')
+  return
+
   bilibiliForm.value = { uid: '', agreed: false }
   bilibiliDialogVisible.value = true
+}
+
+// 打开修改密码对话框
+function openPasswordDialog() {
+  passwordForm.value = { newPassword: '', confirmPassword: '' }
+  passwordDialogVisible.value = true
+}
+
+// 修改密码
+async function changePassword() {
+  if (!passwordFormRef.value) return
+
+  try {
+    await passwordFormRef.value.validate()
+
+    loading.value = true
+    const res = await updateUserPassword(
+      passwordForm.value.newPassword,
+      passwordForm.value.confirmPassword
+    )
+
+    if (res.code === 200) {
+      ElMessage.success('密码修改成功，请重新登录')
+      passwordDialogVisible.value = false
+
+      // 清除登录状态并跳转到登录页
+      userStore.logout()
+      router.push('/login')
+    } else {
+      ElMessage.error(res.message || '修改失败')
+    }
+  } catch (error) {
+    if (error.message) {
+      ElMessage.error(error.message)
+    }
+  } finally {
+    loading.value = false
+  }
 }
 
 // 绑定B站账号
@@ -398,23 +654,23 @@ async function bindBilibili() {
     ElMessage.error('请同意授权获取信息')
     return
   }
-  
+
   try {
     loading.value = true
-    // 模拟API请求
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 模拟绑定成功
-    bilibiliBind.value = {
-      isBound: true,
-      uid: bilibiliForm.value.uid,
-      username: 'B站用户' + bilibiliForm.value.uid.slice(-4),
-      avatar: 'https://i2.hdslb.com/bfs/face/037080004e33990818de22a63394c7de53c0e92c.jpg',
-      fanLevel: Math.floor(Math.random() * 20) + 1 // 模拟粉丝等级
+    const res = await bindBilibiliAccount(bilibiliForm.value.uid.trim())
+    if (res.code === 200) {
+      bilibiliBind.value = {
+        isBound: true,
+        uid: res.data.uid,
+        username: res.data.username,
+        avatar: buildFileUrl(res.data.avatar),
+        fanLevel: res.data.fanLevel
+      }
+      ElMessage.success('B站账号绑定成功')
+      bilibiliDialogVisible.value = false
+    } else {
+      ElMessage.error(res.message || '绑定失败')
     }
-    
-    ElMessage.success('B站账号绑定成功')
-    bilibiliDialogVisible.value = false
   } catch (error) {
     ElMessage.error('绑定失败，请检查ID是否正确')
   } finally {
@@ -430,19 +686,21 @@ async function unbindBilibili() {
       '确认解绑',
       { confirmButtonText: '解绑', cancelButtonText: '取消', type: 'warning' }
     )
-    
+
     loading.value = true
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    bilibiliBind.value = {
-      isBound: false,
-      uid: '',
-      username: '',
-      avatar: '',
-      fanLevel: 0
+    const res = await unbindBilibiliAccount()
+    if (res.code === 200) {
+      bilibiliBind.value = {
+        isBound: false,
+        uid: '',
+        username: '',
+        avatar: '',
+        fanLevel: 0
+      }
+      ElMessage.success('已解绑B站账号')
+    } else {
+      ElMessage.error(res.message || '解绑失败')
     }
-    
-    ElMessage.success('已解绑B站账号')
   } catch (error) {
     if (error !== 'cancel') ElMessage.error('解绑失败')
   } finally {
@@ -460,20 +718,33 @@ async function deleteItem(type, item) {
     )
 
     loading.value = true
-    await new Promise(resolve => setTimeout(resolve, 500))
+    let res
 
     if (type === 'audio') {
-      uploads.value.audios = uploads.value.audios.filter(a => a.id !== item.id)
-      audioTotal.value = uploads.value.audios.length
+      res = await deleteAudio(item.id)
+      if (res.code === 200) {
+        uploads.value.audios = uploads.value.audios.filter(a => a.id !== item.id)
+        audioTotal.value = uploads.value.audios.length
+      }
     } else if (type === 'photo') {
-      uploads.value.photos = uploads.value.photos.filter(p => p.id !== item.id)
-      photoTotal.value = uploads.value.photos.length
+      res = await deletePhoto(item.id)
+      if (res.code === 200) {
+        uploads.value.photos = uploads.value.photos.filter(p => p.id !== item.id)
+        photoTotal.value = uploads.value.photos.length
+      }
     } else if (type === 'plan') {
-      uploads.value.plans = uploads.value.plans.filter(p => p.id !== item.id)
-      planTotal.value = uploads.value.plans.length
+      res = await deletePlan(item.id)
+      if (res.code === 200) {
+        uploads.value.plans = uploads.value.plans.filter(p => p.id !== item.id)
+        planTotal.value = uploads.value.plans.length
+      }
     }
 
-    ElMessage.success('删除成功')
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
   } catch (error) {
     if (error !== 'cancel') ElMessage.error('删除失败')
   } finally {
@@ -481,26 +752,124 @@ async function deleteItem(type, item) {
   }
 }
 
-// 计算属性 - 分页数据
-const paginatedPhotos = computed(() => {
-  const start = (photoPagination.value.currentPage - 1) * photoPagination.value.pageSize
-  return uploads.value.photos.slice(start, start + photoPagination.value.pageSize)
-})
+// 计算属性 - 直接使用 uploads 中的数据（后端已分页）
+const paginatedPhotos = computed(() => uploads.value.photos)
+const paginatedAudios = computed(() => uploads.value.audios)
+const paginatedPlans = computed(() => uploads.value.plans)
+const paginatedMessages = computed(() => messages.value)
 
-const paginatedAudios = computed(() => {
-  const start = (audioPagination.value.currentPage - 1) * audioPagination.value.pageSize
-  return uploads.value.audios.slice(start, start + audioPagination.value.pageSize)
-})
+// 分页切换处理函数
+async function handlePhotoPageChange(page) {
+  photoPagination.value.currentPage = page
+  await fetchUserPhotos()
+}
 
-const paginatedPlans = computed(() => {
-  const start = (planPagination.value.currentPage - 1) * planPagination.value.pageSize
-  return uploads.value.plans.slice(start, start + planPagination.value.pageSize)
-})
+async function handleAudioPageChange(page) {
+  audioPagination.value.currentPage = page
+  await fetchUserAudios()
+}
 
-const paginatedMessages = computed(() => {
-  const start = (messagePagination.value.currentPage - 1) * messagePagination.value.pageSize
-  return messages.value.slice(start, start + messagePagination.value.pageSize)
-})
+async function handlePlanPageChange(page) {
+  planPagination.value.currentPage = page
+  await fetchUserPlans()
+}
+
+async function handleMessagePageChange(page) {
+  messagePagination.value.currentPage = page
+  await fetchUserMessages()
+}
+
+// 获取照片列表
+async function fetchUserPhotos() {
+  try {
+    const res = await getUserPhotos({
+      page: photoPagination.value.currentPage,
+      pageSize: photoPagination.value.pageSize
+    })
+    if (res.code === 200) {
+      uploads.value.photos = res.data.list.map(p => ({
+        id: p.id,
+        name: p.name,
+        url: buildFileUrl(p.url),
+        album_id: p.albumId,
+        album_name: p.albumName,
+        upload_time: formatTime(p.uploadTime),
+        status: p.status
+      }))
+      photoTotal.value = res.data.pagination?.total || 0
+    }
+  } catch (error) {
+    console.error('获取照片列表失败:', error)
+  }
+}
+
+// 获取音声列表
+async function fetchUserAudios() {
+  try {
+    const res = await getUserAudios({
+      page: audioPagination.value.currentPage,
+      pageSize: audioPagination.value.pageSize
+    })
+    if (res.code === 200) {
+      uploads.value.audios = res.data.list.map(a => ({
+        id: a.id,
+        name: a.name,
+        url: buildFileUrl(a.url),
+        classification_id: a.classificationId,
+        classification_name: a.classificationName,
+        upload_time: formatTime(a.uploadTime),
+        status: a.status
+      }))
+      audioTotal.value = res.data.pagination?.total || 0
+    }
+  } catch (error) {
+    console.error('获取音声列表失败:', error)
+  }
+}
+
+// 获取企划列表
+async function fetchUserPlans() {
+  try {
+    const res = await getUserPlans({
+      page: planPagination.value.currentPage,
+      pageSize: planPagination.value.pageSize
+    })
+    if (res.code === 200) {
+      uploads.value.plans = res.data.list.map(p => ({
+        id: p.id,
+        title: p.title,
+        create_time: formatTime(p.createTime),
+        status: p.status
+      }))
+      planTotal.value = res.data.pagination?.total || 0
+    }
+  } catch (error) {
+    console.error('获取企划列表失败:', error)
+  }
+}
+
+// 获取消息列表
+async function fetchUserMessages() {
+  try {
+    const res = await getUserNotifications({
+      page: messagePagination.value.currentPage,
+      pageSize: messagePagination.value.pageSize
+    })
+    if (res.code === 200) {
+      messages.value = res.data.list.map(m => ({
+        id: m.id,
+        title: m.title,
+        content: m.content,
+        type: m.type,
+        is_read: m.isRead,
+        create_time: formatTime(m.createTime)
+      }))
+      messageTotal.value = res.data.pagination?.total || 0
+    }
+  } catch (error) {
+    console.error('获取消息列表失败:', error)
+  }
+}
 
 // 返回上一页
 function goBack() {
@@ -514,6 +883,29 @@ onMounted(() => {
     return
   }
   fetchUserInfo()
+})
+
+// 监听菜单切换，进入消息页面时重新获取消息列表
+watch(activeMenu, async (newMenu) => {
+  if (newMenu === 'messages') {
+    try {
+      const res = await getUserNotifications({ page: 1, pageSize: messagePagination.value.pageSize })
+      if (res.code === 200) {
+        messages.value = res.data.map(m => ({
+          id: m.id,
+          title: m.title,
+          content: m.content,
+          time: formatTime(m.time),
+          read: m.read,
+          type: m.type
+        }))
+        messageTotal.value = res.pagination?.total || 0
+        messagePagination.value.currentPage = 1
+      }
+    } catch (error) {
+      console.error('获取消息列表失败:', error)
+    }
+  }
 })
 </script>
 
@@ -778,34 +1170,43 @@ onMounted(() => {
             全部已读
           </el-button>
         </div>
-        <div class="message-list">
-          <div
-            v-for="msg in paginatedMessages"
-            :key="msg.id"
-            class="message-item"
-            :class="{ unread: !msg.read }"
-            @click="markAsRead(msg)"
-          >
-            <div class="message-icon">
-              <el-icon><Bell /></el-icon>
+        <!-- 空状态提示 -->
+        <div v-if="messages.length === 0" class="empty-state">
+          <el-icon :size="48" class="empty-icon"><Bell /></el-icon>
+          <div class="empty-text">暂无消息</div>
+          <div class="empty-subtext">当有新通知时，会显示在这里</div>
+        </div>
+        <template v-else>
+          <div class="message-list">
+            <div
+              v-for="msg in paginatedMessages"
+              :key="msg.id"
+              class="message-item"
+              :class="{ unread: !msg.read }"
+              @click="markAsRead(msg)"
+            >
+              <div class="message-icon">
+                <el-icon><Bell /></el-icon>
+              </div>
+              <div class="message-content">
+                <div class="message-title">{{ msg.title }}</div>
+                <div class="message-text">{{ msg.content }}</div>
+                <div class="message-time">{{ msg.time }}</div>
+              </div>
+              <div v-if="!msg.read" class="unread-dot"></div>
             </div>
-            <div class="message-content">
-              <div class="message-title">{{ msg.title }}</div>
-              <div class="message-text">{{ msg.content }}</div>
-              <div class="message-time">{{ msg.time }}</div>
-            </div>
-            <div v-if="!msg.read" class="unread-dot"></div>
           </div>
-        </div>
-        <div v-if="messageTotal > messagePagination.pageSize" class="pagination-wrapper">
-          <el-pagination
-            small
-            layout="prev, pager, next"
-            :total="messageTotal"
-            :page-size="messagePagination.pageSize"
-            @current-change="messagePagination.currentPage = $event"
-          />
-        </div>
+          <div v-if="messageTotal > messagePagination.pageSize" class="pagination-wrapper">
+            <el-pagination
+              small
+              layout="prev, pager, next"
+              :total="messageTotal"
+              :page-size="messagePagination.pageSize"
+              :current-page="messagePagination.currentPage"
+              @current-change="handleMessagePageChange"
+            />
+          </div>
+        </template>
       </div>
 
       <!-- 账号信息 -->
@@ -876,8 +1277,8 @@ onMounted(() => {
                 <span>角色</span>
               </div>
               <div class="info-content">
-                <el-tag :type="getPermissionType(user.value?.permission)" size="small" effect="light">
-                  {{ getPermissionLabel(user.value?.permission) }}
+                <el-tag :type="getPermissionType(userInfo.permission)" size="small" effect="light">
+                  {{ getPermissionLabel(userInfo.permission) }}
                 </el-tag>
               </div>
             </div>
@@ -887,7 +1288,7 @@ onMounted(() => {
                 <span>注册时间</span>
               </div>
               <div class="info-content">
-                <span class="info-value">2024-01-01</span>
+                <span class="info-value">{{ formatTime(userInfo.createTime) }}</span>
               </div>
             </div>
           </div>
@@ -943,7 +1344,7 @@ onMounted(() => {
                 <div class="security-title">登录密码</div>
                 <div class="security-desc">定期修改密码可以保护账号安全</div>
               </div>
-              <el-button type="primary" plain size="small">修改密码</el-button>
+              <el-button type="primary" plain size="small" @click="openPasswordDialog">修改密码</el-button>
             </div>
           </div>
         </div>
@@ -1016,7 +1417,8 @@ onMounted(() => {
             layout="prev, pager, next"
             :total="audioTotal"
             :page-size="audioPagination.pageSize"
-            @current-change="audioPagination.currentPage = $event"
+            :current-page="audioPagination.currentPage"
+            @current-change="handleAudioPageChange"
           />
         </div>
       </div>
@@ -1057,7 +1459,8 @@ onMounted(() => {
             layout="prev, pager, next"
             :total="photoTotal"
             :page-size="photoPagination.pageSize"
-            @current-change="photoPagination.currentPage = $event"
+            :current-page="photoPagination.currentPage"
+            @current-change="handlePhotoPageChange"
           />
         </div>
       </div>
@@ -1084,8 +1487,10 @@ onMounted(() => {
                 <span>{{ formatTime(plan.uploadTime) }}</span>
               </div>
             </div>
-            <el-tag v-if="plan.isCurrent" type="success" size="small">当前</el-tag>
-            <el-tag v-else type="info" size="small">历史</el-tag>
+            <el-tag :type="getStatusType(plan.status)" size="small">
+              {{ getStatusText(plan.status) }}
+            </el-tag>
+            <el-tag v-if="plan.isCurrent" type="success" size="small" class="current-tag">当前</el-tag>
             <div class="list-actions">
               <el-button type="primary" link :icon="Edit" @click="openEditDialog('plan', plan)">编辑</el-button>
               <el-button type="danger" link :icon="Delete" @click="deleteItem('plan', plan)">删除</el-button>
@@ -1098,7 +1503,8 @@ onMounted(() => {
             layout="prev, pager, next"
             :total="planTotal"
             :page-size="planPagination.pageSize"
-            @current-change="planPagination.currentPage = $event"
+            :current-page="planPagination.currentPage"
+            @current-change="handlePlanPageChange"
           />
         </div>
       </div>
@@ -1193,6 +1599,32 @@ onMounted(() => {
       </template>
     </el-dialog>
 
+    <!-- 修改密码对话框 -->
+    <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px">
+      <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-position="top">
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="passwordForm.newPassword"
+            type="password"
+            placeholder="请输入新密码（至少6位）"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="passwordForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="passwordDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="changePassword" :loading="loading">确认修改</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 编辑对话框 -->
     <el-dialog
       v-model="editDialogVisible"
@@ -1212,16 +1644,22 @@ onMounted(() => {
         </el-form-item>
         <el-form-item v-if="editType === 'audio'" label="分类">
           <el-select v-model="editForm.classificationId" placeholder="选择分类" clearable>
-            <el-option label="日常" :value="1" />
-            <el-option label="音乐" :value="2" />
-            <el-option label="语音" :value="3" />
+            <el-option
+              v-for="item in classifications"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item v-if="editType === 'photo'" label="相册">
           <el-select v-model="editForm.albumId" placeholder="选择相册" clearable>
-            <el-option label="日常" :value="1" />
-            <el-option label="风景" :value="2" />
-            <el-option label="人物" :value="3" />
+            <el-option
+              v-for="item in albums"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
           </el-select>
         </el-form-item>
       </el-form>
@@ -1830,6 +2268,34 @@ onMounted(() => {
   margin-top: 6px;
 }
 
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.empty-icon {
+  color: #c0c4cc;
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 16px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.empty-subtext {
+  font-size: 14px;
+  color: #909399;
+}
+
 /* 账号信息 */
 .account-avatar-card {
   background: white;
@@ -2176,6 +2642,10 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.current-tag {
+  margin-left: 8px;
 }
 
 /* 企划时间线 */

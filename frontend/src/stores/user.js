@@ -31,7 +31,8 @@ export const useUserStore = defineStore('user', () => {
             let tokenValue = response.data.token
             let userData = {
                 name: response.data.name,
-                permission: response.data.permission
+                permission: response.data.permission,
+                avatar: response.data.avatar
             }
 
             setToken(tokenValue)

@@ -5,9 +5,45 @@ import {
     banUser,
     updateUserPermission,
     resetUserPassword,
-    deleteUser
+    deleteUser,
+    adminResetUserName,
+    adminResetUserAvatar
 } from '../services/user.js';
 import { getDashboardStats } from '../services/dashboard.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+// 配置 multer 存储
+const AVATAR_DIR = path.join(process.cwd(), 'data', 'document', 'avatar');
+if (!fs.existsSync(AVATAR_DIR)) {
+    fs.mkdirSync(AVATAR_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, AVATAR_DIR);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+        const ext = path.extname(file.originalname) || '.jpg';
+        cb(null, uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
+        }
+        cb(new Error('只允许上传图片文件'));
+    }
+});
 
 const router = express.Router();
 
@@ -53,5 +89,20 @@ router.delete('/users/:id', ...createAdminValidatedRouteHandler({
 }, async (req) => {
     return await deleteUser(req.params.id, req.user.id);
 }, 1, 500, { logName: '删除用户' }));
+
+// 管理员重置用户名称
+router.post('/users/:id/reset-name', ...createAdminValidatedRouteHandler({
+    id: { source: 'params', type: 'id', required: true },
+    name: { type: 'string', required: true, min: 1, max: 20 }
+}, async (req) => {
+    return await adminResetUserName(req.params.id, req.body.name, req.user.id);
+}, 1, 500, { logName: '重置用户名称' }));
+
+// 管理员重置用户头像
+router.post('/users/:id/reset-avatar', upload.single('avatar'), ...createAdminValidatedRouteHandler({
+    id: { source: 'params', type: 'id', required: true }
+}, async (req) => {
+    return await adminResetUserAvatar(req.params.id, req.file, req.user.id);
+}, 1, 500, { logName: '重置用户头像' }));
 
 export default router;

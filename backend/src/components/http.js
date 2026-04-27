@@ -7,6 +7,7 @@ import albumRoutes from '../routes/album.js';
 import adminRoutes from '../routes/admin.js';
 import superAdminRoutes from '../routes/super-admin.js';
 import userRoutes from '../routes/user.js';
+import userProfileRoutes from '../routes/userProfile.js';
 import bilibiliRoutes from '../routes/bilibili.js';
 import aiRoutes from '../routes/ai.js';
 import announcementRoutes from '../routes/announcement.js';
@@ -91,7 +92,42 @@ export default async () => {
     });
 
     App.use('/', userRoutes); // 用户相关路由（登录、注册等）
+    App.use('/api/user', userProfileRoutes); // 用户个人中心路由
 
+    // ============================================
+    // TODO: 消息通知触发点 - 待实现
+    // ============================================
+    // 
+    // 1. 创建账号后发欢迎消息
+    //    位置: backend/src/services/user.js -> register() 函数
+    //    实现: 注册成功后调用 createNotification(userId, '欢迎加入', '欢迎...', 'system')
+    //
+    // 2. 审核状态变更通知（普通成员）
+    //    位置: backend/src/services/photo.js, audio.js, album.js 等
+    //    触发: 内容审核通过/失败/撤销时
+    //    实现: 调用 createNotification(userId, '审核通知', '您的xxx已审核通过', 'review')
+    //
+    // 3. 新的待审核信息通知（管理员）
+    //    位置: backend/src/services/photo.js, audio.js, album.js 等
+    //    触发: 有新内容提交审核时
+    //    实现: 查询所有管理员/超级管理员，发送通知
+    //
+    // 4. 新公告通知
+    //    位置: backend/src/services/announcement.js
+    //    触发: 创建新公告时
+    //    实现: 给所有用户发送通知
+    //
+    // 5. 账号信息修改通知
+    //    位置: backend/src/services/userProfile.js
+    //    触发: 修改密码/绑定账号/修改名称/修改头像后
+    //    实现: 调用 createNotification(userId, '安全提醒', '您的xxx已修改', 'security')
+    //
+    // 6. 管理员重置信息通知
+    //    位置: backend/src/services/user.js -> resetUserInfo() 等
+    //    触发: 管理员重置用户名称/头像后
+    //    实现: 调用 createNotification(userId, '账号变更', '管理员已重置您的xxx', 'admin')
+    //
+    // ============================================
 
     const PORT = appConfig.httpPort;
     App.listen(PORT, () => {

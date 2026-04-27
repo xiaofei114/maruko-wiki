@@ -3,9 +3,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { ElMessageBox } from 'element-plus'
-import { Close, User, HomeFilled, Star, SwitchButton } from '@element-plus/icons-vue'
+import { ElMessageBox, ElBadge } from 'element-plus'
+import { Close, User, HomeFilled, Star, SwitchButton, Bell } from '@element-plus/icons-vue'
 import img from '@/assets/猫玩伴.png'
+import { getUnreadNotificationCount } from '@/api/userProfile'
 
 
 // 响应式数据
@@ -13,8 +14,35 @@ const showDropdown = ref(false)
 const showMobileMenu = ref(false)
 const isSidebarClosing = ref(false)
 const sidebarTimer = ref(null)
+const unreadCount = ref(0)
 
 const title = import.meta.env.VITE_APP_TITLE
+
+// 获取未读消息数
+const fetchUnreadCount = async () => {
+  if (!isAuthenticated.value) return
+  try {
+    const res = await getUnreadNotificationCount()
+    if (res.code === 200) {
+      unreadCount.value = res.data.count || 0
+    }
+  } catch (error) {
+    console.error('获取未读消息数失败:', error)
+  }
+}
+
+// 定时刷新未读消息数
+let unreadCountTimer = null
+const startUnreadCountTimer = () => {
+  fetchUnreadCount()
+  unreadCountTimer = setInterval(fetchUnreadCount, 60000) // 每分钟刷新一次
+}
+const stopUnreadCountTimer = () => {
+  if (unreadCountTimer) {
+    clearInterval(unreadCountTimer)
+    unreadCountTimer = null
+  }
+}
 
 // 点击外部关闭下拉菜单
 const handleClickOutside = (e) => {
@@ -24,14 +52,23 @@ const handleClickOutside = (e) => {
   }
 }
 
+// 监听刷新未读消息数事件
+const handleRefreshUnreadCount = (e) => {
+  unreadCount.value = e.detail || 0
+}
+
 // 链接到生命周期
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('refresh-unread-count', handleRefreshUnreadCount)
+  startUnreadCountTimer()
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('refresh-unread-count', handleRefreshUnreadCount)
   cleanupTimer()
+  stopUnreadCountTimer()
 })
 
 // 友情链接数据
@@ -58,6 +95,31 @@ const { token, user } = storeToRefs(userStore)
 const isAuthenticated = computed(() => !!token.value && !!user.value)
 const username = computed(() => user.value?.name || '')
 const permission = computed(() => user.value?.permission || '')
+
+// 构建文件URL（根据环境添加/api前缀）
+const baseUrl = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : (import.meta.env.VITE_APP_BASE_URL?.replace(/\/api\/?$/, '') || '')
+const apiPrefix = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : '/api'
+function buildFileUrl(path) {
+  if (!path) return img
+  // 完整http URL直接返回
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  // 如果路径已经以/api开头，不再添加前缀
+  if (path.startsWith('/api/')) return `${baseUrl}${path}`
+  // 头像路径需要加上 /file/ 前缀
+  if (path.startsWith('avatar/')) {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`
+    return `${baseUrl}${apiPrefix}/file${normalizedPath}`
+  }
+  // 确保路径以 / 开头
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${baseUrl}${apiPrefix}${normalizedPath}`
+}
+
+// 用户头像
+const userAvatar = computed(() => {
+  if (!user.value?.avatar) return img
+  return buildFileUrl(user.value.avatar)
+})
 
 const getPermissionName = () => {
   const permissionName = {
@@ -159,6 +221,7 @@ const handleLogin = () => {
 // 退出登录处理
 const handleLogout = () => {
   userStore.logout()
+  router.push('/login')
 }
 
 // 切换下拉菜单
@@ -298,7 +361,7 @@ const openLink = (url) => {
     <div class="container">
       <!-- 左侧品牌区域 -->
       <div class="brand">
-        <el-avatar :size="28" :src="img" class="brand-avatar" @click="onBrandClick" />
+        <el-avatar :size="28" :src="img" class="brand-avatar" @click="onBrandClick" role="button" aria-label="打开导航菜单" tabindex="0" />
         <router-link to="/" class="brand-link" @keydown="onBrandKeydown">
           <span class="brand-text">{{ title }}</span>
         </router-link>
@@ -333,15 +396,17 @@ const openLink = (url) => {
         <div v-else class="user-info-combo" :class="{ 'expanded': showDropdown }" @mouseenter="showDropdown = true" @mouseleave="hideDropdown">
           <!-- 默认状态：小头像 -->
           <div class="default-avatar-wrapper" :class="{ 'hidden': showDropdown }">
-            <el-avatar :size="36" :src="img" class="default-avatar" />
+            <el-badge :value="unreadCount" :hidden="unreadCount === 0" :max="99" class="avatar-badge">
+              <el-avatar :size="36" :src="userAvatar" class="default-avatar" />
+            </el-badge>
             <div class="default-status-dot"></div>
           </div>
-          
+
           <!-- 展开状态：放大的头像与卡片 -->
           <div class="combo-container" :class="{ 'visible': showDropdown }">
             <div class="combo-avatar-section" @click.stop @mouseenter="cancelHide" @mouseleave="hideDropdown">
               <div class="combo-avatar-wrapper">
-                <el-avatar :size="72" :src="img" class="combo-avatar" />
+                <el-avatar :size="72" :src="userAvatar" class="combo-avatar" />
                 <div class="combo-status-dot"></div>
               </div>
             </div>
@@ -351,18 +416,18 @@ const openLink = (url) => {
               <div class="combo-user-info">
                 <div class="combo-username">{{ username }}</div>
                 <el-tag :type="getPermissionName().type" size="small" effect="light" class="combo-role-tag">
-                  <el-icon v-if="permission === 1"><Star /></el-icon>
                   {{ getPermissionName().name }}
                 </el-tag>
               </div>
 
               <!-- 快捷操作 -->
-              <!-- <div class="combo-actions">
+              <div class="combo-actions">
                 <div class="combo-action-btn" @click="handleUserMenuClick('profile')">
                   <el-icon><User /></el-icon>
                   <span>个人中心</span>
+                  <el-badge v-if="unreadCount > 0" :value="unreadCount" :max="99" class="menu-badge" />
                 </div>
-              </div> -->
+              </div>
 
               <!-- 退出按钮 -->
               <div class="combo-logout" @click="handleUserMenuClick('logout')">
@@ -575,6 +640,32 @@ const openLink = (url) => {
   transition: all 0.3s ease;
 }
 
+/* 头像角标样式 */
+.avatar-badge {
+  position: relative;
+}
+
+.avatar-badge :deep(.el-badge__content) {
+  position: absolute;
+  top: 5px !important;
+  right: 10px !important;
+  border: 2px solid var(--color-primary);
+  background-color: #f56c6c;
+  z-index: 10;
+}
+
+/* 菜单角标样式 */
+.menu-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+}
+
+.menu-badge :deep(.el-badge__content) {
+  background-color: #f56c6c;
+  border: none;
+}
+
 .user-info-combo:hover .default-avatar {
   border-color: white;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
@@ -698,6 +789,7 @@ const openLink = (url) => {
   color: var(--color-primary);
   font-size: 14px;
   font-weight: 500;
+  position: relative;
 }
 
 .combo-action-btn:hover {

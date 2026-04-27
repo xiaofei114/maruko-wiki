@@ -1,5 +1,6 @@
 import path from 'path';
 import { queryOne, queryAll, insert, update, remove, softDelete } from '../method/database.js';
+import { createNotification, notifyAdminsForReview } from '../method/notification.js';
 
 /**
  * 音声服务 - 处理音声相关的业务逻辑
@@ -218,6 +219,13 @@ export async function uploadAudio(file, audioData, userId, userPermission) {
 
         logger.info(`音声上传成功: ${name} (${fileName}) by user ${userId} (审核状态: ${isReview})`);
 
+        // 如果需要审核，通知管理员
+        if (isReview === 0) {
+            notifyAdminsForReview('音声', name).catch(err => {
+                logger.error('发送管理员审核通知失败:', err);
+            });
+        }
+
         return {
             success: true,
             message: message,
@@ -344,7 +352,7 @@ export async function reviewAudio(audioId, isReview, adminId) {
 
         // 检查音声是否存在
         const audio = queryOne(`
-            SELECT id, name, is_review
+            SELECT id, name, is_review, user_id
             FROM audio
             WHERE id = ? AND is_deleted = 0
         `, [audioId]);
@@ -372,6 +380,21 @@ export async function reviewAudio(audioId, isReview, adminId) {
         }
 
         logger.info(`音声审核: ID ${audioId} 状态 ${audio.is_review} -> ${isReview} by admin ${adminId}`);
+
+        // 发送审核通知给用户
+        const statusText = { 0: '待审核', 1: '审核通过', 2: '审核未通过' };
+        const statusDesc = {
+            0: '您的音声已撤销审核，请修改后重新提交',
+            1: '恭喜！您的音声已通过审核，现在可以被其他用户查看',
+            2: '您的音声未通过审核，请修改后重新提交'
+        };
+
+        await createNotification(
+            audio.user_id,
+            '音声审核通知',
+            `您的音声「${audio.name}」${statusDesc[isReview] || statusText[isReview]}`,
+            'review'
+        );
 
         return {
             success: true,
@@ -513,7 +536,7 @@ export async function deleteAudio(audioId, adminId) {
     try {
         // 检查音声是否存在
         const audio = queryOne(`
-            SELECT id, name, is_deleted
+            SELECT id, name, is_deleted, user_id
             FROM audio
             WHERE id = ?
         `, [audioId]);
@@ -544,6 +567,14 @@ export async function deleteAudio(audioId, adminId) {
         }
 
         logger.info(`音声软删除: ID ${audioId} (${audio.name}) by admin ${adminId}`);
+
+        // 通知用户文件被删除
+        await createNotification(
+            audio.user_id,
+            '内容删除通知',
+            `您的音声「${audio.name}」已被管理员删除`,
+            'admin'
+        );
 
         return {
             success: true,
@@ -661,7 +692,7 @@ export async function deleteAudioClassification(classificationId, adminId) {
     try {
         // 检查分类是否存在
         const classification = queryOne(`
-            SELECT id, name, is_deleted
+            SELECT id, name, is_deleted, user_id
             FROM audio_classification
             WHERE id = ?
         `, [classificationId]);
@@ -707,6 +738,14 @@ export async function deleteAudioClassification(classificationId, adminId) {
         }
 
         logger.info(`音声分类软删除: ID ${classificationId} (${classification.name}) by admin ${adminId}`);
+
+        // 通知用户分类被删除
+        await createNotification(
+            classification.user_id,
+            '内容删除通知',
+            `您的音声分类「${classification.name}」已被管理员删除`,
+            'admin'
+        );
 
         return {
             success: true,

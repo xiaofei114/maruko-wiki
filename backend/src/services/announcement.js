@@ -1,4 +1,5 @@
 import { queryOne, queryAll, insert, update, softDelete } from '../method/database.js';
+import { createNotification, sendAnnouncementNotificationToAllUsers } from '../method/notification.js';
 
 /**
  * 公告服务 - 处理公告相关的业务逻辑
@@ -100,6 +101,11 @@ export async function createAnnouncement(data, adminId) {
         ]);
 
         logger.info(`公告创建成功: ${title} by admin ${adminId}`);
+
+        // 发送新公告通知给所有用户（异步执行，不阻塞响应）
+        sendAnnouncementNotificationToAllUsers(title.trim()).catch(err => {
+            logger.error('发送公告通知失败:', err);
+        });
 
         return {
             success: true,
@@ -274,6 +280,10 @@ export async function deleteAnnouncement(id, adminId) {
     }
 }
 
+/**
+ * 发送新公告通知给所有用户
+ * @param {string} title - 公告标题
+ */
 /**
  * 工具函数：Unix时间戳转日期时间字符串
  * @param {number} timestamp - Unix时间戳

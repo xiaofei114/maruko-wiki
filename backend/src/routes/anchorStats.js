@@ -1,6 +1,6 @@
 import express from 'express';
 import { createPublicRoute, createValidatedRouteHandler } from '../method/route-helpers.js';
-import { getStatsByRange, getLatestStats } from '../services/anchorStats.js';
+import { getStatsByRange, getLatestStats, getCurrentMonthMaxCaptainCount } from '../services/anchorStats.js';
 
 const router = express.Router();
 
@@ -28,5 +28,10 @@ router.get('/anchor-stats', ...createValidatedRouteHandler({
  * 获取最新的主播统计数据
  */
 router.get('/anchor-stats/latest', ...createPublicRoute(getLatestStats));
+
+/**
+ * 获取本月最高舰长数
+ */
+router.get('/anchor-stats/max-captain', ...createPublicRoute(getCurrentMonthMaxCaptainCount));
 
 export default router;

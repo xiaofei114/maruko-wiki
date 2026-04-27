@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import { queryOne } from '../method/database.js';
 import { createPublicRoute, createAdminUploadRouteHandler, createRouteHandler } from '../method/route-helpers.js';
 import { authenticateToken, optionalAuth } from '../method/auth.js';
-import { uploadAudio, getAudiosGrouped, createAudioClassification, getAudiosForDownload } from '../services/audio.js';
+import { uploadAudio, getAudiosGrouped, createAudioClassification, getAudiosForDownload, getUserAudioClassifications } from '../services/audio.js';
 import { recordPlayCount, getWeeklyPopularAudios, getTotalPopularAudios } from '../services/audioPlayCount.js';
 import { packAudios } from '../method/pack.js';
 import { read_json } from "../method/read.js"
@@ -15,6 +15,11 @@ const router = express.Router();
 
 // 获取音声列表 (游客可访问) - 返回按分类分组的数据
 router.get('/audios', ...createPublicRoute(getAudiosGrouped));
+
+// 获取当前用户的音声分类（包括待审核的）- 需要登录
+router.get('/audios/classifications/my', authenticateToken, createRouteHandler(async (req) => {
+    return await getUserAudioClassifications(req.user.id);
+}));
 
 // 上传音声 (需要登录)
 router.post('/audios', ...createAdminUploadRouteHandler({

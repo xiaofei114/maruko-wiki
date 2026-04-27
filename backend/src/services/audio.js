@@ -760,5 +760,53 @@ export async function getAudiosForDownload(classificationId) {
     }
 }
 
+/**
+ * 获取当前用户的所有音声分类（包括待审核的）
+ * @param {number} userId - 用户ID
+ * @returns {object} 分类列表
+ */
+export async function getUserAudioClassifications(userId) {
+    try {
+        // 获取所有审核通过的分类（所有人可见）
+        const publicClassifications = queryAll(`
+            SELECT id, name, is_review, create_time
+            FROM audio_classification
+            WHERE is_deleted = 0 AND is_review = 1
+            ORDER BY create_time ASC
+        `);
+
+        // 获取当前用户创建的待审核分类
+        const userPendingClassifications = queryAll(`
+            SELECT id, name, is_review, create_time
+            FROM audio_classification
+            WHERE is_deleted = 0 AND is_review = 0 AND user_id = ?
+            ORDER BY create_time ASC
+        `, [userId]);
+
+        // 合并分类列表
+        const allClassifications = [...publicClassifications, ...userPendingClassifications];
+
+        logger.info(`获取用户音声分类: 用户 ${userId}, 共 ${allClassifications.length} 个分类`);
+
+        return {
+            success: true,
+            message: '获取音声分类成功',
+            data: allClassifications.map(c => ({
+                id: Number(c.id),
+                name: c.name,
+                is_review: c.is_review
+            }))
+        };
+
+    } catch (error) {
+        logger.error('获取用户音声分类失败:', error);
+        return {
+            success: false,
+            message: '获取音声分类失败',
+            code: 500
+        };
+    }
+}
+
 
 

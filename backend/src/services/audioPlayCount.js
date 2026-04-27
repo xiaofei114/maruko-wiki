@@ -1,9 +1,33 @@
 import { queryOne, queryAll, update } from '../method/database.js';
+import { read_json } from '../method/read.js';
 
 /**
  * 音频播放量服务
  * 使用Redis存储7天内的播放数据，SQLite存储总播放量
  */
+
+/**
+ * 获取播放量频率限制配置
+ * @returns {object} 频率限制配置
+ */
+function getRateLimitConfig() {
+    const appConfig = read_json('configs', 'config');
+    const defaultConfig = {
+        windowSeconds: 60,
+        authenticated: 10,
+        guest: 5
+    };
+    
+    if (appConfig.audioPlayCount?.rateLimit) {
+        return {
+            windowSeconds: appConfig.audioPlayCount.rateLimit.windowSeconds ?? defaultConfig.windowSeconds,
+            authenticated: appConfig.audioPlayCount.rateLimit.authenticated ?? defaultConfig.authenticated,
+            guest: appConfig.audioPlayCount.rateLimit.guest ?? defaultConfig.guest
+        };
+    }
+    
+    return defaultConfig;
+}
 
 /**
  * 获取客户端IP地址
@@ -29,26 +53,30 @@ function sanitizeIP(ip) {
 
 /**
  * 检查是否可以记录播放量（频率限制）
+ * 从配置文件读取限制参数
  * @param {number} audioId - 音频ID
  * @param {string} clientIP - 客户端IP
  * @param {object|null} user - 用户信息（null表示未登录）
  * @returns {Promise<{allowed: boolean, limit: number}>} 是否允许记录及限制数量
  */
 async function checkPlayCountLimit(audioId, clientIP, user) {
+    const config = getRateLimitConfig();
     const now = Date.now();
-    const currentMinute = Math.floor(now / 60000); // 当前分钟时间戳
+    // 使用配置的时间窗口计算时间戳
+    const windowSizeMs = config.windowSeconds * 1000;
+    const currentWindow = Math.floor(now / windowSizeMs);
     
     let redisKey;
     let limit;
     
     if (user) {
-        // 已登录用户：每分钟每个音频10条
-        redisKey = `audio_play:${user.id}:${audioId}:${currentMinute}`;
-        limit = 10;
+        // 已登录用户：使用配置的限流值
+        redisKey = `audio_play:${user.id}:${audioId}:${currentWindow}`;
+        limit = config.authenticated;
     } else {
-        // 未登录用户：每分钟每个音频5条
-        redisKey = `audio_play:ip:${sanitizeIP(clientIP)}:${audioId}:${currentMinute}`;
-        limit = 5;
+        // 未登录用户：使用配置的限流值
+        redisKey = `audio_play:ip:${sanitizeIP(clientIP)}:${audioId}:${currentWindow}`;
+        limit = config.guest;
     }
     
     try {
@@ -68,7 +96,32 @@ async function checkPlayCountLimit(audioId, clientIP, user) {
 }
 
 /**
+ * 获取日期字符串（YYYY-MM-DD）
+ * @param {Date} date - 日期对象
+ * @returns {string} 日期字符串
+ */
+function getDateString(date = new Date()) {
+    return date.toISOString().split('T')[0];
+}
+
+/**
+ * 获取最近7天的日期列表
+ * @returns {string[]} 日期字符串数组（从7天前到今天）
+ */
+function getLast7Days() {
+    const dates = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        dates.push(getDateString(date));
+    }
+    return dates;
+}
+
+/**
  * 记录播放量到Redis
+ * 使用每日独立存储，支持真正的7天滑动窗口统计
  * @param {number} audioId - 音频ID
  * @param {string} clientIP - 客户端IP
  * @param {object|null} user - 用户信息
@@ -76,7 +129,7 @@ async function checkPlayCountLimit(audioId, clientIP, user) {
 async function recordPlayCountToRedis(audioId, clientIP, user) {
     const now = Date.now();
     const currentMinute = Math.floor(now / 60000);
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = getDateString();
     
     let userRedisKey;
     
@@ -86,28 +139,67 @@ async function recordPlayCountToRedis(audioId, clientIP, user) {
         userRedisKey = `audio_play:ip:${sanitizeIP(clientIP)}:${audioId}:${currentMinute}`;
     }
     
-    const dailyKey = `audio_play_count:daily:${audioId}:${today}`;
-    const weeklyKey = `audio_play_count:weekly:${audioId}`;
-    const weeklyZSetKey = 'audio:weekly_popular'; // 用于排序的ZSet
+    // 每日播放量键：audio:daily:{audioId}:{YYYY-MM-DD}
+    const dailyKey = `audio:daily:${audioId}:${today}`;
+    // 音频ID集合（用于遍历所有音频）
+    const audioSetKey = 'audio:all_ids';
     
     try {
         // 1. 增加用户分钟计数（用于限流，60秒过期）
         await global.redis.incr(userRedisKey);
         await global.redis.expire(userRedisKey, 60);
         
-        // 2. 增加每日播放计数（24小时过期）
+        // 2. 增加每日播放计数（8天过期，确保7天窗口数据完整）
         await global.redis.incr(dailyKey);
-        await global.redis.expire(dailyKey, 7 * 24 * 3600); // 7天过期
+        await global.redis.expire(dailyKey, 8 * 24 * 3600);
         
-        // 3. 增加7天总计数（使用ZSet，方便排序）
-        await global.redis.zincrby(weeklyZSetKey, 1, audioId.toString());
-        // 设置ZSet的过期时间为7天
-        await global.redis.expire(weeklyZSetKey, 7 * 24 * 3600);
+        // 3. 将音频ID添加到集合（用于后续遍历）
+        await global.redis.sadd(audioSetKey, audioId.toString());
+        // 集合不过期，保持所有音频ID
         
-        logger.debug(`播放量记录成功: audioId=${audioId}, user=${user ? user.id : 'guest'}`);
+        logger.debug(`播放量记录成功: audioId=${audioId}, date=${today}, user=${user ? user.id : 'guest'}`);
     } catch (error) {
         logger.error('Redis播放量记录失败:', error);
         throw error;
+    }
+}
+
+/**
+ * 获取音频在指定日期的播放量
+ * @param {number} audioId - 音频ID
+ * @param {string} date - 日期字符串（YYYY-MM-DD）
+ * @returns {Promise<number>} 播放量
+ */
+async function getDailyPlayCount(audioId, date) {
+    try {
+        const dailyKey = `audio:daily:${audioId}:${date}`;
+        const count = await global.redis.get(dailyKey);
+        return parseInt(count || '0');
+    } catch (error) {
+        logger.error(`获取每日播放量失败: audioId=${audioId}, date=${date}`, error);
+        return 0;
+    }
+}
+
+/**
+ * 获取音频最近7天的总播放量（真正的滑动窗口）
+ * @param {number} audioId - 音频ID
+ * @returns {Promise<number>} 7天总播放量
+ */
+async function get7DayPlayCount(audioId) {
+    try {
+        const last7Days = getLast7Days();
+        let total = 0;
+        
+        for (const date of last7Days) {
+            const count = await getDailyPlayCount(audioId, date);
+            total += count;
+        }
+        
+        return total;
+    } catch (error) {
+        logger.error(`获取7天播放量失败: audioId=${audioId}`, error);
+        return 0;
     }
 }
 
@@ -224,24 +316,28 @@ export async function recordPlayCount(audioId, req, user) {
 }
 
 /**
- * 获取Redis中7天内最热门的音频（按7天播放量排序）
+ * 获取最近7天最热门的音频（真正的滑动窗口）
+ * 实时计算最近7天的播放量，而非累计值
  * @param {number} limit - 返回数量，默认10
  * @returns {Promise<object>} 热门音频列表
  */
 export async function getWeeklyPopularAudios(limit = 10) {
     try {
-        const weeklyZSetKey = 'audio:weekly_popular';
+        const audioSetKey = 'audio:all_ids';
+        const last7Days = getLast7Days();
         
-        // 1. 从Redis获取热门音频ID列表（按播放量排序）
-        let popularAudioIds = [];
+        logger.debug(`计算7天热门音频，日期范围: ${last7Days[0]} 至 ${last7Days[6]}`);
+        
+        // 1. 获取所有有播放记录的音频ID
+        let allAudioIds = [];
         try {
-            popularAudioIds = await global.redis.zrevrange(weeklyZSetKey, 0, limit - 1, 'WITHSCORES');
+            allAudioIds = await global.redis.smembers(audioSetKey);
         } catch (error) {
-            logger.warn('从Redis获取热门音频失败:', error);
+            logger.warn('从Redis获取音频ID集合失败:', error);
         }
         
-        // 2. 如果没有Redis数据，返回空数组
-        if (!popularAudioIds || popularAudioIds.length === 0) {
+        // 2. 如果没有音频数据，返回空数组
+        if (!allAudioIds || allAudioIds.length === 0) {
             return {
                 success: true,
                 message: '获取热门音频成功',
@@ -251,18 +347,27 @@ export async function getWeeklyPopularAudios(limit = 10) {
             };
         }
         
-        // 3. 解析Redis返回的数据（格式：[id1, score1, id2, score2, ...]）
+        // 3. 计算每个音频最近7天的总播放量
         const audioScores = [];
-        for (let i = 0; i < popularAudioIds.length; i += 2) {
-            audioScores.push({
-                id: parseInt(popularAudioIds[i]),
-                weeklyPlays: parseInt(popularAudioIds[i + 1])
-            });
+        for (const audioIdStr of allAudioIds) {
+            const audioId = parseInt(audioIdStr);
+            const weeklyCount = await get7DayPlayCount(audioId);
+            
+            if (weeklyCount > 0) {
+                audioScores.push({
+                    id: audioId,
+                    weeklyPlays: weeklyCount
+                });
+            }
         }
         
-        // 4. 从SQLite获取音频详细信息
+        // 4. 按播放量排序，取前N个
+        audioScores.sort((a, b) => b.weeklyPlays - a.weeklyPlays);
+        const topAudios = audioScores.slice(0, limit);
+        
+        // 5. 从SQLite获取音频详细信息
         const audioDetails = [];
-        for (const item of audioScores) {
+        for (const item of topAudios) {
             const audio = queryOne(`
                 SELECT 
                     a.id,
@@ -290,6 +395,11 @@ export async function getWeeklyPopularAudios(limit = 10) {
                 });
             }
         }
+        
+        // 6. 再次排序（因为可能有些音频在数据库中不存在或已被删除）
+        audioDetails.sort((a, b) => b.weeklyPlays - a.weeklyPlays);
+        
+        logger.info(`获取7天热门音频成功: 共 ${audioDetails.length} 个`);
         
         return {
             success: true,
@@ -360,6 +470,7 @@ export async function getTotalPopularAudios(limit = 10) {
 
 /**
  * 获取音频的播放统计信息（管理员用）
+ * 使用新的Redis key格式：audio:daily:{audioId}:{date}
  * @param {number} audioId - 音频ID
  * @returns {Promise<object>} 播放统计
  */
@@ -379,24 +490,12 @@ export async function getAudioPlayStats(audioId) {
             };
         }
         
-        // 2. 获取最近7天每日播放量
+        // 2. 获取最近7天每日播放量（使用新的key格式）
         const dailyStats = [];
-        const today = new Date();
+        const last7Days = getLast7Days();
         
-        for (let i = 6; i >= 0; i--) {
-            const date = new Date(today);
-            date.setDate(date.getDate() - i);
-            const dateStr = date.toISOString().split('T')[0];
-            
-            const dailyKey = `audio_play_count:daily:${audioId}:${dateStr}`;
-            let count = 0;
-            
-            try {
-                const redisCount = await global.redis.get(dailyKey);
-                count = parseInt(redisCount || '0');
-            } catch (error) {
-                logger.debug(`获取每日播放量失败: ${dailyKey}`);
-            }
+        for (const dateStr of last7Days) {
+            const count = await getDailyPlayCount(audioId, dateStr);
             
             dailyStats.push({
                 date: dateStr,

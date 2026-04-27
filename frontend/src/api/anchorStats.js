@@ -16,3 +16,11 @@ export function getAnchorStats(range = 'month') {
 export function getLatestAnchorStats() {
     return http.get('/api/anchor-stats/latest')
 }
+
+/**
+ * 获取本月最高舰长数
+ * @returns {Promise}
+ */
+export function getCurrentMonthMaxCaptainCount() {
+    return http.get('/api/anchor-stats/max-captain')
+}

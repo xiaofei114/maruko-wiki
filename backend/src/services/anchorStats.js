@@ -158,10 +158,19 @@ export async function getStatsByRange(range = 'month') {
             fansMemberCount: item.fans_member_count
         }));
 
+        // 计算本月最高舰长数（总督+提督+舰长）
+        let maxCaptainCount = 0;
+        if (formattedStats.length > 0) {
+            maxCaptainCount = Math.max(...formattedStats.map(item => 
+                (item.commanderCount || 0) + (item.viceCommanderCount || 0) + (item.captainCount || 0)
+            ));
+        }
+
         return createSuccessResponse('获取统计数据成功', {
             range,
             startDate: new Date(startTime * 1000).toLocaleDateString('zh-CN'),
             endDate: new Date(endTime * 1000).toLocaleDateString('zh-CN'),
+            maxCaptainCount,
             data: formattedStats
         });
     } catch (error) {
@@ -204,5 +213,48 @@ export async function getLatestStats() {
     } catch (error) {
         logger.error('获取最新统计数据失败:', error);
         return createErrorResponse('获取最新统计数据失败: ' + error.message);
+    }
+}
+
+/**
+ * 获取本月最高舰长数（从本月1号到当前日期）
+ * 计算总督 + 提督 + 舰长的总和最大值
+ * @returns {Promise<object>} 本月最高舰长数
+ */
+export async function getCurrentMonthMaxCaptainCount() {
+    try {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth(); // 0-11
+
+        // 本月1号0点时间戳（秒级）
+        const monthStart = new Date(currentYear, currentMonth, 1, 0, 0, 0).getTime() / 1000;
+        // 当前时间戳（秒级）
+        const monthEnd = Math.floor(now.getTime() / 1000);
+
+        // 使用SQL直接查询本月最高舰长数（总督+提督+舰长）
+        const result = queryOne(
+            `SELECT 
+                MAX(commander_count + vice_commander_count + captain_count) as max_captain_count,
+                COUNT(*) as record_count
+            FROM anchor_stats 
+            WHERE record_date >= ? AND record_date <= ?`,
+            [monthStart, monthEnd]
+        );
+
+        const maxCaptainCount = result?.max_captain_count || 0;
+        const recordCount = result?.record_count || 0;
+
+        return createSuccessResponse('获取本月最高舰长数成功', {
+            year: currentYear,
+            month: currentMonth + 1, // 转换为1-12
+            maxCaptainCount,
+            recordCount,
+            startDate: new Date(monthStart * 1000).toLocaleDateString('zh-CN'),
+            endDate: new Date(monthEnd * 1000).toLocaleDateString('zh-CN')
+        });
+    } catch (error) {
+        logger.error('获取本月最高舰长数失败:', error);
+        return createErrorResponse('获取本月最高舰长数失败: ' + error.message);
     }
 }

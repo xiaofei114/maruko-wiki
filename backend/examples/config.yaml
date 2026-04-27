@@ -39,3 +39,8 @@ ai: # AI配置
     blockDuration: 3600 # 封禁时长（秒）
 download: # 下载配置
   audio: 200 # 音频下载限额（MB）
+audioPlayCount: # 音频播放量记录配置
+  rateLimit: # 频率限制
+    windowSeconds: 60 # 时间窗口（秒）
+    authenticated: 10 # 已登录用户每个音频在窗口期内最大记录次数
+    guest: 5 # 未登录用户每个音频在窗口期内最大记录次数

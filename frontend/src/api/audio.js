@@ -9,6 +9,14 @@ export function getAudioList() {
 }
 
 /**
+ * 获取当前用户的音声分类（包括待审核的）
+ * @returns {Promise<Object>} 音声分类列表
+ */
+export function getMyAudioClassifications() {
+    return http.get('/api/audios/classifications/my')
+}
+
+/**
  * 上传音声文件
  * @param {FormData} formData - 包含audio文件和相关参数的FormData对象
  * @returns {Promise<Object>} 上传结果

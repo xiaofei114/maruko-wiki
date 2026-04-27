@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRoomInfo, getMasterInfo, getTopListNew, getLiveDuration } from '@/api/bilibiliApis.js'
 import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock } from '@element-plus/icons-vue'
-import { getAnchorStats } from '@/api/anchorStats.js'
+import { getAnchorStats, getCurrentMonthMaxCaptainCount } from '@/api/anchorStats.js'
 import { getCurrentMonthGifts } from '@/api/captainGift.js'
 
 const router = useRouter()
@@ -380,6 +380,14 @@ const maxCaptainCount = ref(0) // 当月最高舰长数
 const showGiftsSection = computed(() => captainGifts.value.length > 0) // 是否有舰礼
 const showGiftsDetailDialog = ref(false) // 舰礼详情弹窗
 
+// 舰礼进度条计数方式：'max'(本月最高舰长数，默认) 或 'current'(当前舰长数)
+const giftProgressMode = ref('max')
+
+// 当前进度条使用的舰长数（根据计数方式切换）
+const progressCaptainCount = computed(() => {
+  return giftProgressMode.value === 'max' ? maxCaptainCount.value : captain.value
+})
+
 // 礼物类型标签
 const giftTypeLabels = {
   1: '舰长礼物',
@@ -443,18 +451,18 @@ const groupedGiftsByPosition = computed(() => {
 const maxTargetCount = computed(() => {
   if (sortedGifts.value.length === 0) return 0
   const max = sortedGifts.value[sortedGifts.value.length - 1].requiredFansCount
-  return Math.max(max, maxCaptainCount.value)
+  return Math.max(max, progressCaptainCount.value)
 })
 
 // 总体进度百分比
 const overallProgress = computed(() => {
   if (maxTargetCount.value === 0) return 0
-  return Math.min(100, Math.round((maxCaptainCount.value / maxTargetCount.value) * 100))
+  return Math.min(100, Math.round((progressCaptainCount.value / maxTargetCount.value) * 100))
 })
 
 // 判断舰礼是否已解锁
 const isGiftUnlocked = (gift) => {
-  return gift.requiredFansCount === 0 || maxCaptainCount.value >= gift.requiredFansCount
+  return gift.requiredFansCount === 0 || progressCaptainCount.value >= gift.requiredFansCount
 }
 
 // 判断是否是当前阶段（已解锁的最后一个或下一个目标）
@@ -493,8 +501,8 @@ const currentStepIndex = computed(() => {
 // 获取单个舰礼的进度百分比
 const getGiftProgress = (gift) => {
   if (gift.requiredFansCount === 0) return 100
-  if (maxCaptainCount.value >= gift.requiredFansCount) return 100
-  return Math.round((maxCaptainCount.value / gift.requiredFansCount) * 100)
+  if (progressCaptainCount.value >= gift.requiredFansCount) return 100
+  return Math.round((progressCaptainCount.value / gift.requiredFansCount) * 100)
 }
 
 // 计算直播时长（分钟）
@@ -996,8 +1004,6 @@ const fetchCaptainGifts = async () => {
     const res = await getCurrentMonthGifts()
     if (res.code === 200) {
       captainGifts.value = res.data.gifts || []
-      // 使用当前实时舰长数
-      maxCaptainCount.value = captain.value
     } else {
       captainGifts.value = []
     }
@@ -1025,6 +1031,18 @@ const fetchStatsData = async () => {
   }
 }
 
+// 获取本月最高舰长数
+const fetchCurrentMonthMaxCaptainCount = async () => {
+  try {
+    const res = await getCurrentMonthMaxCaptainCount()
+    if (res.code === 200 && res.data) {
+      maxCaptainCount.value = res.data.maxCaptainCount || 0
+    }
+  } catch (error) {
+    console.error('获取本月最高舰长数失败:', error)
+  }
+}
+
 // 切换时间范围
 const changeStatsTimeRange = async (range) => {
   statsTimeRange.value = range
@@ -1038,14 +1056,17 @@ onMounted(async () => {
   const currentMonth = new Date().getMonth() + 1
   const monthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
   await fetchLiveRecords(monthStr)
-  
+
   //每分钟获取一次
   setInterval(fetchRoomInfo, 60000)
   await getUserInfo(true)
-  
+
+  // 获取本月最高舰长数
+  await fetchCurrentMonthMaxCaptainCount()
+
   // 获取舰礼信息（需要在 getUserInfo 之后，因为要用到 captain 值）
   await fetchCaptainGifts()
-  
+
   generateCalendar()
 })
 </script>
@@ -1419,21 +1440,29 @@ onMounted(async () => {
               <!-- 进度概览 -->
               <div class="gifts-overview">
                 <div class="overview-stat">
-                  <span class="overview-label">当前舰长</span>
-                  <span class="overview-value">{{ maxCaptainCount }}</span>
+                  <span class="overview-label">{{ giftProgressMode === 'max' ? '本月最高' : '当前舰长' }}</span>
+                  <span class="overview-value">{{ progressCaptainCount }}</span>
                 </div>
-                <div class="overview-progress">
-                  <el-progress 
-                    :percentage="overallProgress" 
-                    :stroke-width="12"
-                    :show-text="false"
-                    :color="overallProgress >= 100 ? '#67c23a' : '#e6a23c'"
-                  />
+                <div class="overview-center">
+                  <!-- 计数方式切换 -->
+                  <el-radio-group v-model="giftProgressMode" size="small" class="progress-mode-switch">
+                    <el-radio-button label="max">本月最高</el-radio-button>
+                    <el-radio-button label="current">当前舰长</el-radio-button>
+                  </el-radio-group>
+                  <div class="overview-progress">
+                    <el-progress
+                      :percentage="overallProgress"
+                      :stroke-width="12"
+                      :show-text="false"
+                      :color="overallProgress >= 100 ? '#67c23a' : '#e6a23c'"
+                    />
+                  </div>
                 </div>
-                <div class="overview-target" v-if="nextTargetGift">
+                <div class="overview-target">
                   <span class="overview-label">下一目标</span>
-                  <span class="overview-value">{{ nextTargetGift.requiredFansCount }}</span>
-                  <span class="overview-remain">(还差 {{ nextTargetGift.requiredFansCount - maxCaptainCount }})</span>
+                  <span class="overview-value" v-if="nextTargetGift">{{ nextTargetGift.requiredFansCount }}</span>
+                  <span class="overview-remain" v-if="nextTargetGift">(还差 {{ nextTargetGift.requiredFansCount - progressCaptainCount }})</span>
+                  <span v-else>暂无目标</span>
                 </div>
               </div>
 
@@ -1507,7 +1536,7 @@ onMounted(async () => {
                 <!-- 当前位置标记（在进度条下方） -->
                 <div class="current-marker" :style="{ left: overallProgress + '%' }" v-if="overallProgress < 100">
                   <div class="marker-triangle"></div>
-                  <div class="marker-label">{{ maxCaptainCount }}</div>
+                  <div class="marker-label">{{ progressCaptainCount }}</div>
                 </div>
               </div>
 
@@ -3579,7 +3608,27 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 60px;
+  min-width: 80px;
+}
+
+.overview-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-mode-switch {
+  .el-radio-button__inner {
+    padding: 4px 12px;
+    font-size: 12px;
+  }
+}
+
+.overview-center .overview-progress {
+  width: 100%;
+  max-width: 400px;
 }
 
 .overview-stat .overview-label {

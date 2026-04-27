@@ -4,7 +4,7 @@ import { ElMessageBox, ElMessage, ElLoading } from 'element-plus'
 import { UploadFilled, Warning, VideoPlay, Download, TrendCharts } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios, recordAudioPlay, getWeeklyPopularAudios, getTotalPopularAudios } from '@/api/audio'
+import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios, recordAudioPlay, getWeeklyPopularAudios, getTotalPopularAudios, getMyAudioClassifications } from '@/api/audio'
 import PageHero from '@/components/ComponentStyle/PageHero.vue'
 
 const nickName = import.meta.env.VITE_APP_NICK_NAME;
@@ -56,6 +56,36 @@ const shuffle = ref(false)          // 随机播放
 const brainwash = ref(false)        // 洗脑循环：当前曲目无限循环
 const autoStopOnSwitch = ref(true)  // 切换音频时自动停止当前播放，默认开启
 
+// 播放量记录防抖（每个音频ID独立计时，1秒内只记录一次）
+const playCountDebounceMap = new Map()
+const PLAY_COUNT_DEBOUNCE_MS = 1000 // 1秒防抖
+
+/**
+ * 防抖版本的记录播放量函数
+ * 同一音频ID在1秒内多次调用只会记录一次
+ * @param {number} audioId - 音频ID
+ */
+async function recordAudioPlayDebounced(audioId) {
+    if (!audioId) return
+
+    const now = Date.now()
+    const lastRecordTime = playCountDebounceMap.get(audioId)
+
+    // 如果1秒内已经记录过，则跳过
+    if (lastRecordTime && (now - lastRecordTime) < PLAY_COUNT_DEBOUNCE_MS) {
+        return
+    }
+
+    // 更新记录时间
+    playCountDebounceMap.set(audioId, now)
+
+    try {
+        await recordAudioPlay(audioId)
+    } catch (e) {
+        // 忽略记录失败
+    }
+}
+
 // 上传音声相关
 const uploadDialogVisible = ref(false)
 const uploadRef = ref(null)
@@ -65,6 +95,8 @@ const uploadForm = reactive({
     audioTag: '',
     newTagName: '' // 保存新标签的原始名称
 })
+const uploadClassifications = ref([]) // 上传对话框用的分类列表（包括待审核的）
+const uploadClassificationsLoading = ref(false)
 
 // AI音频匹配相关
 const aiMatchDialogVisible = ref(false)
@@ -137,12 +169,8 @@ async function playHotAudio(item) {
     if (sectionIndex === -1) {
         // 如果本地没有该分类，直接播放URL
         playByUrl(item.url, item.name)
-        // 记录播放量
-        try {
-            await recordAudioPlay(item.id)
-        } catch (e) {
-            // 忽略记录失败
-        }
+        // 记录播放量（带防抖）
+        recordAudioPlayDebounced(item.id)
         return
     }
     
@@ -152,12 +180,8 @@ async function playHotAudio(item) {
     if (trackIndex === -1) {
         // 如果本地列表中没有该音频，直接播放URL
         playByUrl(item.url, item.name)
-        // 记录播放量
-        try {
-            await recordAudioPlay(item.id)
-        } catch (e) {
-            // 忽略记录失败
-        }
+        // 记录播放量（带防抖）
+        recordAudioPlayDebounced(item.id)
         return
     }
     
@@ -214,13 +238,14 @@ function playByUrl(url, name) {
     }
 }
 
-// 音声标签选项（基于现有分类）
+// 音声标签选项（基于上传对话框的分类数据，包括待审核的）
 const tagOptions = computed(() => {
     const tags = []
-    audioSections.value.forEach(section => {
+    uploadClassifications.value.forEach(classification => {
+        const isPending = classification.is_review === 0
         tags.push({
-            label: section.title,
-            value: section.id
+            label: isPending ? `${classification.name} (待审核)` : classification.name,
+            value: classification.id
         })
     })
     return tags
@@ -312,14 +337,10 @@ async function playCurrent() {
     const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
     const fullUrl = track.url.startsWith('http') ? track.url : baseUrl + track.url
 
-    // 记录播放量
+    // 记录播放量（带防抖）
     const audioId = track.id || track.audioId
     if (audioId) {
-        try {
-            await recordAudioPlay(audioId)
-        } catch (e) {
-            // 忽略记录失败
-        }
+        recordAudioPlayDebounced(audioId)
     }
 
     if (autoStopOnSwitch.value) {
@@ -627,13 +648,31 @@ const currentTrackName = computed(() => {
     return t ? t.name : '— 未选择 —'
 })
 
+// 获取用户的上传用分类列表（包括待审核的）
+async function fetchUploadClassifications() {
+    try {
+        uploadClassificationsLoading.value = true
+        const response = await getMyAudioClassifications()
+        // 后端返回 {code: 200, message: '...', data: [...]}
+        if (response.code === 200 && response.data) {
+            uploadClassifications.value = response.data
+        } else {
+            ElMessage.error(response.message || '获取分类列表失败')
+            uploadClassifications.value = []
+        }
+    } catch (err) {
+        console.error('获取上传分类列表失败:', err)
+        ElMessage.error('获取分类列表失败')
+        uploadClassifications.value = []
+    } finally {
+        uploadClassificationsLoading.value = false
+    }
+}
+
 // 上传音声相关函数
 function openUploadDialog() {
-    // 如果音频数据还没有加载，先加载数据
-    if (audioSections.value.length === 0 && !loading.value) {
-        console.log('🎵 上传对话框打开时重新加载音频数据')
-        fetchAudioList()
-    }
+    // 加载用户的分类数据（包括待审核的）
+    fetchUploadClassifications()
 
     uploadDialogVisible.value = true
     // 重置表单
@@ -690,10 +729,10 @@ function handleTagSelect(value) {
         // 创建新标签（前端临时创建，实际会在上传时发送到后端）
         console.log('🎵 创建新标签:', value)
         const newTagId = `new_${Date.now()}`
-        audioSections.value.push({
+        uploadClassifications.value.push({
             id: newTagId,
-            title: value,
-            items: []
+            name: value,
+            is_review: 0 // 新创建的分类标记为待审核
         })
         uploadForm.audioTag = newTagId
         uploadForm.newTagName = value // 保存原始标签名称
@@ -1318,7 +1357,7 @@ onBeforeUnmount(() => {
 
                     <el-form-item label="音声标签" prop="audioTag">
                         <el-select v-model="uploadForm.audioTag" placeholder="请选择或输入音声标签" style="width: 100%"
-                            @change="handleTagSelect" filterable allow-create>
+                            @change="handleTagSelect" filterable allow-create :loading="uploadClassificationsLoading">
                             <el-option v-for="tag in tagOptions" :key="tag.value" :label="tag.label"
                                 :value="tag.value" />
                         </el-select>

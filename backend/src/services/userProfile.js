@@ -564,6 +564,85 @@ export async function updateUserAvatar(userId, file) {
 }
 
 /**
+ * 使用B站头像作为用户头像
+ * @param {number} userId - 用户ID
+ * @returns {Object} 更新结果
+ */
+export async function useBilibiliAvatar(userId) {
+  try {
+    // 获取用户的B站绑定信息
+    const user = queryOne(
+      `SELECT bilibili_uid FROM user WHERE id = ? AND is_bilibili_bound = 1`,
+      [userId]
+    );
+
+    if (!user || !user.bilibili_uid) {
+      return { success: false, message: '未绑定B站账号', code: 400 };
+    }
+
+    // 获取B站用户信息
+    const { getBilibiliUserInfo } = await import('./bilibiliBind.js');
+    const bilibiliInfo = await getBilibiliUserInfo(user.bilibili_uid);
+
+    if (!bilibiliInfo || !bilibiliInfo.avatar) {
+      return { success: false, message: '无法获取B站头像', code: 400 };
+    }
+
+    // 下载B站头像到本地
+    const avatarFileName = await downloadAvatar(bilibiliInfo.avatar, userId);
+    if (!avatarFileName) {
+      return { success: false, message: '下载B站头像失败', code: 500 };
+    }
+
+    // 构建数据库存储路径
+    const filePath = path.join('avatar', avatarFileName).replace(/\\/g, '/');
+    const updateTime = Math.floor(Date.now() / 1000);
+
+    // 获取旧头像路径
+    const oldUser = queryOne('SELECT avatar FROM user WHERE id = ?', [userId]);
+
+    // 更新用户头像
+    update(
+      `UPDATE user SET avatar = ?, update_time = ? WHERE id = ?`,
+      [filePath, updateTime, userId]
+    );
+
+    // 删除旧头像文件（如果存在且不是B站默认头像）
+    if (oldUser?.avatar && !oldUser.avatar.includes('bilibili')) {
+      try {
+        const oldFileName = path.basename(oldUser.avatar);
+        const oldFilePath = path.join(AVATAR_DIR, oldFileName);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+          logger.info(`删除旧头像文件: ${oldFilePath}`);
+        }
+      } catch (err) {
+        logger.warn('删除旧头像文件失败:', err);
+      }
+    }
+
+    logger.info(`用户 ${userId} 使用了B站头像`);
+
+    // 发送账号信息变更通知
+    await createNotification(
+      userId,
+      '账号信息变更',
+      '您的头像已更新为B站头像',
+      'security'
+    );
+
+    return {
+      success: true,
+      message: 'B站头像设置成功',
+      data: { avatar: `/file/${filePath}` }
+    };
+  } catch (error) {
+    logger.error('使用B站头像失败:', error);
+    return { success: false, message: '设置B站头像失败', code: 500 };
+  }
+}
+
+/**
  * 更新用户名
  * @param {number} userId - 用户ID
  * @param {string} newName - 新用户名

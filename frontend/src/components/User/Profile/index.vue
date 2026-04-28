@@ -22,6 +22,7 @@ import {
   deleteAudio,
   deletePlan,
   updateUserAvatar,
+  useBilibiliAvatar,
   updateUserName,
   updateUserPassword,
   getBilibiliBindInfo,
@@ -365,22 +366,42 @@ async function saveAvatar() {
   try {
     loading.value = true
 
-    // 检查是否有选择文件
-    if (!avatarFile.value) {
-      ElMessage.error('请选择头像文件')
-      loading.value = false
-      return
-    }
-
-    const res = await updateUserAvatar(avatarFile.value)
-    if (res.code === 200) {
-      userInfo.value.avatar = buildFileUrl(res.data.avatar)
-      ElMessage.success('头像更新成功')
-      avatarDialogVisible.value = false
-      avatarFile.value = null
-      avatarPreviewUrl.value = ''
+    // 根据头像来源选择不同的处理方式
+    if (avatarSource.value === 'bilibili') {
+      // 使用B站头像
+      const res = await useBilibiliAvatar()
+      if (res.code === 200) {
+        const newAvatarUrl = buildFileUrl(res.data.avatar)
+        userInfo.value.avatar = newAvatarUrl
+        // 更新 store 中的用户信息，触发 Top.vue 更新
+        userStore.setUser({ ...userStore.user, avatar: res.data.avatar })
+        ElMessage.success('B站头像设置成功')
+        avatarDialogVisible.value = false
+        avatarSource.value = 'custom'
+      } else {
+        ElMessage.error(res.message || 'B站头像设置失败')
+      }
     } else {
-      ElMessage.error(res.message || '头像更新失败')
+      // 使用自定义头像
+      if (!avatarFile.value) {
+        ElMessage.error('请选择头像文件')
+        loading.value = false
+        return
+      }
+
+      const res = await updateUserAvatar(avatarFile.value)
+      if (res.code === 200) {
+        const newAvatarUrl = buildFileUrl(res.data.avatar)
+        userInfo.value.avatar = newAvatarUrl
+        // 更新 store 中的用户信息，触发 Top.vue 更新
+        userStore.setUser({ ...userStore.user, avatar: res.data.avatar })
+        ElMessage.success('头像更新成功')
+        avatarDialogVisible.value = false
+        avatarFile.value = null
+        avatarPreviewUrl.value = ''
+      } else {
+        ElMessage.error(res.message || '头像更新失败')
+      }
     }
   } catch (error) {
     ElMessage.error('头像更新失败')

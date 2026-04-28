@@ -445,6 +445,16 @@ const openLink = (url) => {
           <div class="mobile-sidebar-header">
             <h3>{{ title }}</h3>
           </div>
+          <!-- 移动端用户信息区域 -->
+          <div v-if="isAuthenticated" class="mobile-user-info">
+            <el-avatar :size="48" :src="userAvatar" class="mobile-user-avatar" />
+            <div class="mobile-user-detail">
+              <div class="mobile-username">{{ username }}</div>
+              <el-tag :type="getPermissionName().type" size="small" effect="light">
+                {{ getPermissionName().name }}
+              </el-tag>
+            </div>
+          </div>
           <el-scrollbar class="sidebar-scrollbar">
             <el-menu :default-active="activeNavIndex" class="mobile-sidebar-menu" @select="handleMenuSelect">
               <template v-for="item in navItems" :key="item.path">
@@ -1125,6 +1135,33 @@ const openLink = (url) => {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+}
+
+/* 移动端用户信息 */
+.mobile-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--color-primary-alpha-10) 0%, var(--color-primary-alpha-5) 100%);
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-user-avatar {
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-user-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-username {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .close-btn {

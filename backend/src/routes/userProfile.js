@@ -15,7 +15,8 @@ import {
   deletePlan,
   updateUserAvatar,
   updateUserName,
-  updateUserPassword
+  updateUserPassword,
+  useBilibiliAvatar
 } from '../services/userProfile.js';
 import { getBilibiliBindInfo, bindBilibiliAccount, unbindBilibiliAccount } from '../services/bilibiliBind.js';
 import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, getUnreadNotificationCount } from '../services/notification.js';
@@ -174,6 +175,14 @@ router.post('/avatar', ...createAdminUploadRouteHandler({
     return { success: false, message: '请选择头像文件', code: 400 };
   }
   return await updateUserAvatar(req.user.id, file);
+}));
+
+/**
+ * 使用B站头像
+ * POST /api/user/avatar/bilibili
+ */
+router.post('/avatar/bilibili', createRouteHandler(async (req) => {
+  return await useBilibiliAvatar(req.user.id);
 }));
 
 /**

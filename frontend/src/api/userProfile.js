@@ -120,7 +120,7 @@ export function deletePlan(id) {
 }
 
 /**
- * 更新用户头像（文件上传）
+ * 更新用户头像
  * @param {File} file - 头像文件
  * @returns {Promise}
  */
@@ -132,6 +132,14 @@ export function updateUserAvatar(file) {
       'Content-Type': 'multipart/form-data'
     }
   })
+}
+
+/**
+ * 使用B站头像
+ * @returns {Promise}
+ */
+export function useBilibiliAvatar() {
+  return http.post('/api/user/avatar/bilibili')
 }
 
 /**

@@ -597,12 +597,17 @@ const goBack = () => {
   left: 0;
   width: 100%;
   backface-visibility: hidden;
-  transition: transform 0.6s ease;
+  -webkit-backface-visibility: hidden;
+  transition: transform 0.6s ease, opacity 0.6s ease;
   transform-style: preserve-3d;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .login-panel {
   transform: rotateY(0deg);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .register-panel {
@@ -615,22 +620,32 @@ const goBack = () => {
 
 .form-flipper.flipped .login-panel {
   transform: rotateY(-180deg);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .form-flipper.flipped .register-panel {
   transform: rotateY(0deg);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .form-flipper.forgot-flipped .login-panel {
   transform: rotateY(-180deg);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .form-flipper.forgot-flipped .forgot-panel {
   transform: rotateY(0deg);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .form-flipper.forgot-flipped .register-panel {
   transform: rotateY(180deg);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .login-form,

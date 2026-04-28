@@ -89,10 +89,9 @@ const router = useRouter()
 const userStore = useUserStore()
 
 // 使用storeToRefs确保响应性
-const { token, user } = storeToRefs(userStore)
+const { token, user, isAuthenticated } = storeToRefs(userStore)
 
-// 用户状态的计算属性，确保响应性
-const isAuthenticated = computed(() => !!token.value && !!user.value)
+// 用户状态的计算属性
 const username = computed(() => user.value?.name || '')
 const permission = computed(() => user.value?.permission || '')
 
@@ -330,9 +329,6 @@ const handleUserMenuClick = async (action) => {
   switch (action) {
     case 'profile':
       router.push('/profile')
-      break
-    case 'settings':
-      console.log('跳转到设置页面')
       break
     case 'logout':
       try {

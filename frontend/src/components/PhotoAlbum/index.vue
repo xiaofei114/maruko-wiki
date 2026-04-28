@@ -179,7 +179,25 @@ onMounted(() => {
       <div v-else class="album-grid">
         <div class="album-card" v-for="album in imgList.photoAlbum" :key="album.id" @click="viewAlbum(album.id)">
           <div class="card-image">
-            <img :src="getFullImageUrl(album.img)" :alt="album.title" />
+            <el-image
+              :src="getFullImageUrl(album.img)"
+              :alt="album.title"
+              fit="cover"
+              style="width: 100%; height: 100%;"
+              lazy
+              :scroll-container="'.album-grid'"
+            >
+              <template #placeholder>
+                <div class="image-slot">
+                  <el-icon><Loading /></el-icon>
+                </div>
+              </template>
+              <template #error>
+                <div class="image-slot">
+                  <el-icon><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
             <div class="card-overlay">
               <div class="overlay-content">
                 <h3>{{ album.title }}</h3>
@@ -220,9 +238,23 @@ onMounted(() => {
         </div>
         <div v-else class="photo-grid">
           <div class="photo-item" v-for="photo in imgList.latestPhotos" :key="photo.id">
-            <el-image :src="getFullImageUrl(photo.img)" :alt="photo.title" fit="cover"
-              :preview-src-list="[getFullImageUrl(photo.img)]" :initial-index="0" hide-on-click-modal
-              style="width: 100%;height: 100%; image-rendering: auto;" preview-teleported>
+            <el-image
+              :src="getFullImageUrl(photo.img)"
+              :alt="photo.title"
+              fit="cover"
+              :preview-src-list="[getFullImageUrl(photo.img)]"
+              :initial-index="0"
+              hide-on-click-modal
+              style="width: 100%;height: 100%; image-rendering: auto;"
+              preview-teleported
+              lazy
+              :scroll-container="'.photo-grid'"
+            >
+              <template #placeholder>
+                <div class="image-slot">
+                  <el-icon><Loading /></el-icon>
+                </div>
+              </template>
               <template #error>
                 <div class="image-viewer-slot image-slot">
                   <el-icon>

@@ -13,55 +13,52 @@ import { createNotification, notifyAdminsForReview } from '../method/notificatio
  */
 export async function getAlbumsWithLatestPhotos() {
     try {
-        // 获取所有审核通过且未删除的相册
+        // 使用子查询一次性获取所有相册数据（包括照片数量和最新照片）
+        // 避免N+1查询问题
         const albums = queryAll(`
             SELECT
                 pa.id,
                 pa.name,
                 pa.introduction,
                 pa.create_time,
-                u.name as user_name
+                u.name as user_name,
+                -- 照片数量子查询
+                (
+                    SELECT COUNT(*)
+                    FROM photo p
+                    WHERE p.album_id = pa.id AND p.is_deleted = 0 AND p.is_review = 1
+                ) as photo_count,
+                -- 最新照片URL子查询
+                (
+                    SELECT p.url
+                    FROM photo p
+                    WHERE p.album_id = pa.id AND p.is_deleted = 0 AND p.is_review = 1
+                    ORDER BY p.create_time DESC
+                    LIMIT 1
+                ) as latest_photo_url
             FROM photo_album pa
             LEFT JOIN user u ON pa.user_id = u.id
             WHERE pa.is_deleted = 0 AND pa.is_review = 1
             ORDER BY pa.create_time DESC
         `);
 
-        // 为每个相册获取最新一张审核通过的照片和照片总数
-        const photoAlbums = [];
-        for (const album of albums) {
-            // 获取该相册下审核通过且未删除的照片总数
-            const photoCountResult = queryOne(`
-                SELECT COUNT(*) as count
-                FROM photo
-                WHERE album_id = ? AND is_deleted = 0 AND is_review = 1
-            `, [album.id]);
-            const photoCount = photoCountResult ? photoCountResult.count : 0;
-
-            // 获取该相册下审核通过且未删除的最新照片
-            const latestPhoto = queryOne(`
-                SELECT url
-                FROM photo
-                WHERE album_id = ? AND is_deleted = 0 AND is_review = 1
-                ORDER BY create_time DESC
-                LIMIT 1
-            `, [album.id]);
-
+        // 处理相册数据
+        const photoAlbums = albums.map(album => {
             let img = '';
-            if (latestPhoto && fileExists(latestPhoto.url)) {
-                img = `/api/file/${latestPhoto.url}`;
+            if (album.latest_photo_url && fileExists(album.latest_photo_url)) {
+                img = `/api/file/${album.latest_photo_url}`;
             }
 
-            photoAlbums.push({
+            return {
                 id: album.id,
                 title: album.name,
                 img: img,
                 tip: album.introduction || '',
-                photoCount: photoCount
-            });
-        }
+                photoCount: album.photo_count || 0
+            };
+        });
 
-        // 获取最新的10张审核通过的照片
+        // 获取最新的24张审核通过的照片
         const latestPhotos = queryAll(`
             SELECT
                 p.id,

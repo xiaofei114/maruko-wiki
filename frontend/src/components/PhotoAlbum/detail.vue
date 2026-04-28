@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Plus, Picture, UploadFilled, Download } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Picture, UploadFilled, Download, Loading } from '@element-plus/icons-vue'
 import { getAlbumPhotos, uploadPhoto } from '@/api/album'
 
 // 路由和用户状态
@@ -310,9 +310,23 @@ onBeforeUnmount(() => {
 
         <div v-else class="photo-grid">
           <div v-for="photo in albumPhotos" :key="photo.id" class="photo-item">
-            <el-image :src="getFullImageUrl(photo.img)" :alt="photo.name" fit="cover"
-              :preview-src-list="[getFullImageUrl(photo.img)]" :initial-index="0" hide-on-click-modal
-              style="width: 100%;height: 100%; image-rendering: auto;" preview-teleported>
+            <el-image
+              :src="getFullImageUrl(photo.img)"
+              :alt="photo.name"
+              fit="cover"
+              :preview-src-list="[getFullImageUrl(photo.img)]"
+              :initial-index="0"
+              hide-on-click-modal
+              style="width: 100%;height: 100%; image-rendering: auto;"
+              preview-teleported
+              lazy
+              :scroll-container="'.photo-grid'"
+            >
+              <template #placeholder>
+                <div class="image-slot">
+                  <el-icon><Loading /></el-icon>
+                </div>
+              </template>
               <template #error>
                 <div class="image-viewer-slot image-slot">
                   <el-icon>

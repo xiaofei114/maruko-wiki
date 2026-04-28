@@ -8,7 +8,7 @@ import { authenticateToken, optionalAuth } from '../method/auth.js';
 import { uploadAudio, getAudiosGrouped, createAudioClassification, getAudiosForDownload, getUserAudioClassifications } from '../services/audio.js';
 import { recordPlayCount, getWeeklyPopularAudios, getTotalPopularAudios } from '../services/audioPlayCount.js';
 import { packAudios } from '../method/pack.js';
-import { read_json } from "../method/read.js"
+import { getUploadLimit } from "../method/read.js"
 
 const router = express.Router();
 
@@ -24,7 +24,7 @@ router.get('/audios/classifications/my', authenticateToken, createRouteHandler(a
 // 上传音声 (需要登录)
 router.post('/audios', ...createAdminUploadRouteHandler({
     destination: path.join(process.cwd(), 'data', 'document', 'audios'),
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: getUploadLimit('audio'),
     allowedTypes: ['audio/mpeg', 'audio/mp3'],
     allowedExtensions: ['.mp3', '.MP3']
 }, 'audio', async (req) => {
@@ -142,26 +142,36 @@ router.get('/audios/download/:token', async (req, res) => {
         // 检查用户每天下载量限制（200MB）
         const today = new Date().toISOString().split('T')[0];
         const downloadLimitKey = `download:limit:${userId}:${today}`;
+        let downloadQuotaReserved = false;
 
         try {
             if (global.redis) {
-                // 获取今天已下载的大小
-                const todayDownloaded = await global.redis.get(downloadLimitKey) || 0;
-                const totalDownloadSize = parseInt(todayDownloaded) + packResult.fileSize;
                 const appConfig = read_json("configs", "config")
                 const dailyLimit = appConfig.download.audio * 1024 * 1024;
 
-                if (totalDownloadSize > dailyLimit) {
-                    logger.warn(`用户 ${userId} 超过每日下载限制，当前: ${(totalDownloadSize / 1024 / 1024).toFixed(2)}MB，限制: 200MB`);
+                // 使用原子操作预占下载额度
+                // 先增加下载量，检查是否超过限制，如果超过则回滚
+                const currentSize = await global.redis.incrby(downloadLimitKey, packResult.fileSize);
+                
+                // 设置过期时间（如果是新创建的key）
+                await global.redis.expire(downloadLimitKey, 86400); // 24小时过期
+
+                if (currentSize > dailyLimit) {
+                    // 超过限制，回滚预占的额度
+                    await global.redis.decrby(downloadLimitKey, packResult.fileSize);
+                    
+                    // 获取实际已下载量（回滚后的值）
+                    const actualDownloaded = await global.redis.get(downloadLimitKey) || 0;
+                    
+                    logger.warn(`用户 ${userId} 超过每日下载限制，当前: ${(currentSize / 1024 / 1024).toFixed(2)}MB，限制: ${appConfig.download.audio}MB`);
                     return res.status(429).json({
                         success: false,
-                        message: `每日下载量不能超过${appConfig.download.audio}MB，当前已下载 ${(parseInt(todayDownloaded) / 1024 / 1024).toFixed(2)}MB`
+                        message: `每日下载量不能超过${appConfig.download.audio}MB，当前已下载 ${(parseInt(actualDownloaded) / 1024 / 1024).toFixed(2)}MB`
                     });
                 }
 
-                // 更新下载量
-                await global.redis.set(downloadLimitKey, totalDownloadSize, 'EX', 86400); // 24小时过期
-                logger.debug(`更新用户 ${userId} 今日下载量: ${(totalDownloadSize / 1024 / 1024).toFixed(2)}MB`);
+                downloadQuotaReserved = true;
+                logger.debug(`预占用户 ${userId} 下载额度: ${(packResult.fileSize / 1024 / 1024).toFixed(2)}MB，今日总计: ${(currentSize / 1024 / 1024).toFixed(2)}MB`);
             }
         } catch (redisError) {
             logger.error('检查下载限制时Redis错误:', redisError);
@@ -179,10 +189,42 @@ router.get('/audios/download/:token', async (req, res) => {
         const fileStream = fs.createReadStream(packResult.zipFilePath);
         fileStream.pipe(res);
 
-        // 错误处理
-        fileStream.on('error', (error) => {
+        // 监听流的完成和错误事件
+        fileStream.on('error', async (error) => {
             logger.error('发送文件失败:', error);
-            res.status(500).json({ success: false, message: '发送文件失败', code: 500 });
+            
+            // 如果已预占额度，回滚
+            if (downloadQuotaReserved && global.redis) {
+                try {
+                    await global.redis.decrby(downloadLimitKey, packResult.fileSize);
+                    logger.debug(`文件发送失败，回滚用户 ${userId} 下载额度: ${(packResult.fileSize / 1024 / 1024).toFixed(2)}MB`);
+                } catch (rollbackError) {
+                    logger.error('回滚下载额度失败:', rollbackError);
+                }
+            }
+            
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: '发送文件失败', code: 500 });
+            }
+        });
+
+        // 监听响应完成事件
+        res.on('finish', () => {
+            logger.info(`文件发送完成: ${packResult.zipFileName}`);
+        });
+
+        res.on('error', async (error) => {
+            logger.error('响应发送失败:', error);
+            
+            // 如果已预占额度，回滚
+            if (downloadQuotaReserved && global.redis) {
+                try {
+                    await global.redis.decrby(downloadLimitKey, packResult.fileSize);
+                    logger.debug(`响应失败，回滚用户 ${userId} 下载额度: ${(packResult.fileSize / 1024 / 1024).toFixed(2)}MB`);
+                } catch (rollbackError) {
+                    logger.error('回滚下载额度失败:', rollbackError);
+                }
+            }
         });
 
     } catch (error) {

@@ -10,6 +10,7 @@ import {
     adminResetUserAvatar
 } from '../services/user.js';
 import { getDashboardStats } from '../services/dashboard.js';
+import { getUploadLimit } from "../method/read.js"
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -33,7 +34,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: getUploadLimit('avatar') },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif|webp/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());

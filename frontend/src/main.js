@@ -33,6 +33,14 @@ app.use(pinia)
 import { useUserStore } from '@/stores/user'
 const userStore = useUserStore(pinia)
 
+// 监听登录失效事件
+window.addEventListener('auth:logout', () => {
+    // 清除登录状态
+    userStore.logout()
+    // 跳转到首页
+    router.push('/')
+})
+
 // 异步初始化用户状态
 const initializeApp = async () => {
     try {

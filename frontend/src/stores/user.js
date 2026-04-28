@@ -10,7 +10,6 @@ export const useUserStore = defineStore('user', () => {
     // 状态
     const token = ref(localStorage.getItem(TOKEN_KEY) || '')
     const user = ref(JSON.parse(localStorage.getItem(USER_KEY) || 'null') || null)
-    const isLoggedIn = ref(false)
 
     // 计算属性
     const permission = computed(() => user.value?.permission || '')
@@ -37,8 +36,6 @@ export const useUserStore = defineStore('user', () => {
 
             setToken(tokenValue)
             setUser(userData)
-
-            isLoggedIn.value = true
 
             // 同时保存到localStorage（确保数据同步）
             localStorage.setItem(TOKEN_KEY, token.value)
@@ -106,7 +103,6 @@ export const useUserStore = defineStore('user', () => {
     const logout = () => {
         token.value = ''
         user.value = null
-        isLoggedIn.value = false
 
         // 清除本地存储
         localStorage.removeItem(TOKEN_KEY)
@@ -121,10 +117,9 @@ export const useUserStore = defineStore('user', () => {
         const storedUser = localStorage.getItem(USER_KEY)
 
         if (storedToken && storedUser) {
-            // 先恢复本地状态
+            // 恢复本地状态
             token.value = storedToken
             user.value = JSON.parse(storedUser)
-            isLoggedIn.value = true
 
             // 尝试刷新token以确保有效性
             try {
@@ -141,7 +136,6 @@ export const useUserStore = defineStore('user', () => {
         // 状态
         token,
         user,
-        isLoggedIn,
 
         // 计算属性
         permission,

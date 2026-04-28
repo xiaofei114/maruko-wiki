@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createPublicRoute, createValidatedRouteHandler, createAdminValidatedRouteHandler, createAdminUploadRouteHandler } from '../method/route-helpers.js';
 import { getAlbumsWithLatestPhotos, getPhotos, createAlbum, uploadPhoto } from '../services/album.js';
+import { getUploadLimit } from "../method/read.js"
 
 const router = express.Router();
 
@@ -36,7 +37,7 @@ router.post('/albums', ...createAdminValidatedRouteHandler({
 // 上传照片 (需要登录)
 router.post('/photos', ...createAdminUploadRouteHandler({
     destination: path.join(process.cwd(), 'data', 'document', 'images'),
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: getUploadLimit('photo'),
     allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.JPG', '.JPEG', '.PNG', '.GIF', '.WEBP']
 }, 'photo', async (req) => {

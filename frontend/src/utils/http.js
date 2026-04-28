@@ -37,6 +37,11 @@ http.interceptors.response.use(
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
             localStorage.removeItem(import.meta.env.VITE_APP_TOKEN)
             localStorage.removeItem(import.meta.env.VITE_APP_USER)
+
+            // 触发登录失效事件，通知应用跳转
+            window.dispatchEvent(new CustomEvent('auth:logout', {
+                detail: { reason: 'token_expired' }
+            }))
         }
 
         // 可以在这里统一处理错误

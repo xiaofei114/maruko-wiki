@@ -41,10 +41,12 @@ const isPlaying = ref(false)
 const volume = ref(0.9)
 const audioUnlocked = ref(false)
 const backgroundAudios = ref([]) // 存储后台音频实例（当不自动停止时使用）
+const backgroundAudioListeners = ref(new Map()) // 存储后台音频的事件监听器引用
 
 // 地狱绘卷模式
 const hellScrollAudios = ref([]) // 存储多个音频实例
 const isHellScrollMode = ref(false)
+const hellScrollAudioListeners = ref(new Map()) // 存储地狱绘卷音频的事件监听器引用
 
 // 用户状态
 const userStore = useUserStore()
@@ -192,6 +194,11 @@ async function playHotAudio(item) {
 
 // 通过URL直接播放
 function playByUrl(url, name) {
+    // 如果地狱绘卷模式开启，先停止它
+    if (isHellScrollMode.value) {
+        stopHellScroll()
+    }
+
     createAudioIfNeeded()
     
     const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
@@ -226,12 +233,29 @@ function playByUrl(url, name) {
         const newAudio = new Audio(fullUrl)
         newAudio.volume = volume.value
         newAudio.loop = !!brainwash.value
+
+        // 创建播放结束时的清理逻辑函数并保存引用
+        const endedHandler = () => {
+            const index = backgroundAudios.value.indexOf(newAudio)
+            if (index > -1) {
+                backgroundAudios.value.splice(index, 1)
+            }
+            // 移除监听器引用
+            backgroundAudioListeners.value.delete(newAudio)
+        }
+        newAudio.addEventListener('ended', endedHandler)
+
+        // 保存监听器引用
+        backgroundAudioListeners.value.set(newAudio, {
+            ended: endedHandler
+        })
+
         backgroundAudios.value.push(newAudio)
-        
+
         if (!audioUnlocked.value) {
             unlockAudio()
         }
-        
+
         newAudio.play().catch((error) => {
             console.error('后台播放失败:', error)
         })
@@ -326,6 +350,11 @@ function playByFlatIndex(flatIndex) {
 }
 
 async function playCurrent() {
+    // 如果地狱绘卷模式开启，先停止它
+    if (isHellScrollMode.value) {
+        stopHellScroll()
+    }
+
     const secIdx = currentSectionIndex.value
     const trIdx = currentTrackIndex.value
     if (secIdx < 0 || trIdx < 0 || secIdx >= audioSections.value.length ||
@@ -374,12 +403,20 @@ async function playCurrent() {
         backgroundAudio.loop = !!brainwash.value // 洗脑循环：后台音频也参与循环
         backgroundAudio.preload = 'auto'
 
-        // 添加播放结束时的清理逻辑
-        backgroundAudio.addEventListener('ended', () => {
+        // 创建播放结束时的清理逻辑函数并保存引用
+        const endedHandler = () => {
             const index = backgroundAudios.value.indexOf(backgroundAudio)
             if (index > -1) {
                 backgroundAudios.value.splice(index, 1)
             }
+            // 移除监听器引用
+            backgroundAudioListeners.value.delete(backgroundAudio)
+        }
+        backgroundAudio.addEventListener('ended', endedHandler)
+
+        // 保存监听器引用
+        backgroundAudioListeners.value.set(backgroundAudio, {
+            ended: endedHandler
         })
 
         // 尝试播放后台音频
@@ -431,8 +468,15 @@ function stopPlayback(resetModes = true, keepAiAutoPlay = false) {
     backgroundAudios.value.forEach(bgAudio => {
         bgAudio.pause()
         bgAudio.currentTime = 0
+
+        // 获取并移除对应的事件监听器
+        const listeners = backgroundAudioListeners.value.get(bgAudio)
+        if (listeners && listeners.ended) {
+            bgAudio.removeEventListener('ended', listeners.ended)
+        }
     })
     backgroundAudios.value = []
+    backgroundAudioListeners.value.clear()
 
     // 可选择是否重置播放模式
     if (resetModes) {
@@ -531,20 +575,13 @@ async function startHellScroll() {
             }
         )
 
-        // 停止当前播放
+        // 停止当前播放（包括清理地狱绘卷模式）
         stopPlayback(true)
 
         // 确保音频已解锁
         if (!audioUnlocked.value) {
             unlockAudio()
         }
-
-        // 清理之前的音频实例
-        hellScrollAudios.value.forEach(audio => {
-            audio.pause()
-            audio.removeEventListener('ended', onTrackEnded)
-        })
-        hellScrollAudios.value = []
 
         // 创建所有音频实例并同时播放
         const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:6660/api'
@@ -555,9 +592,15 @@ async function startHellScroll() {
             audioInstance.loop = true // 开启洗脑循环
             audioInstance.preload = 'auto'
 
-            // 添加错误处理
-            audioInstance.addEventListener('error', (e) => {
+            // 创建错误处理函数并保存引用
+            const errorHandler = (e) => {
                 console.warn(`Failed to load audio: ${track.name}`, e)
+            }
+            audioInstance.addEventListener('error', errorHandler)
+
+            // 保存监听器引用
+            hellScrollAudioListeners.value.set(audioInstance, {
+                error: errorHandler
             })
 
             // 尝试播放
@@ -578,19 +621,24 @@ async function startHellScroll() {
 
 function stopHellScroll() {
     // 停止所有地狱绘卷音频
-    hellScrollAudios.value.forEach(audio => {
-        audio.pause()
-        audio.currentTime = 0
-        // 移除所有事件监听器
-        audio.removeEventListener('ended', onTrackEnded)
-        audio.removeEventListener('error', () => {
-        })
-        audio.removeEventListener('canplay', () => {
-        })
+    hellScrollAudios.value.forEach(hellAudio => {
+        hellAudio.pause()
+        hellAudio.currentTime = 0
+
+        // 获取并移除对应的事件监听器
+        const listeners = hellScrollAudioListeners.value.get(hellAudio)
+        if (listeners) {
+            if (listeners.error) {
+                hellAudio.removeEventListener('error', listeners.error)
+            }
+            hellScrollAudioListeners.value.delete(hellAudio)
+        }
+
         // 释放音频资源
-        audio.src = ''
+        hellAudio.src = ''
     })
     hellScrollAudios.value = []
+    hellScrollAudioListeners.value.clear()
     isHellScrollMode.value = false
 }
 
@@ -972,6 +1020,13 @@ function playAiAutoPlayCurrent() {
 function stopAiAutoPlay() {
     isAiAutoPlaying.value = false
     aiAutoPlayIndex.value = -1
+    // 停止当前播放的音频
+    if (audio.value) {
+        audio.value.pause()
+        audio.value.currentTime = 0
+    }
+    isPlaying.value = false
+    audioPlayPromise.value = null
 }
 
 // AI音频匹配相关函数
@@ -1170,21 +1225,41 @@ async function downloadAudiosByTag(section) {
 
 // 清理
 onBeforeUnmount(() => {
+    // 停止AI自动播放
+    if (isAiAutoPlaying.value) {
+        stopAiAutoPlay()
+    }
+
+    // 清理主音频实例
     if (audio.value) {
         audio.value.pause()
         audio.value.removeEventListener('ended', onTrackEnded)
+        audio.value.src = ''
         audio.value = null
     }
 
     // 清理所有后台音频实例
     backgroundAudios.value.forEach(bgAudio => {
         bgAudio.pause()
-        bgAudio.removeEventListener('ended', () => { })
+        bgAudio.currentTime = 0
+
+        // 获取并移除对应的事件监听器
+        const listeners = backgroundAudioListeners.value.get(bgAudio)
+        if (listeners && listeners.ended) {
+            bgAudio.removeEventListener('ended', listeners.ended)
+        }
+
+        // 释放音频资源
+        bgAudio.src = ''
     })
     backgroundAudios.value = []
+    backgroundAudioListeners.value.clear()
 
     // 清理地狱绘卷音频实例
     stopHellScroll()
+
+    // 清理防抖Map
+    playCountDebounceMap.clear()
 })
 </script>
 

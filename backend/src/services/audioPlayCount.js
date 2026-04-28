@@ -186,7 +186,7 @@ async function getDailyPlayCount(audioId, date) {
  * @param {number} audioId - 音频ID
  * @returns {Promise<number>} 7天总播放量
  */
-async function get7DayPlayCount(audioId) {
+export async function get7DayPlayCount(audioId) {
     try {
         const last7Days = getLast7Days();
         let total = 0;

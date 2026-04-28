@@ -22,6 +22,7 @@ import { getBilibiliBindInfo, bindBilibiliAccount, unbindBilibiliAccount } from 
 import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, getUnreadNotificationCount } from '../services/notification.js';
 import { getUserAlbums } from '../services/album.js';
 import { getUserAudioClassifications } from '../services/audio.js';
+import { getUploadLimit } from "../method/read.js"
 
 const router = express.Router();
 
@@ -166,7 +167,7 @@ router.delete('/plans/:id', createRouteHandler(async (req) => {
  */
 router.post('/avatar', ...createAdminUploadRouteHandler({
   destination: path.join(process.cwd(), 'data', 'document', 'avatar'),
-  maxSize: 5 * 1024 * 1024, // 5MB
+  maxSize: getUploadLimit('avatar'),
   allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
   allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.JPG', '.JPEG', '.PNG', '.GIF', '.WEBP']
 }, 'avatar', async (req) => {

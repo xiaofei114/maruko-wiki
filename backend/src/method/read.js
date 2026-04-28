@@ -64,3 +64,14 @@ export function read_json(paths, name) {
         throw error;
     }
 }
+
+/**
+ * 获取上传限制配置
+ * @param {string} type - 上传类型 (audio, photo, avatar, document, default)
+ * @returns {number} 上传限制大小（字节）
+ */
+export function getUploadLimit(type) {
+    const appConfig = read_json("configs", "config");
+    const limitMB = appConfig.upload?.[type] || appConfig.upload?.default || 10;
+    return limitMB * 1024 * 1024;
+}

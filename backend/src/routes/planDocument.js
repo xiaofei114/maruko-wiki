@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createPublicRoute, createAdminUploadRouteHandler, createAdminRoute, createAdminValidatedRouteHandler } from '../method/route-helpers.js';
 import { uploadPlanDocument, getPlanDocuments, deletePlanDocument, setCurrentPlanDocument, getCurrentPlanDocument, getPlanDocumentsForAdmin } from '../services/planDocument.js';
+import { getUploadLimit } from "../method/read.js"
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ router.get('/plan-documents/current', ...createPublicRoute(getCurrentPlanDocumen
 
 router.post('/plan-documents', ...createAdminUploadRouteHandler({
     destination: path.join(process.cwd(), 'data', 'document', 'docs'),
-    maxSize: 20 * 1024 * 1024,
+    maxSize: getUploadLimit('document'),
     allowedTypes: ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
     allowedExtensions: ['.docx', '.DOCX']
 }, 'document', async (req) => {

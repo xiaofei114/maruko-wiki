@@ -310,8 +310,8 @@ onBeforeUnmount(() => {
 
         <div v-else class="photo-grid">
           <div v-for="photo in albumPhotos" :key="photo.id" class="photo-item">
-            <el-image :src="getFullImageUrl(photo.url)" :alt="photo.name" fit="cover"
-              :preview-src-list="[getFullImageUrl(photo.url)]" :initial-index="0" hide-on-click-modal
+            <el-image :src="getFullImageUrl(photo.img)" :alt="photo.name" fit="cover"
+              :preview-src-list="[getFullImageUrl(photo.img)]" :initial-index="0" hide-on-click-modal
               style="width: 100%;height: 100%; image-rendering: auto;" preview-teleported>
               <template #error>
                 <div class="image-viewer-slot image-slot">

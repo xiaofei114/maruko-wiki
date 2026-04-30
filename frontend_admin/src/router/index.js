@@ -32,8 +32,20 @@ const sidebar = [
   {
     path: 'captain-gift',
     name: 'captain-gift',
-    component: () => import('../components/Content/CaptainGift/index.vue'),
+    component: () => import('../components/Operation/CaptainGift/index.vue'),
     meta: { needLogin: true, name: "舰礼管理", cnname: "舰礼管理", }
+  },
+  {
+    path: 'plan-document',
+    name: 'plan-document',
+    component: () => import('../components/Content/PlanDocument/index.vue'),
+    meta: { needLogin: true, name: "企划文档管理", cnname: "企划文档管理", }
+  },
+  {
+    path: 'announcement',
+    name: 'announcement',
+    component: () => import('../components/Operation/Announcement/index.vue'),
+    meta: { needLogin: true, name: "公告管理", cnname: "公告管理", }
   },
   {
     path: 'user',
@@ -58,6 +70,12 @@ const sidebar = [
     name: 'redis-admin',
     component: () => import('../components/System/RedisAdmin/index.vue'),
     meta: { needLogin: true, name: "Redis管理", cnname: "Redis管理", needSuperAdmin: true }
+  },
+  {
+    path: 'system-config',
+    name: 'system-config',
+    component: () => import('../components/System/Config/index.vue'),
+    meta: { needLogin: true, name: "系统配置", cnname: "系统配置", needSuperAdmin: true }
   }
 ]
 

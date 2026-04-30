@@ -2,7 +2,6 @@ import express from 'express';
 import { optionalAuth } from '../method/auth.js';
 import { createRouteHandler } from '../method/route-helpers.js';
 import { getAudioMatches } from '../services/ai.js';
-import { read_json } from '../method/read.js';
 
 const router = express.Router();
 
@@ -44,7 +43,7 @@ async function isIPBlocked(clientIP) {
  * 记录可疑行为
  */
 async function recordSuspiciousActivity(clientIP, reason) {
-    const config = read_json("configs", "config");
+    const config = global.appConfig;
     const suspiciousKey = `ai_suspicious:${clientIP.replace(/\./g, '_')}`;
     const failureCount = await global.redis.incr(suspiciousKey);
 

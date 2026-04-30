@@ -6,7 +6,7 @@ class HttpClient {
     constructor(timeout = 10000) {
         // 创建 axios 实例
         this.instance = axios.create({
-            baseURL: this.formatBaseUrl(import.meta.env.VITE_API_BASE),
+            baseURL: this.formatBaseUrl(import.meta.env.VITE_APP_API_BASE),
             timeout,
             headers: {
                 'Content-Type': 'application/json'

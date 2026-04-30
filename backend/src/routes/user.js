@@ -1,7 +1,6 @@
 import express from 'express';
 import { createRouteHandler } from '../method/route-helpers.js';
 import { sendVerificationCode, verifyCode, register, login, resetPasswordByEmail } from '../services/user.js';
-import { read_json } from '../method/read.js';
 
 const router = express.Router();
 
@@ -19,7 +18,7 @@ router.post('/register', createRouteHandler(async (req, res) => {
 
 // 发送验证码接口
 router.post('/sendVerification', createRouteHandler(async (req, res) => {
-    const appConfig = read_json('configs', 'config');
+    const appConfig = global.appConfig;
 
     // 检查邮件传输器是否已初始化
     if (!global.emailTransporter) {

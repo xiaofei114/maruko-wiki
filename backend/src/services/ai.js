@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { read_json } from '../method/read.js';
 import { createSuccessResponse, createErrorResponse } from '../method/business-utils.js';
 import { queryAll } from '../method/database.js';
 import { get7DayPlayCount } from './audioPlayCount.js';
@@ -9,7 +8,7 @@ import { get7DayPlayCount } from './audioPlayCount.js';
  * @returns {OpenAI|null} OpenAI客户端实例或null（如果API Key未配置）
  */
 function getAIClient() {
-    const config = read_json("configs", "config");
+    const config = global.appConfig;
 
     if (!config.deepseek || !config.deepseek.apiKey || config.deepseek.apiKey === 'null' || config.deepseek.apiKey === null) {
         return null;

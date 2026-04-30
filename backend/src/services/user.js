@@ -111,7 +111,7 @@ export async function verifyCode(email, code) {
  */
 export async function login(accountNumber, password, token) {
     // 获取配置
-    const config = read_json('configs', 'config');
+    const config = global.appConfig;
     const jwtSecret = config.token;
 
     // 如果传入了token，进行token验证
@@ -527,7 +527,7 @@ export async function resetUserPassword(userId, adminId) {
 
         // 发送邮件通知
         try {
-            const config = read_json('configs', 'config');
+            const config = global.appConfig;
             const emailTransporter = global.emailTransporter;
 
             const mailOptions = {

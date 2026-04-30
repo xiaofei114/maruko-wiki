@@ -50,7 +50,7 @@ function executeSqlMigrations(db) {
     const newMigrations = sqlFiles.filter(file => !executedMigrations.includes(file));
 
     if (newMigrations.length === 0) {
-        logger.info(chalk.green('所有 SQL 文件已执行完毕'));
+        logger.debug('没有新的 SQL 文件待执行');
         return;
     }
 

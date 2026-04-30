@@ -1,0 +1,191 @@
+{
+  "_comment": "配置字段映射表，用于前端表单渲染",
+  "_order": ["服务器", "安全", "日志", "Redis", "邮件", "Bilibili", "DeepSeek", "AI", "下载", "上传"],
+  "fields": {
+    "httpPort": {
+      "type": "number",
+      "label": "HTTP 端口",
+      "min": 1,
+      "max": 65535,
+      "group": "服务器"
+    },
+    "domainName": {
+      "type": "array",
+      "label": "允许的域名",
+      "group": "服务器"
+    },
+    "token": {
+      "type": "password",
+      "label": "JWT Token",
+      "group": "安全"
+    },
+    "log.cmd": {
+      "type": "select",
+      "label": "控制台日志级别",
+      "options": ["trace", "debug", "info", "warn", "error", "fatal"],
+      "group": "日志"
+    },
+    "log.file": {
+      "type": "select",
+      "label": "文件日志级别",
+      "options": ["trace", "debug", "info", "warn", "error", "fatal", "all"],
+      "group": "日志"
+    },
+    "log.prefix": {
+      "type": "string",
+      "label": "日志前缀",
+      "group": "日志"
+    },
+    "redis.host": {
+      "type": "string",
+      "label": "Redis 主机",
+      "group": "Redis"
+    },
+    "redis.port": {
+      "type": "number",
+      "label": "Redis 端口",
+      "min": 1,
+      "max": 65535,
+      "group": "Redis"
+    },
+    "redis.password": {
+      "type": "password",
+      "label": "Redis 密码",
+      "group": "Redis"
+    },
+    "redis.keyPrefix": {
+      "type": "string",
+      "label": "Redis 键前缀",
+      "group": "Redis"
+    },
+    "email.host": {
+      "type": "string",
+      "label": "SMTP 主机",
+      "group": "邮件"
+    },
+    "email.port": {
+      "type": "number",
+      "label": "SMTP 端口",
+      "min": 1,
+      "max": 65535,
+      "group": "邮件"
+    },
+    "email.secure": {
+      "type": "boolean",
+      "label": "使用 TLS",
+      "group": "邮件"
+    },
+    "email.auth.user": {
+      "type": "string",
+      "label": "邮箱用户名",
+      "group": "邮件"
+    },
+    "email.auth.pass": {
+      "type": "password",
+      "label": "邮箱授权码",
+      "group": "邮件"
+    },
+    "email.from": {
+      "type": "string",
+      "label": "发件人",
+      "group": "邮件"
+    },
+    "email.subject": {
+      "type": "string",
+      "label": "邮件标题",
+      "group": "邮件"
+    },
+    "bilibili.roomId": {
+      "type": "string",
+      "label": "B站房间号",
+      "group": "Bilibili"
+    },
+    "bilibili.userId": {
+      "type": "string",
+      "label": "B站用户ID",
+      "group": "Bilibili"
+    },
+    "bilibili.ttl": {
+      "type": "number",
+      "label": "缓存时间(秒)",
+      "group": "Bilibili"
+    },
+    "deepseek.apiKey": {
+      "type": "password",
+      "label": "DeepSeek API Key",
+      "group": "DeepSeek"
+    },
+    "ai.limits.authenticated": {
+      "type": "number",
+      "label": "已登录用户每日限制",
+      "min": 1,
+      "group": "AI"
+    },
+    "ai.limits.guest": {
+      "type": "number",
+      "label": "游客每日限制",
+      "min": 1,
+      "group": "AI"
+    },
+    "ai.security.maxRequestsPerMinute": {
+      "type": "number",
+      "label": "每分钟最大请求数",
+      "min": 1,
+      "group": "AI"
+    },
+    "ai.security.maxRequestsPerHour": {
+      "type": "number",
+      "label": "每小时最大请求数",
+      "min": 1,
+      "group": "AI"
+    },
+    "ai.security.suspiciousThreshold": {
+      "type": "number",
+      "label": "可疑行为阈值",
+      "min": 1,
+      "group": "AI"
+    },
+    "ai.security.blockDuration": {
+      "type": "number",
+      "label": "封禁时长(秒)",
+      "min": 1,
+      "group": "AI"
+    },
+    "download.audio": {
+      "type": "number",
+      "label": "音频下载限制(MB)",
+      "min": 1,
+      "group": "下载"
+    },
+    "upload.audio": {
+      "type": "number",
+      "label": "音频上传限制(MB)",
+      "min": 1,
+      "group": "上传"
+    },
+    "upload.photo": {
+      "type": "number",
+      "label": "照片上传限制(MB)",
+      "min": 1,
+      "group": "上传"
+    },
+    "upload.avatar": {
+      "type": "number",
+      "label": "头像上传限制(MB)",
+      "min": 1,
+      "group": "上传"
+    },
+    "upload.document": {
+      "type": "number",
+      "label": "文档上传限制(MB)",
+      "min": 1,
+      "group": "上传"
+    },
+    "upload.default": {
+      "type": "number",
+      "label": "默认上传限制(MB)",
+      "min": 1,
+      "group": "上传"
+    }
+  }
+}

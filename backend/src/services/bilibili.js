@@ -1,6 +1,5 @@
 import axios from 'axios';
 import crypto from 'crypto';
-import { read_json } from '../method/read.js';
 
 /**
  * 生成缓存key的函数
@@ -54,7 +53,7 @@ async function getCachedData(cacheKey) {
 async function setCachedData(cacheKey, data) {
     try {
         const cacheValue = JSON.stringify(data);
-        const config = read_json('configs', 'config');
+        const config = global.appConfig;
         await global.redis.setex(cacheKey, config.bilibili.ttl, cacheValue);
         logger.debug(`已缓存到Redis (${config.bilibili.ttl}秒): ${cacheKey}`);
     } catch (error) {
@@ -98,7 +97,7 @@ async function callBilibiliAPI(path, params = {}) {
  * @returns {Promise<object>} 房间信息
  */
 export async function getRoomInfo() {
-    const config = read_json('configs', 'config');
+    const config = global.appConfig;
     const path = '/room/v1/Room/get_info';
     const params = {
         room_id: config.bilibili.roomId
@@ -120,7 +119,7 @@ export async function getRoomInfo() {
  * @returns {Promise<object>} 主播信息
  */
 export async function getMasterInfo() {
-    const config = read_json('configs', 'config');
+    const config = global.appConfig;
     const path = '/live_user/v1/Master/info';
     const params = {
         uid: config.bilibili.userId
@@ -142,7 +141,7 @@ export async function getMasterInfo() {
  * @returns {Promise<object>} 排行榜数据
  */
 export async function getTopListNew() {
-    const config = read_json('configs', 'config');
+    const config = global.appConfig;
     const path = '/xlive/app-room/v2/guardTab/topListNew';
     const params = {
         roomid: config.bilibili.roomId,
@@ -167,7 +166,7 @@ export async function getTopListNew() {
  * @returns {Promise<number>} 大航海总数（总督+提督+舰长）
  */
 export async function getGuardTotal() {
-    const config = read_json('configs', 'config');
+    const config = global.appConfig;
     const path = '/xlive/app-room/v2/guardTab/topListNew';
     const params = {
         roomid: config.bilibili.roomId,
@@ -194,7 +193,7 @@ export async function getGuardTotal() {
  * @returns {Promise<object>} {total, commanderCount, viceCommanderCount, captainCount}
  */
 export async function getGuardLevelStats() {
-    const config = read_json('configs', 'config');
+    const config = global.appConfig;
     const path = '/xlive/app-room/v2/guardTab/topListNew';
     const pageSize = 30;
 
@@ -277,7 +276,7 @@ export async function getGuardLevelStats() {
  * @returns {Promise<object>} 粉丝团成员数据
  */
 export async function getFansMembersRank() {
-    const config = read_json('configs', 'config');
+    const config = global.appConfig;
     const path = '/xlive/general-interface/v1/rank/getFansMembersRank';
     const params = {
         page: 1,

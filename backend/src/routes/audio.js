@@ -79,7 +79,7 @@ router.get('/audios/download/:token', async (req, res) => {
         // 验证token
         let userId;
         try {
-            const config = read_json('configs', 'config');
+            const config = global.appConfig;
             const jwtSecret = config.token;
             const decoded = jwt.verify(token, jwtSecret);
             userId = decoded.userId;
@@ -146,7 +146,7 @@ router.get('/audios/download/:token', async (req, res) => {
 
         try {
             if (global.redis) {
-                const appConfig = read_json("configs", "config")
+                const appConfig = global.appConfig;
                 const dailyLimit = appConfig.download.audio * 1024 * 1024;
 
                 // 使用原子操作预占下载额度

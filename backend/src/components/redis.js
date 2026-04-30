@@ -1,8 +1,7 @@
 import Redis from 'ioredis';
-import { read_json } from '../method/read.js'
 
 export default async () => {
-    const config = read_json("configs", "config");
+    const config = global.appConfig;
     const redisdata = config.redis;
 
     const redis = new Redis({

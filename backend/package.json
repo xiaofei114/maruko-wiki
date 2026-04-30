@@ -4,7 +4,15 @@
 	"main": "app.js",
 	"scripts": {
 		"dev": "nodemon app.js",
-		"start": "node app.js"
+		"start": "pm2 start ecosystem.config.cjs",
+		"start:log": "pm2 start ecosystem.config.cjs --attach",
+		"stop": "pm2 stop maruko-node",
+		"restart": "pm2 restart maruko-node",
+		"logs": "pm2 logs maruko-node",
+		"logs:f": "pm2 logs maruko-node --lines 100",
+		"monit": "pm2 monit",
+		"pm2:save": "pm2 save",
+		"pm2:startup": "pm2 startup"
 	},
 	"type": "module",
 	"dependencies": {
@@ -24,7 +32,8 @@
 		"openai": "^6.16.0",
 		"path-to-regexp": "^8.3.0",
 		"uuid": "^11.1.0",
-		"yaml": "^2.8.2"
+		"yaml": "^2.8.2",
+		"pm2": "^6.0.5"
 	},
 	"devDependencies": {
 		"@types/cors": "^2.8.17",

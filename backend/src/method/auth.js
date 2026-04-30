@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import { read_json } from './read.js';
 import { queryOne } from './database.js';
 
 /**
@@ -24,7 +23,7 @@ export async function authenticateToken(req, res, next) {
     }
 
     try {
-        const config = read_json('configs', 'config');
+        const config = global.appConfig;
         const jwtSecret = config.token;
 
         const decoded = jwt.verify(token, jwtSecret);
@@ -100,7 +99,7 @@ export async function optionalAuth(req, res, next) {
 
     if (token) {
         try {
-            const config = read_json('configs', 'config');
+            const config = global.appConfig;
             const jwtSecret = config.token;
 
             const decoded = jwt.verify(token, jwtSecret);

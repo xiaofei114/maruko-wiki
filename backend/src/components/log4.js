@@ -1,10 +1,9 @@
 // 导入日志库和颜色库
 import log4js from 'log4js'
 import { Chalk } from 'chalk'
-import { read_json } from '../method/read.js'
 
 export default async function () {
-    const config = read_json("configs", "config")
+    const config = global.appConfig
     const log = config.log
 
     // 配置日志系统

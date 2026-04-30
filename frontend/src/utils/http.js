@@ -28,11 +28,22 @@ http.interceptors.request.use(
 // 响应拦截器
 http.interceptors.response.use(
     response => {
-        // 直接返回数据部分，简化调用
-        // 注意：304 Not Modified 浏览器会自动从缓存返回数据，axios 会正常处理
-        return response.data
+        // 业务逻辑错误处理（code !== 200）
+        const data = response.data
+        if (data?.code !== 200 && response.config?.alertError !== false) {
+            const msg = data?.message || '操作失败'
+            ElMessage.warning({
+                message: `错误${data?.code}:${msg}`,
+                grouping: true,
+                duration: 3000
+            })
+        }
+        return data
     },
     error => {
+        let errorMessage = ''
+        let errorCode = 'NETWORK_ERROR'
+
         // 认证错误时清除本地存储的token和用户信息
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
             localStorage.removeItem(import.meta.env.VITE_APP_TOKEN)
@@ -44,39 +55,50 @@ http.interceptors.response.use(
             }))
         }
 
-        // 可以在这里统一处理错误
-        // 比如显示错误提示、处理认证失败等
         if (error.response) {
             // 服务器响应错误
             const { status, data } = error.response
+            errorCode = status
+            errorMessage = data?.message || `请求失败（状态码: ${status}）`
+
             switch (status) {
                 case 401:
-                    // 未授权，可以跳转到登录页
-                    ElMessage.error('未授权访问，请重新登录')
+                    errorMessage = data?.message ?? '登录已过期，请重新登录'
                     break
                 case 403:
-                    ElMessage.error('Token无效或权限不足，请重新登录')
+                    errorMessage = '没有操作权限，请联系管理员'
                     break
                 case 404:
-                    ElMessage.error('请求地址不存在')
+                    errorMessage = `请求资源不存在: ${error.config?.url || ''}`
                     break
                 case 500:
-                    ElMessage.error('服务器内部错误')
+                    errorMessage = '服务器内部错误，请联系技术支持'
                     break
-                default:
-                    // 对于其他错误，优先使用服务器返回的消息
-                    const errorMessage = data?.message || `请求失败: ${status}`
-                    ElMessage.error(errorMessage)
             }
         } else if (error.request) {
             // 网络错误
-            ElMessage.error('网络错误，请检查网络连接')
+            errorMessage = '网络错误，请检查网络连接'
         } else {
             // 其他错误
-            ElMessage.error('请求配置错误，请稍后重试')
+            errorMessage = '请求配置错误，请稍后重试'
         }
 
-        return Promise.reject(error)
+        // 显示错误提示（配置可选）
+        if (error.config?.alertError !== false) {
+            ElMessage.error({
+                message: errorMessage,
+                grouping: true,
+                duration: 5000
+            })
+        }
+
+        // 返回统一错误格式
+        return Promise.reject({
+            code: errorCode,
+            message: errorMessage,
+            data: error.response?.data,
+            original: error
+        })
     }
 )
 

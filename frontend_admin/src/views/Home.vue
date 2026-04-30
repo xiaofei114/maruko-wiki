@@ -29,17 +29,37 @@ const menuConfig = ref([
                 route: 'album'
             },
             {
-            title: '音声管理',
-            icon: 'Headset',
-            index: 'audio',
-            route: 'audio'
-        },
-        {
-            title: '舰礼管理',
-            icon: 'Present',
-            index: 'captain-gift',
-            route: 'captain-gift'
-        }
+                title: '音声管理',
+                icon: 'Headset',
+                index: 'audio',
+                route: 'audio'
+            },
+            {
+                title: '企划管理',
+                icon: 'Document',
+                index: 'plan-document',
+                route: 'plan-document'
+            }
+        ]
+    },
+    {
+        type: 'submenu',
+        title: '运营管理',
+        icon: 'Management',
+        index: 'operation',
+        children: [
+            {
+                title: '舰礼管理',
+                icon: 'Present',
+                index: 'captain-gift',
+                route: 'captain-gift'
+            },
+            {
+                title: '公告管理',
+                icon: 'Bell',
+                index: 'announcement',
+                route: 'announcement'
+            }
         ]
     },
     {
@@ -66,6 +86,13 @@ const menuConfig = ref([
                 icon: 'Coin',
                 index: 'redis-admin',
                 route: 'redis-admin',
+                permission: 1
+            },
+            {
+                title: '系统配置',
+                icon: 'Tools',
+                index: 'system-config',
+                route: 'system-config',
                 permission: 1
             },
             {

@@ -11,6 +11,12 @@ import DocxPreview from '@/components/ComponentStyle/DocxPreview.vue'
 const userStore = useUserStore()
 const { isAuthenticated } = storeToRefs(userStore)
 
+// 是否为管理员或超级管理员（有权限设置当前文档）
+const canSetCurrent = computed(() => {
+    const permission = userStore.user?.permission
+    return permission === 1 || permission === 2
+})
+
 const nickName = import.meta.env.VITE_APP_NICK_NAME;
 
 const planDocuments = ref([])
@@ -289,7 +295,7 @@ onMounted(() => {
                     下载
                   </el-button>
                   <el-button 
-                    v-if="!doc.isCurrent" 
+                    v-if="canSetCurrent && !doc.isCurrent" 
                     @click.stop="setAsCurrent(doc)" 
                     type="success" 
                     size="small" 
@@ -298,7 +304,7 @@ onMounted(() => {
                     设置为当前
                   </el-button>
                   <el-button 
-                    v-if="isAuthenticated" 
+                    v-if="canSetCurrent" 
                     @click.stop="deleteDocument(doc)" 
                     type="danger" 
                     size="small" 

@@ -1,9 +1,8 @@
 import nodemailer from 'nodemailer';
-import { read_json } from '../method/read.js';
 
 export default async () => {
     try {
-        const config = read_json('configs', 'config');
+        const config = global.appConfig;
 
         // 检查邮件配置是否存在
         const emailConfig = config.email;

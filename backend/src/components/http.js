@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from "cors";
-import { read_json } from "../method/read.js"
+
 import { getFile } from '../services/file.js';
 import audioRoutes from '../routes/audio.js';
 import albumRoutes from '../routes/album.js';
@@ -17,10 +17,11 @@ import dictionaryRoutes from '../routes/dictionary.js';
 import anchorStatsRoutes from '../routes/anchorStats.js';
 import captainGiftRoutes from '../routes/captainGift.js';
 import redisAdminRoutes from '../routes/redisAdmin.js';
+import configRoutes from '../routes/config.js';
 import chalk from 'chalk';
 
 export default async () => {
-    const appConfig = read_json("configs", "config")
+    const appConfig = global.appConfig
 
     const App = express();
 
@@ -62,6 +63,7 @@ export default async () => {
     App.use('/api', anchorStatsRoutes); // 主播统计数据路由
     App.use('/api', captainGiftRoutes); // 舰长礼物路由
     App.use('/api', redisAdminRoutes); // Redis 管理路由（超级管理员）
+    App.use('/api/admin/config', configRoutes); // 系统配置管理路由
 
     // 通过url获取/data/document下的文件 - 必须在用户路由之前
     App.get('/api/file/*', async (req, res) => {

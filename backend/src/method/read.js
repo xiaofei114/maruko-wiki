@@ -71,7 +71,7 @@ export function read_json(paths, name) {
  * @returns {number} 上传限制大小（字节）
  */
 export function getUploadLimit(type) {
-    const appConfig = read_json("configs", "config");
+    const appConfig = global.appConfig;
     const limitMB = appConfig.upload?.[type] || appConfig.upload?.default || 10;
     return limitMB * 1024 * 1024;
 }

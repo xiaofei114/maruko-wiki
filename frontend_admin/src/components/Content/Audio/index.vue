@@ -278,7 +278,7 @@ const toggleAudioPlay = (audio) => {
     const getFullUrl = (url) => {
         if (!url) return ''
         if (url.startsWith('http')) return url
-        const baseUrl = import.meta.env.VITE_API_BASE || 'http://localhost:6660'
+        const baseUrl = import.meta.env.VITE_APP_API_BASE || 'http://localhost:6660'
         return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`
     }
 

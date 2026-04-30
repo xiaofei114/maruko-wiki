@@ -1,5 +1,4 @@
 import { queryOne, queryAll, update } from '../method/database.js';
-import { read_json } from '../method/read.js';
 
 /**
  * 音频播放量服务
@@ -11,7 +10,7 @@ import { read_json } from '../method/read.js';
  * @returns {object} 频率限制配置
  */
 function getRateLimitConfig() {
-    const appConfig = read_json('configs', 'config');
+    const appConfig = global.appConfig;
     const defaultConfig = {
         windowSeconds: 60,
         authenticated: 10,

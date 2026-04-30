@@ -39,6 +39,7 @@ ai: # AI配置
     blockDuration: 3600 # 封禁时长（秒）
 download: # 下载配置
   audio: 200 # 音频下载限额（MB）
+  document: 50 # 文档下载限额（MB）
 audioPlayCount: # 音频播放量记录配置
   rateLimit: # 频率限制
     windowSeconds: 60 # 时间窗口（秒）
@@ -48,4 +49,5 @@ upload:
   audio: 5      # 音频文件上传限制（MB）
   photo: 10     # 照片上传限制（MB）
   avatar: 5     # 头像上传限制（MB）
+  document: 50 # 文档上传限制（MB）
   default: 10   # 默认上传限制（MB）

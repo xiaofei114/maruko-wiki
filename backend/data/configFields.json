@@ -1,6 +1,6 @@
 {
   "_comment": "配置字段映射表，用于前端表单渲染",
-  "_order": ["服务器", "安全", "日志", "Redis", "邮件", "Bilibili", "DeepSeek", "AI", "下载", "上传"],
+  "_order": ["服务器", "安全", "日志", "Redis", "邮件", "Bilibili", "DeepSeek", "AI", "下载", "音频播放量记录", "上传"],
   "fields": {
     "httpPort": {
       "type": "number",
@@ -186,6 +186,24 @@
       "label": "默认上传限制(MB)",
       "min": 1,
       "group": "上传"
+    },
+    "audioPlayCount.rateLimit.windowSeconds": {
+      "type": "number",
+      "label": "时间窗口(秒)",
+      "min": 1,
+      "group": "音频播放量记录"
+    },
+    "audioPlayCount.rateLimit.authenticated": {
+      "type": "number",
+      "label": "已登录用户每个音频在窗口期内最大记录次数",
+      "min": 1,
+      "group": "音频播放量记录"
+    },
+    "audioPlayCount.rateLimit.guest": {
+      "type": "number",
+      "label": "未登录用户每个音频在窗口期内最大记录次数",
+      "min": 1,
+      "group": "音频播放量记录"
     }
   }
 }

@@ -39,6 +39,12 @@ const menuConfig = ref([
                 icon: 'Document',
                 index: 'plan-document',
                 route: 'plan-document'
+            },
+            {
+                title: '视频管理',
+                icon: 'VideoCamera',
+                index: 'video-favorite',
+                route: 'video-favorite'
             }
         ]
     },

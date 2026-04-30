@@ -615,7 +615,6 @@ async function startHellScroll() {
 
     } catch (error) {
         // 用户取消了操作
-        console.log('用户取消了地狱绘卷模式')
     }
 }
 
@@ -761,21 +760,16 @@ function handleFileChange(file, fileList) {
 }
 
 function handleTagSelect(value) {
-    console.log('🎵 handleTagSelect 被调用:', { value, currentAudioTag: uploadForm.audioTag })
-
     if (!value) {
-        console.log('🎵 清空选择')
         uploadForm.newTagName = ''
         return
     }
 
     // 检查是否是新创建的标签
     const existingTag = tagOptions.value.find(tag => tag.value === value)
-    console.log('🎵 查找现有标签结果:', existingTag)
 
     if (!existingTag) {
         // 创建新标签（前端临时创建，实际会在上传时发送到后端）
-        console.log('🎵 创建新标签:', value)
         const newTagId = `new_${Date.now()}`
         uploadClassifications.value.push({
             id: newTagId,
@@ -787,7 +781,6 @@ function handleTagSelect(value) {
         ElMessage.success(`新标签 "${value}" 已创建`)
     } else {
         // 如果是选择现有标签，清空新标签名称
-        console.log('🎵 选择现有标签:', existingTag)
         uploadForm.newTagName = ''
     }
 }
@@ -922,7 +915,6 @@ async function handleUpload() {
             ElMessage.error(error.message || '上传过程中发生错误')
         }
     } catch (error) {
-        console.log(error);
         ElMessage.error('上传过程中发生错误')
     }
 }

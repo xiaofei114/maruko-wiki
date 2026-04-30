@@ -15,6 +15,7 @@ import {
   getUserPhotos,
   getUserAudios,
   getUserPlans,
+  getUserVideos,
   updatePhoto,
   updateAudio,
   updatePlan,
@@ -35,6 +36,7 @@ import {
   getUserAlbums,
   getUserAudioClassifications
 } from '@/api/userProfile'
+import { deleteVideo, moveVideoToFavorite, getMyFavorites } from '@/api/videoFavorite'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -71,7 +73,8 @@ const userInfo = ref({
 const uploads = ref({
   photos: [],
   audios: [],
-  plans: []
+  plans: [],
+  videos: []
 })
 
 // 消息数据
@@ -142,6 +145,15 @@ const passwordForm = ref({
   newPassword: '',
   confirmPassword: ''
 })
+
+// 视频移动对话框
+const videoMoveDialogVisible = ref(false)
+const videoMoveForm = ref({
+  videoId: null,
+  favoriteId: null
+})
+const videoMoveFormRef = ref(null)
+const myFavorites = ref([])
 const passwordFormRef = ref(null)
 const passwordRules = {
   newPassword: [
@@ -186,12 +198,14 @@ function switchAdminVersion(version) {
 const photoPagination = ref({ currentPage: 1, pageSize: 12 })
 const audioPagination = ref({ currentPage: 1, pageSize: 10 })
 const planPagination = ref({ currentPage: 1, pageSize: 10 })
+const videoPagination = ref({ currentPage: 1, pageSize: 10 })
 const messagePagination = ref({ currentPage: 1, pageSize: 10 })
 
 // 总数变量
 const photoTotal = ref(0)
 const audioTotal = ref(0)
 const planTotal = ref(0)
+const videoTotal = ref(0)
 const messageTotal = ref(0)
 
 // 未读消息数
@@ -257,11 +271,12 @@ async function fetchUserInfo() {
     error.value = null
 
     // 并行获取所有数据
-    const [profileRes, photosRes, audiosRes, plansRes, notificationsRes, bilibiliRes] = await Promise.all([
+    const [profileRes, photosRes, audiosRes, plansRes, videosRes, notificationsRes, bilibiliRes] = await Promise.all([
       getUserProfile(),
       getUserPhotos({ page: photoPagination.value.currentPage, pageSize: photoPagination.value.pageSize }),
       getUserAudios({ page: audioPagination.value.currentPage, pageSize: audioPagination.value.pageSize }),
       getUserPlans({ page: planPagination.value.currentPage, pageSize: planPagination.value.pageSize }),
+      getUserVideos({ page: videoPagination.value.currentPage, pageSize: videoPagination.value.pageSize }),
       getUserNotifications({ page: messagePagination.value.currentPage, pageSize: messagePagination.value.pageSize }),
       getBilibiliBindInfo()
     ])
@@ -316,6 +331,28 @@ async function fetchUserInfo() {
         status: p.status
       }))
       planTotal.value = plansRes.data.pagination?.total || 0
+    }
+
+    // 处理视频列表
+    console.log('videosRes', videosRes)
+    if (videosRes.code === 200 || videosRes.success) {
+      uploads.value.videos = videosRes.data.list.map(v => ({
+        id: v.id,
+        bvid: v.bvid,
+        title: v.title,
+        cover: buildFileUrl(v.cover),
+        uploaderName: v.uploaderName,
+        totalRecommend: v.totalRecommend || 0,
+        weeklyRecommend: v.weeklyRecommend || 0,
+        createTime: formatTime(v.createTime),
+        status: v.status,
+        favoriteId: v.favoriteId,
+        favoriteName: v.favoriteName
+      }))
+      videoTotal.value = videosRes.data.pagination?.total || 0
+      console.log('videos loaded', uploads.value.videos)
+    } else {
+      console.error('videosRes error', videosRes)
     }
 
     // 处理消息列表
@@ -745,23 +782,34 @@ async function deleteItem(type, item) {
       res = await deleteAudio(item.id)
       if (res.code === 200) {
         uploads.value.audios = uploads.value.audios.filter(a => a.id !== item.id)
-        audioTotal.value = uploads.value.audios.length
+        audioTotal.value--
       }
     } else if (type === 'photo') {
       res = await deletePhoto(item.id)
       if (res.code === 200) {
         uploads.value.photos = uploads.value.photos.filter(p => p.id !== item.id)
-        photoTotal.value = uploads.value.photos.length
+        photoTotal.value--
       }
     } else if (type === 'plan') {
       res = await deletePlan(item.id)
       if (res.code === 200) {
         uploads.value.plans = uploads.value.plans.filter(p => p.id !== item.id)
-        planTotal.value = uploads.value.plans.length
+        planTotal.value--
+      }
+    } else if (type === 'video') {
+      res = await deleteVideo(item.id)
+      if (res.success) {
+        uploads.value.videos = uploads.value.videos.filter(v => v.id !== item.id)
+        videoTotal.value--
+        // 如果当前页没有数据了，且不是第一页，则返回上一页
+        if (uploads.value.videos.length === 0 && videoPagination.value.currentPage > 1) {
+          videoPagination.value.currentPage--
+          await fetchUserVideos()
+        }
       }
     }
 
-    if (res.code === 200) {
+    if (res.success || res.code === 200) {
       ElMessage.success('删除成功')
     } else {
       ElMessage.error(res.message || '删除失败')
@@ -777,6 +825,7 @@ async function deleteItem(type, item) {
 const paginatedPhotos = computed(() => uploads.value.photos)
 const paginatedAudios = computed(() => uploads.value.audios)
 const paginatedPlans = computed(() => uploads.value.plans)
+const paginatedVideos = computed(() => uploads.value.videos)
 const paginatedMessages = computed(() => messages.value)
 
 // 分页切换处理函数
@@ -793,6 +842,11 @@ async function handleAudioPageChange(page) {
 async function handlePlanPageChange(page) {
   planPagination.value.currentPage = page
   await fetchUserPlans()
+}
+
+async function handleVideoPageChange(page) {
+  videoPagination.value.currentPage = page
+  await fetchUserVideos()
 }
 
 async function handleMessagePageChange(page) {
@@ -869,6 +923,34 @@ async function fetchUserPlans() {
   }
 }
 
+// 获取视频列表
+async function fetchUserVideos() {
+  try {
+    const res = await getUserVideos({
+      page: videoPagination.value.currentPage,
+      pageSize: videoPagination.value.pageSize
+    })
+    if (res.code === 200 || res.success) {
+      uploads.value.videos = res.data.list.map(v => ({
+        id: v.id,
+        bvid: v.bvid,
+        title: v.title,
+        cover: buildFileUrl(v.cover),
+        uploaderName: v.uploaderName,
+        totalRecommend: v.totalRecommend || 0,
+        weeklyRecommend: v.weeklyRecommend || 0,
+        createTime: formatTime(v.createTime),
+        status: v.status,
+        favoriteId: v.favoriteId,
+        favoriteName: v.favoriteName
+      }))
+      videoTotal.value = res.data.pagination?.total || 0
+    }
+  } catch (error) {
+    console.error('获取视频列表失败:', error)
+  }
+}
+
 // 获取消息列表
 async function fetchUserMessages() {
   try {
@@ -895,6 +977,62 @@ async function fetchUserMessages() {
 // 返回上一页
 function goBack() {
   router.back()
+}
+
+// 打开B站视频
+function openBilibiliVideo(bvid) {
+  if (bvid) {
+    window.open(`https://www.bilibili.com/video/${bvid}`, '_blank')
+  }
+}
+
+// 打开视频移动对话框
+async function openVideoMoveDialog(video) {
+  console.log('打开视频移动对话框', video)
+  try {
+    const res = await getMyFavorites()
+    console.log('获取收藏夹列表', res)
+    if (res.success) {
+      myFavorites.value = res.data || []
+      videoMoveForm.value = {
+        videoId: video.id,
+        favoriteId: video.favoriteId || null
+      }
+      videoMoveDialogVisible.value = true
+    } else {
+      ElMessage.error(res.message || '获取收藏夹列表失败')
+    }
+  } catch (error) {
+    console.error('获取收藏夹列表失败:', error)
+    ElMessage.error('获取收藏夹列表失败')
+  }
+}
+
+// 确认移动视频
+async function confirmMoveVideo() {
+  console.log('确认移动视频', videoMoveForm.value)
+  if (!videoMoveForm.value.favoriteId) {
+    ElMessage.warning('请选择目标收藏夹')
+    return
+  }
+  try {
+    loading.value = true
+    const res = await moveVideoToFavorite(videoMoveForm.value.videoId, videoMoveForm.value.favoriteId)
+    console.log('移动视频响应', res)
+    if (res.success) {
+      ElMessage.success('移动成功')
+      videoMoveDialogVisible.value = false
+      // 刷新视频列表
+      await fetchUserVideos()
+    } else {
+      ElMessage.error(res.message || '移动失败')
+    }
+  } catch (error) {
+    console.error('移动视频失败:', error)
+    ElMessage.error('移动失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {
@@ -926,6 +1064,9 @@ watch(activeMenu, async (newMenu) => {
     } catch (error) {
       console.error('获取消息列表失败:', error)
     }
+  } else if (newMenu === 'videos') {
+    // 进入视频页面时刷新视频列表
+    await fetchUserVideos()
   }
 })
 </script>
@@ -1002,6 +1143,15 @@ watch(activeMenu, async (newMenu) => {
           <span>我的企划</span>
           <span class="nav-count">{{ planTotal }}</span>
         </div>
+        <div
+          class="nav-item"
+          :class="{ active: activeMenu === 'videos' }"
+          @click="activeMenu = 'videos'"
+        >
+          <el-icon><VideoPlay /></el-icon>
+          <span>我的视频</span>
+          <span class="nav-count">{{ videoTotal }}</span>
+        </div>
       </nav>
     </aside>
 
@@ -1034,6 +1184,13 @@ watch(activeMenu, async (newMenu) => {
               <span class="stat-label">企划</span>
             </div>
           </div>
+          <div class="stat-card" @click="activeMenu = 'videos'">
+            <el-icon class="stat-icon video"><VideoPlay /></el-icon>
+            <div class="stat-info">
+              <span class="stat-number">{{ videoTotal }}</span>
+              <span class="stat-label">视频</span>
+            </div>
+          </div>
         </div>
 
         <!-- 快捷操作 -->
@@ -1057,6 +1214,12 @@ watch(activeMenu, async (newMenu) => {
                 <el-icon><Document /></el-icon>
               </div>
               <span class="action-text">上传企划</span>
+            </div>
+            <div class="action-item" @click="$router.push('/video-favorite')">
+              <div class="action-icon video-action">
+                <el-icon><VideoPlay /></el-icon>
+              </div>
+              <span class="action-text">上传视频</span>
             </div>
             <div class="action-item" @click="activeMenu = 'account'">
               <div class="action-icon setting-action">
@@ -1529,6 +1692,63 @@ watch(activeMenu, async (newMenu) => {
           />
         </div>
       </div>
+
+      <!-- 我的视频 -->
+      <div v-else-if="activeMenu === 'videos'" class="content-section">
+        <h2 class="section-title">我的视频 <span class="count">({{ videoTotal }})</span></h2>
+        <div class="data-list">
+          <div v-if="uploads.videos.length === 0" class="empty-state">
+            <el-empty description="暂无视频" :image-size="80" />
+          </div>
+          <div
+            v-for="video in paginatedVideos"
+            :key="video.id"
+            class="list-item video-item"
+          >
+            <el-image :src="video.cover" fit="cover" class="list-thumb video-thumb" @click="openBilibiliVideo(video.bvid)">
+              <template #error>
+                <div class="video-thumb-placeholder">
+                  <el-icon><VideoPlay /></el-icon>
+                </div>
+              </template>
+            </el-image>
+            <div class="list-content">
+              <div class="list-title">{{ video.title }}</div>
+              <div class="list-meta">
+                <span v-if="video.favoriteName">{{ video.favoriteName }}</span>
+                <span>{{ video.createTime }}</span>
+              </div>
+              <div class="video-stats">
+                <span class="stat-item">
+                  <el-icon><Star /></el-icon>
+                  {{ video.totalRecommend }} 推荐
+                </span>
+                <span class="stat-item weekly-stat" v-if="video.weeklyRecommend > 0">
+                  本周 {{ video.weeklyRecommend }}
+                </span>
+              </div>
+            </div>
+            <el-tag :type="getStatusType(video.status)" size="small">
+              {{ getStatusText(video.status) }}
+            </el-tag>
+            <div class="list-actions">
+              <el-button type="primary" link :icon="VideoPlay" @click="openBilibiliVideo(video.bvid)">播放</el-button>
+              <el-button type="primary" link :icon="Edit" @click="openVideoMoveDialog(video)">移动</el-button>
+              <el-button type="danger" link :icon="Delete" @click="deleteItem('video', video)">删除</el-button>
+            </div>
+          </div>
+        </div>
+        <div v-if="videoTotal > videoPagination.pageSize" class="pagination-wrapper">
+          <el-pagination
+            background
+            layout="prev, pager, next"
+            :total="videoTotal"
+            :page-size="videoPagination.pageSize"
+            :current-page="videoPagination.currentPage"
+            @current-change="handleVideoPageChange"
+          />
+        </div>
+      </div>
     </main>
 
     <!-- 头像上传对话框 -->
@@ -1696,6 +1916,26 @@ watch(activeMenu, async (newMenu) => {
       :url-list="[currentImageUrl]"
       @close="imageViewerVisible = false"
     />
+
+    <!-- 视频移动对话框 -->
+    <el-dialog v-model="videoMoveDialogVisible" title="移动到收藏夹" width="400px">
+      <el-form ref="videoMoveFormRef" :model="videoMoveForm" label-position="top">
+        <el-form-item label="选择收藏夹" prop="favoriteId" :rules="[{ required: true, message: '请选择收藏夹', trigger: 'change' }]">
+          <el-select v-model="videoMoveForm.favoriteId" placeholder="请选择目标收藏夹" style="width: 100%">
+            <el-option
+              v-for="item in myFavorites"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="videoMoveDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmMoveVideo" :loading="loading">确认移动</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1889,6 +2129,11 @@ watch(activeMenu, async (newMenu) => {
   color: #fa8c16;
 }
 
+.stat-icon.video {
+  background: #fff2f0;
+  color: #f5222d;
+}
+
 .stat-info {
   display: flex;
   flex-direction: column;
@@ -1963,6 +2208,11 @@ watch(activeMenu, async (newMenu) => {
 .action-icon.plan-action {
   background: #fff7e6;
   color: #fa8c16;
+}
+
+.action-icon.video-action {
+  background: #fff2f0;
+  color: #f5222d;
 }
 
 .action-icon.setting-action {
@@ -2638,6 +2888,43 @@ watch(activeMenu, async (newMenu) => {
   cursor: pointer;
 }
 
+.list-thumb.video-thumb {
+  width: 80px;
+  height: 60px;
+  border-radius: 6px;
+}
+
+.video-thumb-placeholder {
+  width: 80px;
+  height: 60px;
+  border-radius: 6px;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  font-size: 24px;
+}
+
+.video-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.video-stats .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.video-stats .weekly-stat {
+  color: #f5222d;
+  font-weight: 500;
+}
+
 .list-content {
   flex: 1;
   min-width: 0;
@@ -3041,6 +3328,63 @@ watch(activeMenu, async (newMenu) => {
     width: 100%;
     justify-content: flex-end;
     margin-top: 8px;
+  }
+
+  /* 视频列表移动端适配 */
+  .list-thumb.video-thumb,
+  .video-thumb-placeholder {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 10;
+  }
+
+  .video-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .video-item .list-content {
+    width: 100%;
+  }
+
+  .video-item .list-title {
+    font-size: 14px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .video-stats {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* 更小屏幕的适配 */
+@media (max-width: 480px) {
+  .home-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .video-item .list-actions {
+    width: auto;
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 375px) {
+  .home-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .action-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

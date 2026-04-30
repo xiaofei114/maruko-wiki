@@ -26,10 +26,13 @@ class HttpClient {
         this.instance.interceptors.response.use(
             response => {
                 // 成功响应处理
-                if (response.data?.code !== 200 && response.config?.alertError !== false) {
+                // 支持两种格式：{ code: 200, ... } 或 { success: true, ... }
+                const isSuccess = response.data?.code === 200 || response.data?.success === true
+                if (!isSuccess && response.config?.alertError !== false) {
                     const msg = response.data?.message || 'error'
+                    const code = response.data?.code || response.data?.success
                     ElMessage.warning({
-                        message: `错误${response.data?.code}:${msg}`,
+                        message: `错误${code}:${msg}`,
                         grouping: true,  // 合并相同内容提示
                         duration: 3000
                     })

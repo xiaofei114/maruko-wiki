@@ -42,6 +42,17 @@ export function getUserPlans(params = { page: 1, pageSize: 10 }) {
 }
 
 /**
+ * 获取用户上传的视频列表
+ * @param {Object} params - 分页参数
+ * @param {number} params.page - 页码
+ * @param {number} params.pageSize - 每页数量
+ * @returns {Promise}
+ */
+export function getUserVideos(params = { page: 1, pageSize: 10 }) {
+  return http.get('/api/user/videos', { params })
+}
+
+/**
  * 获取用户的相册列表（用于编辑照片时选择相册）
  * @returns {Promise}
  */

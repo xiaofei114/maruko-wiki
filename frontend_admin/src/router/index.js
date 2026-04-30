@@ -42,6 +42,12 @@ const sidebar = [
     meta: { needLogin: true, name: "企划文档管理", cnname: "企划文档管理", }
   },
   {
+    path: 'video-favorite',
+    name: 'video-favorite',
+    component: () => import('../components/Content/VideoFavorite/index.vue'),
+    meta: { needLogin: true, name: "视频收藏管理", cnname: "视频收藏管理", }
+  },
+  {
     path: 'announcement',
     name: 'announcement',
     component: () => import('../components/Operation/Announcement/index.vue'),

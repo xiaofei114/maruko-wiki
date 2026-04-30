@@ -52,6 +52,18 @@ const router = createRouter({
                     meta: { title: '企划', public: true }
                 },
                 {
+                    path: '/video-favorite',
+                    name: 'video-favorite',
+                    component: () => import('../components/VideoFavorite/index.vue'),
+                    meta: { title: '视频收藏夹', public: true }
+                },
+                {
+                    path: '/video-favorite/:id',
+                    name: 'video-favorite-detail',
+                    component: () => import('../components/VideoFavorite/detail.vue'),
+                    meta: { title: '收藏夹详情', public: true }
+                },
+                {
                     path: '/admin',
                     name: 'admin',
                     component: () => import('../components/Admin/index.vue'),

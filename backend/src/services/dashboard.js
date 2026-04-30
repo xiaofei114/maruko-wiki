@@ -18,7 +18,8 @@ export async function getDashboardStats() {
                 COUNT(*) as total,
                 SUM(CASE WHEN create_time >= ? THEN 1 ELSE 0 END) as today_new,
                 SUM(CASE WHEN create_time >= ? THEN 1 ELSE 0 END) as week_new,
-                SUM(CASE WHEN create_time >= ? THEN 1 ELSE 0 END) as month_new
+                SUM(CASE WHEN create_time >= ? THEN 1 ELSE 0 END) as month_new,
+                SUM(CASE WHEN is_bilibili_bound = 1 THEN 1 ELSE 0 END) as bilibili_bound
             FROM user WHERE is_deleted = 0
         `, [todayStart, weekStart, monthStart]);
 
@@ -26,6 +27,7 @@ export async function getDashboardStats() {
         const pendingAudio = queryOne(`SELECT COUNT(*) as count FROM audio WHERE is_deleted = 0 AND is_review = 0`);
         const pendingAlbum = queryOne(`SELECT COUNT(*) as count FROM photo_album WHERE is_deleted = 0 AND is_review = 0`);
         const pendingPhoto = queryOne(`SELECT COUNT(*) as count FROM photo WHERE is_deleted = 0 AND is_review = 0`);
+        const pendingPlanDoc = queryOne(`SELECT COUNT(*) as count FROM plan_document WHERE deleted = 0 AND is_review = 0`);
 
         // 音声/相册统计
         const audioClassification = queryOne(`SELECT COUNT(*) as count FROM audio_classification WHERE is_deleted = 0`);
@@ -51,31 +53,55 @@ export async function getDashboardStats() {
         // 格式化直播时长（小时）
         const totalHours = liveStats.total_duration ? Math.floor(liveStats.total_duration / 3600000) : 0;
 
+        // 主播统计数据（最新一天）
+        const latestAnchorStats = queryOne(`
+            SELECT fans_count, captain_count, commander_count, vice_commander_count, fans_member_count
+            FROM anchor_stats
+            ORDER BY record_date DESC
+            LIMIT 1
+        `);
+
+        // 检查当月舰礼是否设置
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1;
+        const currentMonthGifts = queryOne(`
+            SELECT COUNT(*) as count FROM captain_gifts 
+            WHERE year = ? AND month = ?
+        `, [currentYear, currentMonth]);
+        const isCaptainGiftSet = currentMonthGifts.count > 0;
+
         return createSuccessResponse('获取仪表盘数据成功', {
             users: {
                 total: userStats.total,
                 todayNew: userStats.today_new,
                 weekNew: userStats.week_new,
-                monthNew: userStats.month_new
+                monthNew: userStats.month_new,
+                bilibiliBound: userStats.bilibili_bound
             },
             pending: {
                 audio: pendingAudio.count,
                 album: pendingAlbum.count,
                 photo: pendingPhoto.count,
-                total: pendingAudio.count + pendingAlbum.count + pendingPhoto.count
+                planDoc: pendingPlanDoc.count,
+                captainGift: isCaptainGiftSet ? 0 : 1,
+                total: pendingAudio.count + pendingAlbum.count + pendingPhoto.count + pendingPlanDoc.count + (isCaptainGiftSet ? 0 : 1)
             },
             contents: {
                 audioClassification: audioClassification.count,
                 audio: audioCount.count,
                 album: albumCount.count,
-                photo: photoCount.count
+                photo: photoCount.count,
+                planDoc: planDocCount.count
             },
             announcements: announcementCount.count,
-            planDocuments: planDocCount.count,
             liveStream: {
                 totalStreams: liveStats.total_streams,
                 totalHours: totalHours,
-                isLive: liveStats.live_now > 0
+                isLive: liveStats.live_now > 0,
+                fansCount: latestAnchorStats ? latestAnchorStats.fans_count || 0 : 0,
+                captainCount: latestAnchorStats ? latestAnchorStats.captain_count || 0 : 0,
+                commanderCount: latestAnchorStats ? latestAnchorStats.commander_count || 0 : 0,
+                viceCommanderCount: latestAnchorStats ? latestAnchorStats.vice_commander_count || 0 : 0
             }
         });
 
@@ -83,7 +109,7 @@ export async function getDashboardStats() {
         logger.error('获取仪表盘数据失败:', error);
         return {
             success: false,
-            message: '获取仪��盘数据失败',
+            message: '获取仪表盘数据失败',
             code: 500
         };
     }

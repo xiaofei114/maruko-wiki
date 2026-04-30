@@ -257,6 +257,87 @@ export async function getUserPlans(userId, pagination = { page: 1, pageSize: 10 
 }
 
 /**
+ * 获取本周开始时间（周一0点）
+ * @returns {number} Unix时间戳（秒）
+ */
+function getWeekStartTimestamp() {
+  const now = new Date();
+  const day = now.getDay(); // 0是周日，1-6是周一到周六
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1); // 调整为周一
+  const monday = new Date(now.setDate(diff));
+  monday.setHours(0, 0, 0, 0);
+  return Math.floor(monday.getTime() / 1000);
+}
+
+/**
+ * 获取用户上传的视频列表
+ * @param {number} userId - 用户ID
+ * @param {Object} pagination - 分页参数
+ * @returns {Object} 视频列表
+ */
+export async function getUserVideos(userId, pagination = { page: 1, pageSize: 10 }) {
+  try {
+    const { page, pageSize } = pagination;
+    const offset = (page - 1) * pageSize;
+
+    const videos = queryAll(
+      `SELECT v.id, v.bvid, v.title, v.cover_local as coverLocal, v.uploader_name as uploaderName,
+              v.total_recommend as totalRecommend,
+              v.is_review as status, v.create_time as createTime,
+              v.favorite_id as favoriteId,
+              f.name as favoriteName
+       FROM video_favorite v
+       LEFT JOIN favorite f ON v.favorite_id = f.id
+       WHERE v.user_id = ? AND v.is_deleted = 0
+       ORDER BY v.create_time DESC
+       LIMIT ? OFFSET ?`,
+      [userId, pageSize, offset]
+    );
+
+    const totalResult = queryOne(
+      `SELECT COUNT(*) as total FROM video_favorite WHERE user_id = ? AND is_deleted = 0`,
+      [userId]
+    );
+
+    // 获取本周推荐数（从Redis）
+    const weekStart = getWeekStartTimestamp();
+    const recommendKey = `video_favorite:recommend_count:${weekStart}`;
+    
+    const videosWithRecommend = await Promise.all(videos.map(async (v) => {
+      const weeklyRecommend = await global.redis.hget(recommendKey, v.id.toString()) || 0;
+      return {
+        id: v.id,
+        bvid: v.bvid,
+        title: v.title,
+        cover: v.coverLocal ? `/api/file/${v.coverLocal}` : '',
+        uploaderName: v.uploaderName,
+        totalRecommend: v.totalRecommend || 0,
+        weeklyRecommend: parseInt(weeklyRecommend),
+        status: v.status,
+        createTime: v.createTime,
+        favoriteId: v.favoriteId,
+        favoriteName: v.favoriteName
+      };
+    }));
+
+    return {
+      success: true,
+      data: {
+        list: videosWithRecommend,
+        pagination: {
+          currentPage: page,
+          pageSize,
+          total: totalResult?.total || 0
+        }
+      }
+    };
+  } catch (error) {
+    logger.error('获取用户视频失败:', error);
+    return { success: false, message: '获取视频列表失败', code: 500 };
+  }
+}
+
+/**
  * 更新照片信息
  * @param {number} photoId - 照片ID
  * @param {number} userId - 用户ID

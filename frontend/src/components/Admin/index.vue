@@ -744,7 +744,6 @@ const handleEditAudio = async () => {
             if (updatedCategory) {
                 selectedAudio.value = updatedCategory
                 audioPagination.value.total = updatedCategory.audios.length
-                console.log('🎵 音频编辑完成，当前分类音频数量:', updatedCategory.audios.length)
             } else {
                 // 如果分类不存在了（比如被删除了），清空选择
                 selectedAudio.value = null
@@ -833,7 +832,6 @@ const handleEditPhoto = async () => {
             if (updatedAlbum) {
                 selectedAlbum.value = updatedAlbum
                 albumPagination.value.total = updatedAlbum.photos.length
-                console.log('📸 照片编辑完成，当前相册照片数量:', updatedAlbum.photos.length)
             } else {
                 // 如果相册不存在了（比如被删除了），清空选择
                 selectedAlbum.value = null
@@ -880,18 +878,13 @@ const handleDeleteAudio = async (audio, category) => {
         await deleteAudio(audio.id)
         ElMessage.success('音频已删除')
 
-        console.log('🎵 删除音频成功，准备刷新数据...')
-
         // 重新获取数据
         await fetchAudioCategories()
-
-        console.log('🎵 数据刷新完成，当前音频分类:', audioCategories.value)
 
         // 如果删除的是当前选中分类中的音频，清空选择状态
         if (selectedAudio.value && selectedAudio.value.id === category.id) {
             const remainingAudios = selectedAudio.value.audios.filter(a => a.id !== audio.id)
             selectedAudio.value.audios = remainingAudios
-            console.log('🎵 更新了选中分类的音频列表')
         }
     } catch (error) {
         if (error !== 'cancel') {
@@ -914,7 +907,6 @@ const editPhoto = (photo) => {
 
 // 选择逻辑
 const selectAudioCategory = async (category) => {
-    console.log('🎵 选择音频分类:', category.name, category.id)
     selectedAudio.value = category
     selectedAlbum.value = null
     selectedUser.value = null
@@ -929,15 +921,12 @@ const selectAudioCategory = async (category) => {
     if (updatedCategory) {
         selectedAudio.value = updatedCategory
         audioPagination.value.total = updatedCategory.audios.length
-        console.log('🎵 选中分类更新完成，音频数量:', updatedCategory.audios.length)
     } else {
-        console.warn('🎵 未找到更新的分类，可能已被删除')
         selectedAudio.value = null
     }
 }
 
 const selectAlbum = async (album) => {
-    console.log('📸 选择相册:', album.name, album.id)
     selectedAlbum.value = album
     selectedAudio.value = null
     selectedUser.value = null
@@ -952,9 +941,7 @@ const selectAlbum = async (album) => {
     if (updatedAlbum) {
         selectedAlbum.value = updatedAlbum
         albumPagination.value.total = updatedAlbum.photos.length
-        console.log('📸 选中相册更新完成，照片数量:', updatedAlbum.photos.length)
     } else {
-        console.warn('📸 未找到更新的相册，可能已被删除')
         selectedAlbum.value = null
     }
 }

@@ -12,12 +12,15 @@ import bilibiliRoutes from '../routes/bilibili.js';
 import aiRoutes from '../routes/ai.js';
 import announcementRoutes from '../routes/announcement.js';
 import planDocumentRoutes from '../routes/planDocument.js';
+import videoFavoriteRoutes from '../routes/videoFavorite.js';
+import favoriteRoutes from '../routes/favorite.js';
 import logsRoutes from '../routes/logs.js';
 import dictionaryRoutes from '../routes/dictionary.js';
 import anchorStatsRoutes from '../routes/anchorStats.js';
 import captainGiftRoutes from '../routes/captainGift.js';
 import redisAdminRoutes from '../routes/redisAdmin.js';
 import configRoutes from '../routes/config.js';
+import homeModulesRoutes from '../routes/homeModules.js';
 import chalk from 'chalk';
 
 export default async () => {
@@ -54,6 +57,10 @@ export default async () => {
     App.use('/api', albumRoutes);
     App.use('/api', announcementRoutes); // 公告相关路由
     App.use('/api', planDocumentRoutes); // 企划文档相关路由
+    App.use('/api', captainGiftRoutes); // 舰长礼物路由（必须在 videoFavoriteRoutes 之前，避免路由冲突）
+    App.use('/api', homeModulesRoutes); // 首页功能模块数据路由（必须在 favoriteRoutes 之前）
+    App.use('/api', videoFavoriteRoutes); // 视频收藏夹相关路由
+    App.use('/api', favoriteRoutes); // 收藏夹相关路由
     App.use('/api/admin', adminRoutes);
     App.use('/api/admin', logsRoutes); // 日志查询路由
     App.use('/api/admin', dictionaryRoutes); // 字典管理路由
@@ -61,7 +68,6 @@ export default async () => {
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由
     App.use('/api/ai', aiRoutes); // AI相关路由
     App.use('/api', anchorStatsRoutes); // 主播统计数据路由
-    App.use('/api', captainGiftRoutes); // 舰长礼物路由
     App.use('/api', redisAdminRoutes); // Redis 管理路由（超级管理员）
     App.use('/api/admin/config', configRoutes); // 系统配置管理路由
 

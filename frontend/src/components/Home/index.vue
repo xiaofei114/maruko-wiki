@@ -1,10 +1,12 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRoomInfo, getMasterInfo, getTopListNew, getLiveDuration } from '@/api/bilibiliApis.js'
-import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock, Switch } from '@element-plus/icons-vue'
+import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock, Switch, Picture, Headset, Document, VideoPlay, VideoPause, ArrowRight, Download } from '@element-plus/icons-vue'
 import { getAnchorStats, getCurrentMonthMaxCaptainCount } from '@/api/anchorStats.js'
 import { getCurrentMonthGifts } from '@/api/captainGift.js'
+import { getHomeModules } from '@/api/homeModules.js'
+import DocxPreview from '@/components/ComponentStyle/DocxPreview.vue'
 
 const router = useRouter()
 
@@ -402,6 +404,139 @@ const captainGifts = ref([]) // 当月舰礼列表
 const maxCaptainCount = ref(0) // 当月最高舰长数
 const showGiftsSection = computed(() => captainGifts.value.length > 0) // 是否有舰礼
 const showGiftsDetailDialog = ref(false) // 舰礼详情弹窗
+
+// 功能模块数据
+const latestPhoto = ref(null) // 最新照片
+const hotAudio = ref(null) // 本周最热音声
+const currentPlan = ref(null) // 当前企划
+const hotVideo = ref(null) // 本周最热视频
+
+// 音频播放相关
+const audioPlayer = ref(null)
+const isPlayingAudio = ref(false)
+const currentAudioUrl = ref('')
+
+// 企划详情弹窗
+const planDialogVisible = ref(false)
+const planDetail = ref(null)
+const planPreviewKey = ref(0)
+const planPreviewError = ref('')
+
+// 获取完整图片URL
+function getFullImageUrl(relativeUrl) {
+  if (!relativeUrl) return ''
+  if (relativeUrl.startsWith('http')) return relativeUrl
+  if (relativeUrl.startsWith('/api/')) {
+    const serverUrl = import.meta.env.VITE_APP_BASE_URL?.replace('/api', '')
+    return serverUrl + relativeUrl
+  }
+  const baseUrl = import.meta.env.VITE_APP_BASE_URL
+  return baseUrl + relativeUrl
+}
+
+// 获取企划文档预览URL（与PlanDocument组件保持一致）
+function getPlanPreviewUrl(filePath) {
+  console.log(filePath);
+  
+  if (!filePath) return ''
+  const baseUrl = import.meta.env.VITE_APP_BASE_URL
+  // 企划文档路径需要加上 api/file 前缀
+  console.log(`${baseUrl}/api/file/${filePath}`);
+  
+  return `${baseUrl}/api/file/${filePath}`
+}
+
+// 播放音声
+function playAudio(audio) {
+  if (!audio) return
+  
+  const audioUrl = getFullImageUrl(audio.cover)
+  
+  // 如果点击的是当前正在播放的音频，则暂停
+  if (currentAudioUrl.value === audioUrl && isPlayingAudio.value) {
+    audioPlayer.value?.pause()
+    isPlayingAudio.value = false
+    return
+  }
+  
+  // 播放新音频
+  currentAudioUrl.value = audioUrl
+  isPlayingAudio.value = true
+  
+  // 使用 nextTick 确保音频元素已更新
+  nextTick(() => {
+    if (audioPlayer.value) {
+      audioPlayer.value.play().catch(err => {
+        console.error('音频播放失败:', err)
+        isPlayingAudio.value = false
+      })
+    }
+  })
+}
+
+// 查看企划详情
+function viewPlanDetail(plan) {
+  if (!plan) return
+  planDetail.value = plan
+  planPreviewKey.value += 1
+  planPreviewError.value = ''
+  planDialogVisible.value = true
+  // 弹窗打开后强制重新渲染预览组件
+  nextTick(() => {
+    planPreviewKey.value += 1
+  })
+}
+
+// 企划文档预览错误
+function onPlanPreviewError(payload) {
+  const detail = payload?.message ? `（${payload.message}）` : ''
+  planPreviewError.value = `当前文档暂不支持在线预览，请下载后查看${detail}`
+  console.error('企划文档预览失败:', detail)
+}
+
+// 下载企划文档
+async function downloadPlanDocument(doc) {
+  if (!doc || !doc.filePath) return
+  
+  try {
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : (import.meta.env.VITE_APP_BASE_URL?.replace(/\/api\/?$/, '') || '')
+    const apiPrefix = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : '/api'
+    // 企划文档路径需要加上 file 前缀
+    const url = `${baseUrl}${apiPrefix}/file/${doc.filePath}`
+    
+    // 使用 fetch 获取文件 blob，这样才能正确设置文件名
+    const token = localStorage.getItem(import.meta.env.VITE_APP_TOKEN)
+    const headers = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
+    const response = await fetch(url, { headers })
+    if (!response.ok) {
+      throw new Error(`下载失败: ${response.status}`)
+    }
+    
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = doc.fileName || 'document.docx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // 释放 blob URL
+    window.URL.revokeObjectURL(blobUrl)
+  } catch (error) {
+    console.error('下载失败:', error)
+    // 如果 fetch 失败，回退到直接打开链接
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : (import.meta.env.VITE_APP_BASE_URL?.replace(/\/api\/?$/, '') || '')
+    const apiPrefix = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : '/api'
+    const url = `${baseUrl}${apiPrefix}/all/file/${doc.filePath}`
+    window.open(url, '_blank')
+  }
+}
 
 // 舰礼进度条计数方式：'max'(本月最高舰长数，默认) 或 'current'(当前舰长数)
 const giftProgressMode = ref('max')
@@ -977,6 +1112,11 @@ const goTo = (url, isRoute) => {
   else window.open(url, '_blank')
 }
 
+// 打开B站视频
+function openBilibiliVideo(bvid) {
+  window.open(`https://www.bilibili.com/video/${bvid}`, '_blank')
+}
+
 // 显示飘动动画
 const showFloatAnimation = (changeRef, diff) => {
   changeRef.value = {
@@ -1015,11 +1155,6 @@ const fetchRoomInfo = async (firstTime = false) => {
     captain.value = newCaptain
     prevAttention.value = newAttention
     prevCaptain.value = newCaptain
-
-    console.log({
-      roomInfo: roomInfo.value,
-      captain: captain.value,
-    });
 
   } else {
     error.value = res.message || res.msg || '获取直播间信息失败'
@@ -1098,6 +1233,53 @@ const changeStatsTimeRange = async (range) => {
   await fetchStatsData()
 }
 
+// 获取功能模块数据（聚合接口）
+const fetchHomeModules = async () => {
+  try {
+    const response = await getHomeModules()
+    if (response.code === 200 && response.data) {
+      const data = response.data
+      
+      // 最新相片
+      if (data.photo) {
+        latestPhoto.value = {
+          url: data.photo.url,
+          title: data.photo.title
+        }
+      }
+      
+      // 本周最热音声
+      if (data.audio) {
+        hotAudio.value = {
+          cover: data.audio.cover,
+          title: data.audio.title
+        }
+      }
+      
+      // 当前企划
+      if (data.plan) {
+        currentPlan.value = {
+          id: data.plan.id,
+          title: data.plan.title,
+          filePath: data.plan.filePath,
+          fileName: data.plan.fileName
+        }
+      }
+      
+      // 本周最热视频
+      if (data.video) {
+        hotVideo.value = {
+          cover: data.video.cover,
+          title: data.video.title,
+          bvid: data.video.bvid
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取首页模块数据失败:', error)
+  }
+}
+
 // 组件挂载后获取直播间信息
 onMounted(async () => {
   // 获取当前月份的直播记录
@@ -1117,6 +1299,9 @@ onMounted(async () => {
 
   // 获取舰礼信息（需要在 getUserInfo 之后，因为要用到 captain 值）
   await fetchCaptainGifts()
+
+  // 获取功能模块数据
+  await fetchHomeModules()
 
   generateCalendar()
 })
@@ -1689,6 +1874,40 @@ onUnmounted(() => {
           </el-scrollbar>
         </el-dialog>
 
+        <!-- 企划详情弹窗 -->
+        <el-dialog
+          v-model="planDialogVisible"
+          :title="planDetail?.title || '企划详情'"
+          width="900px"
+          :close-on-click-modal="true"
+          align-center
+          destroy-on-close
+          custom-class="plan-preview-dialog"
+        >
+          <div v-if="planDetail" class="plan-preview-content">
+             <div class="plan-preview-panel">
+               <el-empty v-if="planPreviewError" :description="planPreviewError" :image-size="60" />
+               <docx-preview
+                  v-else
+                  :key="planPreviewKey"
+                  :src="getPlanPreviewUrl(planDetail.filePath)"
+                  style="height: 60vh"
+                  @error="onPlanPreviewError"
+                />
+             </div>
+            <div class="plan-preview-footer">
+              <el-button @click="planDialogVisible = false">关闭</el-button>
+              <el-button type="primary" @click="downloadPlanDocument(planDetail)">
+                <el-icon><Download /></el-icon>
+                下载文档
+              </el-button>
+              <el-button type="success" @click="goTo('/plan-document', true); planDialogVisible = false">
+                查看全部企划
+              </el-button>
+            </div>
+          </div>
+        </el-dialog>
+
         <div class="module-card status-module">
           <div class="module-header">
             <h2>直播状态</h2>
@@ -1717,54 +1936,92 @@ onUnmounted(() => {
       <div class="maruko-section">
         <div class="maruko-content">
 
-          <div class="module-card photo-album-module" @click="goTo('/photo-album', true)" style="cursor: pointer;">
+          <!-- 丸子相簿 -->
+          <div class="module-card feature-module">
             <div class="module-header">
               <h2>{{ nickName }}相簿</h2>
+              <el-button type="text" size="small" style="color: var(--color-primary);" @click="goTo('/photo-album', true)">查看全部</el-button>
             </div>
-            <div class="module-body">
-              <div class="album-content">
-                <div class="album-placeholder">
-                  <p>记录精彩时刻，与你分享美好时光</p>
+            <div class="module-body feature-body">
+              <div v-if="latestPhoto" class="feature-preview photo-preview">
+                <img :src="getFullImageUrl(latestPhoto.url)" :alt="latestPhoto.title" />
+                <div class="preview-overlay">
+                  <span class="preview-label">最新相片</span>
+                  <span class="preview-title">{{ latestPhoto.title }}</span>
                 </div>
+              </div>
+              <div v-else class="feature-empty">
+                <el-icon><Picture /></el-icon>
+                <p>暂无照片</p>
               </div>
             </div>
           </div>
 
-          <div class="module-card message-module" @click="goTo('/audio', true)" style="cursor: pointer;">
+          <!-- 丸子音声 -->
+          <div class="module-card feature-module">
             <div class="module-header">
               <h2>{{ nickName }}音声</h2>
+              <el-button type="text" size="small" style="color: var(--color-primary);" @click="goTo('/audio', true)">查看全部</el-button>
             </div>
-            <div class="module-body">
-              <div class="message-content">
-                <div class="message-placeholder">
-                  <p>聆听奇妙回响，与你分享此刻欢愉</p>
+            <div class="module-body feature-body">
+              <div v-if="hotAudio" class="feature-content audio-content clickable" @click="playAudio(hotAudio)">
+                <div class="audio-icon-large" :class="{ 'is-playing': isPlayingAudio && currentAudioUrl === getFullImageUrl(hotAudio.cover) }">
+                  <el-icon v-if="isPlayingAudio && currentAudioUrl === getFullImageUrl(hotAudio.cover)"><VideoPause /></el-icon>
+                  <el-icon v-else><VideoPlay /></el-icon>
                 </div>
+                <div class="audio-info">
+                  <span class="audio-label">本周最热</span>
+                  <span class="audio-title">{{ hotAudio.title }}</span>
+                </div>
+                <audio ref="audioPlayer" :src="currentAudioUrl" @ended="isPlayingAudio = false" style="display: none;"></audio>
+              </div>
+              <div v-else class="feature-empty">
+                <el-icon><Headset /></el-icon>
+                <p>暂无音声</p>
               </div>
             </div>
           </div>
 
-          <div class="module-card message-module" @click="goTo('/plan-document', true)" style="cursor: pointer;">
+          <!-- 丸子企划 -->
+          <div class="module-card feature-module">
             <div class="module-header">
               <h2>{{ nickName }}企划</h2>
+              <el-button type="text" size="small" style="color: var(--color-primary);" @click="goTo('/plan-document', true)">查看全部</el-button>
             </div>
-            <div class="module-body">
-              <div class="message-content">
-                <div class="message-placeholder">
-                  <p>绘出明日蓝图，邀你共同执笔未来</p>
+            <div class="module-body feature-body">
+              <div v-if="currentPlan" class="feature-content plan-content clickable" @click="viewPlanDetail(currentPlan)">
+                <div class="plan-icon-large">
+                  <el-icon><Document /></el-icon>
                 </div>
+                <div class="plan-info">
+                  <span class="plan-label">当前企划</span>
+                  <span class="plan-title">{{ currentPlan.title }}</span>
+                </div>
+              </div>
+              <div v-else class="feature-empty">
+                <el-icon><Document /></el-icon>
+                <p>暂无企划</p>
               </div>
             </div>
           </div>
 
-          <div class="module-card photo-album-module" @click="goTo('/announcement', true)" style="cursor: pointer;">
+          <!-- 丸子视频 -->
+          <div class="module-card feature-module" @click="hotVideo?.bvid ? openBilibiliVideo(hotVideo.bvid) : goTo('/video-favorite', true)">
             <div class="module-header">
-              <h2>公告中心</h2>
+              <h2>{{ nickName }}视频</h2>
+              <el-button type="text" size="small" style="color: var(--color-primary);" @click.stop="goTo('/video-favorite', true)">查看全部</el-button>
             </div>
-            <div class="module-body">
-              <div class="album-content">
-                <div class="album-placeholder">
-                  <p>同步每份动态，与你共赴崭新旅程</p>
+            <div class="module-body feature-body">
+              <div v-if="hotVideo" class="feature-preview video-preview">
+                <img :src="getFullImageUrl(hotVideo.cover)" :alt="hotVideo.title" />
+                <div class="preview-overlay">
+                  <span class="preview-label">本周热门</span>
+                  <span class="preview-title">{{ hotVideo.title }}</span>
                 </div>
+              </div>
+              <div v-else class="feature-empty">
+                <el-icon><VideoPlay /></el-icon>
+                <p>暂无视频</p>
               </div>
             </div>
           </div>
@@ -2770,7 +3027,241 @@ onUnmounted(() => {
 .maruko-content {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 25px;
+  gap: 20px;
+}
+
+/* 功能模块卡片 - 与页面其他模块风格统一 */
+.feature-module {
+  cursor: pointer;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature-module:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.feature-body {
+  padding: 15px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 预览区域 */
+.feature-preview {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+
+.feature-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.feature-preview:hover img {
+  transform: scale(1.05);
+}
+
+.preview-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: white;
+  font-size: 13px;
+}
+
+.preview-overlay span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-title {
+  font-weight: 500;
+}
+
+.video-hot {
+  font-size: 11px;
+  color: #ffd700;
+  margin-top: 4px;
+}
+
+/* 空状态 */
+.feature-empty {
+  text-align: center;
+  color: #999;
+}
+
+.feature-empty .el-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+  color: #ddd;
+}
+
+.feature-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* 音声和企划内容展示 */
+.feature-content {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  position: relative;
+}
+
+.audio-content {
+  background: linear-gradient(135deg, #fef3f3 0%, #fde8e8 100%);
+}
+
+.plan-content {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.audio-icon-large,
+.plan-icon-large {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.audio-icon-large .el-icon {
+  font-size: 24px;
+  color: #e74c3c;
+}
+
+.plan-icon-large .el-icon {
+  font-size: 24px;
+  color: #0ea5e9;
+}
+
+.audio-info,
+.plan-info {
+  text-align: center;
+  padding: 0 10px;
+}
+
+.audio-label,
+.plan-label {
+  display: block;
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.audio-title,
+.plan-title {
+  display: block;
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* 播放中状态 */
+.audio-icon-large.is-playing {
+  background: #e74c3c;
+  animation: pulse 1.5s infinite;
+}
+
+.audio-icon-large.is-playing .el-icon {
+  color: white;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+  }
+}
+
+/* 企划预览弹窗 */
+.plan-preview-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.plan-preview-panel {
+  flex: 1;
+  background: #f5f5f5;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.plan-preview-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e4e7ed;
+}
+
+/* 信息展示 */
+.feature-info {
+  text-align: center;
+  padding: 10px;
+}
+
+.feature-icon-large {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 15px;
+}
+
+.feature-icon-large .el-icon {
+  font-size: 28px;
+  color: var(--color-primary);
+}
+
+.feature-icon-large.plan-icon .el-icon {
+  color: #0ea5e9;
+}
+
+.feature-desc {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
 }
 
 /* 移动端统计数字优化 */
@@ -2938,7 +3429,61 @@ onUnmounted(() => {
   }
 
   .maruko-content {
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
+  }
+
+  .feature-body {
+    min-height: 120px;
+    padding: 10px;
+  }
+
+  .feature-preview {
+    height: 100px;
+  }
+
+  .preview-overlay {
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .feature-empty .el-icon {
+    font-size: 36px;
+  }
+
+  .feature-icon-large {
+    width: 50px;
+    height: 50px;
+  }
+
+  .feature-icon-large .el-icon {
+    font-size: 22px;
+  }
+
+  .feature-desc {
+    font-size: 12px;
+  }
+
+  .feature-content {
+    height: 100px;
+  }
+
+  .audio-icon-large,
+  .plan-icon-large {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 8px;
+  }
+
+  .audio-icon-large .el-icon,
+  .plan-icon-large .el-icon {
+    font-size: 20px;
+  }
+
+  .audio-title,
+  .plan-title {
+    font-size: 12px;
+    max-width: 150px;
   }
 
   .module-header {
@@ -2998,6 +3543,28 @@ onUnmounted(() => {
 
   .anchor-id {
     font-size: 12px;
+  }
+
+  .maruko-content {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-body {
+    min-height: 100px;
+  }
+
+  .feature-preview {
+    height: 80px;
+  }
+
+  .feature-icon-large {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 10px;
+  }
+
+  .feature-icon-large .el-icon {
+    font-size: 18px;
   }
 
   .module-header h2 {
@@ -3904,5 +4471,304 @@ onUnmounted(() => {
   padding: 0 10px;
   height: 22px;
   line-height: 20px;
+}
+
+/* ========== 补充手机端适配 ========== */
+@media (max-width: 768px) {
+  /* 视频预览模块手机端适配 */
+  .video-preview {
+    height: 160px;
+  }
+
+  .video-preview .preview-overlay {
+    padding: 8px;
+  }
+
+  .video-preview .preview-label {
+    font-size: 10px;
+    padding: 2px 6px;
+    background: rgba(255, 215, 0, 0.9);
+    border-radius: 3px;
+    display: inline-block;
+    margin-bottom: 4px;
+  }
+
+  .video-preview .preview-title {
+    font-size: 12px;
+  }
+
+  /* 功能模块手机端优化 */
+  .feature-module {
+    -webkit-tap-highlight-color: var(--color-primary-alpha-10);
+  }
+
+  .feature-module:active {
+    transform: scale(0.98);
+  }
+
+  /* 统计图表弹窗手机端适配 */
+  .stats-detail-dialog {
+    width: 95vw !important;
+    max-height: 80vh !important;
+  }
+
+  .stats-detail-dialog .el-dialog__body {
+    padding: 12px;
+  }
+
+  .chart-wrapper {
+    height: 250px;
+    padding: 8px;
+  }
+
+  .stats-summary {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 8px 0;
+    border-bottom: 1px solid #e4e7ed;
+  }
+
+  .summary-item:last-child {
+    border-bottom: none;
+  }
+
+  .summary-label {
+    font-size: 13px;
+    margin-bottom: 0;
+  }
+
+  .summary-value {
+    font-size: 16px;
+  }
+
+  /* 舰礼详情弹窗手机端适配 */
+  .gifts-detail-dialog {
+    width: 95vw !important;
+    max-height: 85vh !important;
+  }
+
+  .gifts-detail-dialog .el-dialog__body {
+    padding: 12px;
+  }
+
+  .gifts-overview {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .overview-stat,
+  .overview-target {
+    min-width: auto;
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .overview-stat .overview-label,
+  .overview-target .overview-label {
+    margin-bottom: 0;
+  }
+
+  .overview-center {
+    width: 100%;
+    order: -1;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e4e7ed;
+  }
+
+  .gift-type-section {
+    padding: 12px;
+  }
+
+  .gift-type-header {
+    font-size: 14px;
+  }
+
+  .gift-card {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .gift-card-body .gift-name {
+    font-size: 14px;
+  }
+
+  .gift-card-body .gift-content {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 视频预览小屏适配 */
+  .video-preview {
+    height: 130px;
+  }
+
+  .video-preview .preview-title {
+    font-size: 11px;
+  }
+
+  /* 功能模块小屏优化 */
+  .feature-body {
+    min-height: 100px;
+    padding: 8px;
+  }
+
+  .feature-preview {
+    height: 90px;
+  }
+
+  .preview-overlay {
+    padding: 6px;
+    font-size: 11px;
+  }
+
+  .preview-label {
+    font-size: 9px;
+  }
+
+  .preview-title {
+    font-size: 11px;
+  }
+
+  /* 音频和企划模块小屏适配 */
+  .audio-icon-large,
+  .plan-icon-large {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 6px;
+  }
+
+  .audio-icon-large .el-icon,
+  .plan-icon-large .el-icon {
+    font-size: 18px;
+  }
+
+  .audio-title,
+  .plan-title {
+    font-size: 11px;
+    max-width: 120px;
+  }
+
+  .audio-label,
+  .plan-label {
+    font-size: 10px;
+  }
+
+  /* 图表小屏适配 */
+  .chart-wrapper {
+    height: 200px;
+  }
+
+  /* 舰礼进度条小屏适配 */
+  .gifts-section {
+    padding: 12px;
+    margin-top: 16px;
+  }
+
+  .gifts-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+
+  .gifts-header h4 {
+    font-size: 14px;
+  }
+
+  .single-progress-bar {
+    padding: 30px 12px 20px;
+  }
+
+  .stage-nodes {
+    height: 40px;
+    margin-bottom: -20px;
+  }
+
+  .node-badge {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  .node-label {
+    font-size: 9px;
+    max-width: 50px;
+  }
+
+  .marker-label {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .progress-legend {
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+
+  .legend-item {
+    font-size: 11px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .gift-card {
+    padding: 10px;
+  }
+
+  .gift-step-num {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+
+  .gift-status-icon {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 375px) {
+  .video-preview {
+    height: 110px;
+  }
+
+  .feature-preview {
+    height: 80px;
+  }
+
+  .chart-wrapper {
+    height: 180px;
+  }
+
+  .single-progress-bar {
+    padding: 25px 8px 18px;
+  }
+
+  .node-badge {
+    width: 22px;
+    height: 22px;
+    font-size: 9px;
+  }
+
+  .node-label {
+    font-size: 8px;
+    max-width: 40px;
+  }
 }
 </style>

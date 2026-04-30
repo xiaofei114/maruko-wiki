@@ -2,19 +2,13 @@
 import { ref, onMounted } from 'vue'
 import { getDashboardStats } from '@/api/dashboard.js'
 import { useUserStore } from '@/stores/user.js'
+import { useRouter } from 'vue-router'
 
 const userStore = useUserStore()
+const router = useRouter()
 
 const stats = ref(null)
 const loading = ref(true)
-
-// 统计数据
-const statsData = [
-    { key: 'users', label: '用户总数', icon: 'user', color: '#409EFF' },
-    { key: 'contents', label: '内容总数', icon: 'document', color: '#67C23A' },
-    { key: 'announcements', label: '公告数量', icon: 'bell', color: '#E6A23C' },
-    { key: 'planDocuments', label: '企划文档', icon: 'folder', color: '#909399' }
-]
 
 // 待处理数据
 const pendingData = ref([])
@@ -36,15 +30,24 @@ const getIcon = (iconName) => {
         user: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M406 598q80-76 176-118t208-42q107 0 208 42t176 118q-14 16-39 52t-71 102t-84 137t-67 152q-18 18-41 18t-41-18q-26-52-67-152t-84-137t-71-102t-39-52zm310 210q0 106-75 181t-181 75t-181-75t-75-181q0-26 5 56q-86-8-165.5-43T112.5 650T64 531.5T43 372q23 7 53 0t63-16.5T224 328t62-9.5T351 337t63 26q29 20 60.5 27T531 372q0 106-75 181t-181 75t-181-75t-75-181q0-26 5 56q-86-8-165.5-43T112.5 650T64 531.5T43 372q36 0 62 9.5T170 408.5t55 27.5t62 26q29 20 60.5 27T404 491q0 53-13.5 102.5T365 675.5t-79.5 87T214 823q38 0 71-16.5t54-45.5q23-29 41-66.5t28-81.5q35 15 72.5 22t76.5 7q39 0 72-7t72-22q8 43 20.5 81.5t34.5 66.5q23 29 54 45.5t71 16.5q37 0 71.5-16.5t54.5-45.5q23-29 41-66.5t28-81.5q35 15 72.5 22t76.5 7q106 0 181-75t75-181z"/></svg>`,
         document: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M896 384H640V128H192v768h704V384zM832 320v64H704v-64h128zm0 128v64H704v-64h128zm0 128v64H704v-64h128zM192 320h384v64H192v-64zm0 128h384v64H192v-64z"/></svg>`,
         bell: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M640 768q0-33-23.5-56.5T560 688t-56.5 23.5T480 768t23.5 56.5T560 848t56.5-23.5T640 768zm-72-80v80H128V688q0-99 68.5-170t167.5-71h1q29 0 56 7t48 22 38.5 33 27 45 14.5 53.5zm288 256q0 11-7 18t-18 7H144q-11 0-18-7t-7-18t7-18t18-7h720q11 0 18 7t7 18z"/></svg>`,
-        folder: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M928 160H576l-64-64H96C43 96 0 139 0 192v640q0 53 43 96h896q53 0 96-43t43-96V224q0-53-43-96zm-16 672H72V231h111l63 63h615v534z"/></svg>`,
         audio: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 160c-194 0-352 158-352 352s158 352 352 352s352-158 352-352S706 160 512 160zm0 640c-159 0-288-129-288-288s129-288 288-288s288 129 288 288s-129 288-288 288zm-48-448V160h16v192h-16zm64 0V160h16v192h-16zm64 0V160h16v192h-16z"/></svg>`,
         album: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M928 160H96c-53 0-96 43-96 96v512c0 53 43 96 96 96h832c53 0 96-43 96-96V256c0-53-43-96-96-96zm-16 592H112V272h800v480zM752 384H208V192h544v192z"/></svg>`,
         photo: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M928 160H96c-53 0-96 43-96 96v512c0 53 43 96 96 96h832c53 0 96-43 96-96V256c0-53-43-96-96-96zm-16 592H112V272h800v480zm-96-320c0-53-43-96-96-96s-96 43-96 96s43 96 96 96s96-43 96-96z"/></svg>`,
         video: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M896 192H128v576h768V192zm-16 544H144V224h736v512zM320 480v96l288-144L320 288v96h288v96H320z"/></svg>`,
         warning: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M448 128v320l192 96V32L448 128zm64 448h-64V192h64v384zm32-384h-128v448h-64V96q65-14 128-14t128 14v96h-64V192z"/></svg>`,
-        clock: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 128c-185 0-336 151-336 336s151 336 336 336s336-151 336-336S697 128 512 128zm0 608c-150 0-272-122-272-272s122-272 272-272s272 122 272 272s-122 272-272 272zm64-384v160l128 80l-32 48L448 512l-32-48 128-80V352h160z"/></svg>`
+        clock: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 128c-185 0-336 151-336 336s151 336 336 336s336-151 336-336S697 128 512 128zm0 608c-150 0-272-122-272-272s122-272 272-272s272 122 272 272s-122 272-272 272zm64-384v160l128 80l-32 48L448 512l-32-48 128-80V352h160z"/></svg>`,
+        bilibili: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M800 128H224C144 128 80 192 80 272v480c0 80 64 144 144 144h576c80 0 144-64 144-144V272c0-80-64-144-144-144zM384 544c-35 0-64-29-64-64s29-64 64-64 64 29 64 64-29 64-64 64zm256 0c-35 0-64-29-64-64s29-64 64-64 64 29 64 64-29 64-64 64z"/></svg>`,
+        gift: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M832 352H640V224c0-53-43-96-96-96s-96 43-96 96v128H192c-53 0-96 43-96 96v64c0 53 43 96 96 96h32v224c0 53 43 96 96 96h384c53 0 96-43 96-96v-224h32c53 0 96-43 96-96v-64c0-53-43-96-96-96zM448 224c0-53 43-96 96-96s96 43 96 96v128H448V224z"/></svg>`,
+        fans: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 128c-212 0-384 172-384 384s172 384 384 384 384-172 384-384S724 128 512 128zm0 640c-141 0-256-115-256-256s115-256 256-256 256 115 256 256-115 256-256 256zm-128-256c0-71 57-128 128-128s128 57 128 128-57 128-128 128-128-57-128-128z"/></svg>`,
+        crown: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 64L352 256 192 128v256l160 128 160-192 160 192 160-128V128L672 256 512 64zM192 576v256h640v-256H192z"/></svg>`,
+        plan: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M832 128H192c-53 0-96 43-96 96v576c0 53 43 96 96 96h640c53 0 96-43 96-96V224c0-53-43-96-96-96zM512 768H256v-64h256v64zm0-192H256v-64h256v64zm0-192H256v-64h256v64zm256 384H576v-64h192v64zm0-192H576v-64h192v64zm0-192H576v-64h192v64z"/></svg>`
     }
     return icons[iconName] || icons.document
+}
+
+// 跳转到待处理页面
+const goToPending = (path) => {
+    router.push(path)
 }
 
 const fetchStats = () => {
@@ -53,17 +56,20 @@ const fetchStats = () => {
         if (res.code === 200) {
             stats.value = res.data
             // 构建待处理数据列表
-            pendingData.value = [
+            const pendingItems = [
                 { label: '待审核音声', count: res.data.pending.audio, icon: 'audio', path: '/audio' },
                 { label: '待审核相册', count: res.data.pending.album, icon: 'album', path: '/album' },
-                { label: '待审核照片', count: res.data.pending.photo, icon: 'photo', path: '/album' }
-            ].filter(item => item.count > 0)
-        } else {
-            console.error('获取数据失败:', res.message)
+                { label: '待审核照片', count: res.data.pending.photo, icon: 'photo', path: '/album' },
+                { label: '待审核企划', count: res.data.pending.planDoc, icon: 'plan', path: '/plan-document' }
+            ]
+            // 如果当月舰礼未设置，添加到待处理
+            if (res.data.pending.captainGift > 0) {
+                pendingItems.push({ label: '当月舰礼未设置', count: 1, icon: 'gift', path: '/captain-gift' })
+            }
+            pendingData.value = pendingItems.filter(item => item.count > 0)
         }
         loading.value = false
-    }).catch((err) => {
-        console.error('请求失败:', err)
+    }).catch(() => {
         loading.value = false
     })
 }
@@ -104,6 +110,7 @@ onMounted(() => {
                             <span>今日 +{{ stats.users.todayNew }}</span>
                             <span>本周 +{{ stats.users.weekNew }}</span>
                             <span>本月 +{{ stats.users.monthNew }}</span>
+                            <span>B站绑定 {{ stats.users.bilibiliBound }}</span>
                         </div>
                     </div>
                 </div>
@@ -113,11 +120,12 @@ onMounted(() => {
                     <div class="stat-icon" v-html="getIcon('document')"></div>
                     <div class="stat-content">
                         <div class="stat-label">内容总数</div>
-                        <div class="stat-value">{{ formatNumber(stats.contents.audio + stats.contents.album + stats.contents.photo) }}</div>
+                        <div class="stat-value">{{ formatNumber(stats.contents.audio + stats.contents.album + stats.contents.photo + stats.contents.planDoc) }}</div>
                         <div class="stat-detail">
                             <span>音声 {{ formatNumber(stats.contents.audio) }}</span>
                             <span>相册 {{ formatNumber(stats.contents.album) }}</span>
                             <span>照片 {{ formatNumber(stats.contents.photo) }}</span>
+                            <span>企划 {{ formatNumber(stats.contents.planDoc) }}</span>
                         </div>
                     </div>
                 </div>
@@ -130,18 +138,6 @@ onMounted(() => {
                         <div class="stat-value">{{ formatNumber(stats.announcements) }}</div>
                         <div class="stat-detail">
                             <span>系统公告</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 企划文档 -->
-                <div class="stat-card stat-card-info">
-                    <div class="stat-icon" v-html="getIcon('folder')"></div>
-                    <div class="stat-content">
-                        <div class="stat-label">企划文档</div>
-                        <div class="stat-value">{{ formatNumber(stats.planDocuments) }}</div>
-                        <div class="stat-detail">
-                            <span>项目文档</span>
                         </div>
                     </div>
                 </div>
@@ -160,7 +156,7 @@ onMounted(() => {
                     </div>
                     <div class="panel-content">
                         <div v-if="pendingData.length > 0" class="pending-list">
-                            <div v-for="item in pendingData" :key="item.label" class="pending-item">
+                            <div v-for="item in pendingData" :key="item.label" class="pending-item" @click="goToPending(item.path)">
                                 <div class="pending-icon" v-html="getIcon(item.icon)"></div>
                                 <span class="pending-label">{{ item.label }}</span>
                                 <span class="pending-count">{{ item.count }}</span>
@@ -197,6 +193,24 @@ onMounted(() => {
                                 <div class="live-stat-label">总时长(h)</div>
                             </div>
                         </div>
+                        <div class="anchor-stats">
+                            <div class="anchor-stat-item">
+                                <span class="anchor-stat-label">粉丝数</span>
+                                <span class="anchor-stat-value">{{ formatNumber(stats.liveStream.fansCount) }}</span>
+                            </div>
+                            <div class="anchor-stat-item">
+                                <span class="anchor-stat-label">舰长</span>
+                                <span class="anchor-stat-value">{{ formatNumber(stats.liveStream.captainCount) }}</span>
+                            </div>
+                            <div class="anchor-stat-item">
+                                <span class="anchor-stat-label">提督</span>
+                                <span class="anchor-stat-value">{{ formatNumber(stats.liveStream.viceCommanderCount) }}</span>
+                            </div>
+                            <div class="anchor-stat-item">
+                                <span class="anchor-stat-label">总督</span>
+                                <span class="anchor-stat-value">{{ formatNumber(stats.liveStream.commanderCount) }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -205,7 +219,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-
 /* 欢迎区域 */
 .welcome-section {
     position: relative;
@@ -331,11 +344,6 @@ onMounted(() => {
 
 .stat-card-warning .stat-icon {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: #fff;
-}
-
-.stat-card-info .stat-icon {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     color: #fff;
 }
 
@@ -494,6 +502,7 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     gap: 40px;
+    margin-bottom: 24px;
 }
 
 .live-stat {
@@ -544,6 +553,31 @@ onMounted(() => {
     50% { opacity: 0.5; transform: scale(1.2); }
 }
 
+/* 主播统计 */
+.anchor-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.anchor-stat-item {
+    text-align: center;
+}
+
+.anchor-stat-label {
+    font-size: 12px;
+    color: #909399;
+    margin-bottom: 4px;
+}
+
+.anchor-stat-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: #303133;
+}
+
 /* 响应式 */
 @media screen and (max-width: 768px) {
     .dashboard {
@@ -572,6 +606,10 @@ onMounted(() => {
 
     .bottom-grid {
         grid-template-columns: 1fr;
+    }
+
+    .anchor-stats {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 </style>

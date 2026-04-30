@@ -28,12 +28,12 @@ http.interceptors.request.use(
 // 响应拦截器
 http.interceptors.response.use(
     response => {
-        // 业务逻辑错误处理（code !== 200）
+        // 业务逻辑错误处理（success === false）
         const data = response.data
-        if (data?.code !== 200 && response.config?.alertError !== false) {
+        if (data?.success === false && response.config?.alertError !== false) {
             const msg = data?.message || '操作失败'
             ElMessage.warning({
-                message: `错误${data?.code}:${msg}`,
+                message: `错误${data?.code ? ':' + data.code : ''}${msg}`,
                 grouping: true,
                 duration: 3000
             })

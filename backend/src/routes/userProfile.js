@@ -7,6 +7,7 @@ import {
   getUserPhotos,
   getUserAudios,
   getUserPlans,
+  getUserVideos,
   updatePhoto,
   updateAudio,
   updatePlan,
@@ -65,6 +66,16 @@ router.get('/plans', createRouteHandler(async (req) => {
   const page = parseInt(req.query.page) || 1;
   const pageSize = parseInt(req.query.pageSize) || 10;
   return await getUserPlans(req.user.id, { page, pageSize });
+}));
+
+/**
+ * 获取用户上传的视频列表
+ * GET /api/user/videos?page=1&pageSize=10
+ */
+router.get('/videos', createRouteHandler(async (req) => {
+  const page = parseInt(req.query.page) || 1;
+  const pageSize = parseInt(req.query.pageSize) || 10;
+  return await getUserVideos(req.user.id, { page, pageSize });
 }));
 
 /**

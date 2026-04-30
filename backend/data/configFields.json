@@ -157,6 +157,12 @@
       "min": 1,
       "group": "下载"
     },
+    "download.document": {
+      "type": "number",
+      "label": "文档下载限制(MB)",
+      "min": 1,
+      "group": "下载"
+    },
     "upload.audio": {
       "type": "number",
       "label": "音频上传限制(MB)",

@@ -7,6 +7,7 @@ import { ElMessageBox, ElBadge } from 'element-plus'
 import { Close, User, HomeFilled, Star, SwitchButton, Bell } from '@element-plus/icons-vue'
 import img from '@/assets/猫玩伴.png'
 import { getUnreadNotificationCount } from '@/api/userProfile'
+import axios from 'axios'
 
 
 // 响应式数据
@@ -15,8 +16,27 @@ const showMobileMenu = ref(false)
 const isSidebarClosing = ref(false)
 const sidebarTimer = ref(null)
 const unreadCount = ref(0)
+const friendlyLinks = ref([])
 
 const title = import.meta.env.VITE_APP_TITLE
+
+// 获取友情链接
+const fetchFriendlyLinks = async () => {
+  try {
+    const res = await axios.get('https://friendlink.xiaofei.icu/api/links', {
+      params: { limit: 100, exclude: title }
+    })
+    if (res.data.success && res.data.data.list) {
+      friendlyLinks.value = res.data.data.list.map(link => ({
+        name: link.name,
+        url: link.url
+      }))
+    }
+  } catch (error) {
+    console.error('获取友情链接失败:', error)
+    friendlyLinks.value = []
+  }
+}
 
 // 获取未读消息数
 const fetchUnreadCount = async () => {
@@ -62,6 +82,7 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   window.addEventListener('refresh-unread-count', handleRefreshUnreadCount)
   startUnreadCountTimer()
+  fetchFriendlyLinks()
 })
 
 onUnmounted(() => {
@@ -72,17 +93,17 @@ onUnmounted(() => {
 })
 
 // 友情链接数据
-const friendlyLinks = [
-  { name: '梨按钮', url: 'https://www.shanerubian.online/' },
-  { name: '虎按钮', url: 'https://zhaoshihu.shanerubian.online/' },
-  { name: '羽毛球按钮', url: 'https://xinggongyun.shanerubian.online/' },
-  { name: '虾按钮', url: 'https://xia.shanerubian.online/' },
-  { name: '龟按钮', url: 'https://kami.shanerubian.online/' },
-  { name: '浣熊按钮', url: 'https://huanxiong.shanerubian.online/' },
-  { name: '埋按钮', url: 'https://maibutton.yangdujun.top/' },
-  { name: '黛棠OI-WIKI', url: 'https://daitangoi.asia/' },
-  { name: '煲按钮', url: 'https://wangbaobao.moe/' },
-]
+// const friendlyLinks = [
+//   { name: '梨按钮', url: 'https://www.shanerubian.online/' },
+//   { name: '虎按钮', url: 'https://zhaoshihu.shanerubian.online/' },
+//   { name: '羽毛球按钮', url: 'https://xinggongyun.shanerubian.online/' },
+//   { name: '虾按钮', url: 'https://xia.shanerubian.online/' },
+//   { name: '龟按钮', url: 'https://kami.shanerubian.online/' },
+//   { name: '浣熊按钮', url: 'https://huanxiong.shanerubian.online/' },
+//   { name: '埋按钮', url: 'https://maibutton.yangdujun.top/' },
+//   { name: '黛棠OI-WIKI', url: 'https://daitangoi.asia/' },
+//   { name: '煲按钮', url: 'https://wangbaobao.moe/' },
+// ]
 
 // 计算属性
 const router = useRouter()

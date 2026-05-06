@@ -2,7 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getVideoList, reviewVideo, revokeVideoReview, deleteVideo, getFavorites, moveVideoToFavorite, updateFavorite, deleteFavorite } from '@/api/videoFavorite.js'
-import { Search, Refresh, Edit, Delete, View, CircleCheck, CircleClose, Folder } from '@element-plus/icons-vue'
+import { Search, Refresh, Edit, Delete, View, CircleCheck, CircleClose, Folder, VideoPlay } from '@element-plus/icons-vue'
+
+// 当前视图模式：'favorite' 按收藏夹管理，'all' 全部视频列表
+const viewMode = ref('all')
 
 // 数据列表
 const videoList = ref([])
@@ -128,6 +131,88 @@ const paginatedVideos = computed(() => {
     const end = start + videoPagination.value.pageSize
     return filteredVideos.value.slice(start, end)
 })
+
+// ==================== 全部列表视图 ====================
+
+// 全部视频列表（平铺所有收藏夹下的视频）
+const allVideosList = computed(() => {
+    return videoList.value.map(video => {
+        const favorite = favoritesList.value.find(f => f.id === video.favoriteId)
+        return {
+            ...video,
+            favoriteName: favorite?.name || '未分类'
+        }
+    })
+})
+
+// 全部列表筛选条件
+const allVideoFilters = ref({
+    title: '',
+    status: ''
+})
+
+// 全部列表搜索参数
+const allVideoSearchParams = ref({
+    title: '',
+    status: ''
+})
+
+// 全部列表分页
+const allVideoPagination = ref({
+    page: 1,
+    pageSize: 10,
+    total: 0
+})
+
+// 筛选后的全部视频列表
+const filteredAllVideos = computed(() => {
+    let result = allVideosList.value
+
+    // 标题筛选
+    if (allVideoSearchParams.value.title) {
+        result = result.filter(video =>
+            video.title.toLowerCase().includes(allVideoSearchParams.value.title.toLowerCase())
+        )
+    }
+
+    // 状态筛选
+    if (allVideoSearchParams.value.status !== '') {
+        result = result.filter(video => video.isReview === parseInt(allVideoSearchParams.value.status))
+    }
+
+    // 更新总数
+    allVideoPagination.value.total = result.length
+
+    return result
+})
+
+// 分页后的全部视频列表
+const paginatedAllVideos = computed(() => {
+    const start = (allVideoPagination.value.page - 1) * allVideoPagination.value.pageSize
+    const end = start + allVideoPagination.value.pageSize
+    return filteredAllVideos.value.slice(start, end)
+})
+
+// 全部列表搜索
+const handleAllVideoSearch = () => {
+    allVideoSearchParams.value.title = allVideoFilters.value.title
+    allVideoSearchParams.value.status = allVideoFilters.value.status
+    allVideoPagination.value.page = 1
+}
+
+// 重置全部列表筛选
+const resetAllVideoFilters = () => {
+    allVideoFilters.value.title = ''
+    allVideoFilters.value.status = ''
+    allVideoSearchParams.value.title = ''
+    allVideoSearchParams.value.status = ''
+    allVideoPagination.value.page = 1
+}
+
+// 全部列表分页处理
+const handleAllVideoPageChange = (page) => {
+    allVideoPagination.value.page = page
+}
 
 // 获取收藏夹列表
 const fetchFavorites = async () => {
@@ -484,7 +569,22 @@ onMounted(() => {
 
 <template>
     <div class="video-favorite-management">
-        <div class="content-wrapper">
+        <!-- 视图切换 Tabs -->
+        <div class="view-tabs">
+            <el-radio-group v-model="viewMode" size="large">
+                <el-radio-button label="all">
+                    <el-icon><VideoPlay /></el-icon>
+                    全部视频
+                </el-radio-button>
+                <el-radio-button label="favorite">
+                    <el-icon><Folder /></el-icon>
+                    按收藏夹管理
+                </el-radio-button>
+            </el-radio-group>
+        </div>
+
+        <!-- 按收藏夹管理视图 -->
+        <div v-if="viewMode === 'favorite'" class="content-wrapper">
             <!-- 左侧收藏夹列表 -->
             <div class="left-section">
                 <div class="section-header">
@@ -656,6 +756,123 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- 全部视频列表视图 -->
+        <div v-else class="all-videos-view">
+            <div class="section-header">
+                <el-icon><VideoPlay /></el-icon>
+                <h3>全部视频列表</h3>
+            </div>
+
+            <div class="operate">
+                <div class="search-area">
+                    <el-input
+                        v-model="allVideoFilters.title"
+                        placeholder="请输入视频标题"
+                        clearable
+                        :trigger-on-focus="false"
+                        style="width: 200px; margin-right: 10px"
+                    />
+                    <el-select v-model="allVideoFilters.status" placeholder="审核状态" clearable style="width: 120px; margin-right: 10px">
+                        <el-option label="待审核" :value="0" />
+                        <el-option label="已通过" :value="1" />
+                        <el-option label="不通过" :value="2" />
+                    </el-select>
+                    <el-button type="primary" @click="handleAllVideoSearch">
+                        <el-icon><Search /></el-icon>
+                        搜索
+                    </el-button>
+                    <el-button @click="resetAllVideoFilters">
+                        <el-icon><Refresh /></el-icon>
+                        重置
+                    </el-button>
+                </div>
+            </div>
+
+            <el-table
+                :data="paginatedAllVideos"
+                style="width: 100%"
+                v-loading="loading"
+                :header-cell-style="{ 'text-align': 'center', 'color': '#000' }"
+            >
+                <el-table-column align="center" type="index" :index="(allVideoPagination.page - 1) * allVideoPagination.pageSize + 1" label="序号" width="60" />
+                <el-table-column align="center" label="封面" width="130">
+                    <template #default="scope">
+                        <el-image
+                            :src="getFullUrl(scope.row.cover)"
+                            fit="cover"
+                            style="width: 100px; height: 60px; border-radius: 4px; cursor: pointer;"
+                            @click="openVideoPreview(scope.row)"
+                        />
+                    </template>
+                </el-table-column>
+                <el-table-column align="center" prop="title" label="视频标题" min-width="180" show-overflow-tooltip />
+                <el-table-column align="center" prop="bvid" label="BV号" width="130" />
+                <el-table-column align="center" prop="uploaderName" label="UP主" width="100" />
+                <el-table-column align="center" prop="favoriteName" label="所属收藏夹" width="120" />
+                <el-table-column align="center" prop="userName" label="上传者" width="100" />
+                <el-table-column align="center" label="审核状态" width="100">
+                    <template #default="scope">
+                        <el-tag :type="getReviewStatusType(scope.row.isReview)">
+                            {{ getReviewStatusLabel(scope.row.isReview) }}
+                        </el-tag>
+                    </template>
+                </el-table-column>
+                <el-table-column align="center" label="操作" width="260">
+                    <template #default="scope">
+                        <el-button
+                            v-if="scope.row.isReview === 0"
+                            type="primary"
+                            text
+                            @click="openReviewDialog(scope.row, 'review')"
+                            class="preview-btn"
+                        >
+                            <el-icon><CircleCheck /></el-icon>
+                            审核
+                        </el-button>
+                        <el-button
+                            v-if="scope.row.isReview === 1 || scope.row.isReview === 2"
+                            type="warning"
+                            text
+                            @click="openReviewDialog(scope.row, 'revoke')"
+                            class="preview-btn"
+                        >
+                            <el-icon><CircleClose /></el-icon>
+                            撤销
+                        </el-button>
+                        <el-button type="primary" text @click="openVideoPreview(scope.row)" class="preview-btn">
+                            <el-icon><View /></el-icon>
+                            预览
+                        </el-button>
+                        <el-button type="primary" text @click="handleEditVideo(scope.row)" class="preview-btn">
+                            <el-icon><Edit /></el-icon>
+                            编辑
+                        </el-button>
+                        <el-button type="danger" text @click="handleDeleteVideo(scope.row)" class="preview-btn">
+                            <el-icon><Delete /></el-icon>
+                            删除
+                        </el-button>
+                    </template>
+                </el-table-column>
+                <template #empty>
+                    暂无数据
+                </template>
+            </el-table>
+
+            <div class="paging">
+                <span>共 {{ allVideoPagination.total }} 条</span>
+                <el-pagination
+                    background
+                    prev-text="上一页"
+                    next-text="下一页"
+                    layout="prev, pager, next"
+                    :total="allVideoPagination.total"
+                    :pager-count="5"
+                    :current-page="allVideoPagination.page"
+                    @current-change="handleAllVideoPageChange"
+                />
+            </div>
+        </div>
+
         <!-- 视频预览对话框 -->
         <el-dialog v-model="videoPreviewVisible" title="视频预览" width="800px" append-to-body>
             <div v-if="previewVideo" class="video-preview-content">
@@ -770,32 +987,55 @@ onMounted(() => {
     height: calc(100vh - 170px);
 }
 
+.view-tabs {
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.view-tabs .el-radio-group {
+    display: flex;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.view-tabs .el-radio-button__inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
+}
+
 .content-wrapper {
     display: flex;
-    gap: 20px;
-    height: 100%;
+    gap: 16px;
+    height: calc(100% - 60px);
 }
 
 .left-section {
-    width: 40%;
+    width: 38%;
     background: #fff;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
+    border: 1px solid #f0f0f0;
 }
 
 .right-section {
     flex: 1;
     background: #fff;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     min-width: 0;
+    border: 1px solid #f0f0f0;
 }
 
 .right-section.empty-section {
@@ -803,17 +1043,28 @@ onMounted(() => {
     justify-content: center;
 }
 
+.all-videos-view {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 60px);
+    border: 1px solid #f0f0f0;
+}
+
 .section-header {
     display: flex;
     align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #ebeef5;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
 }
 
 .section-header h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: #303133;
 }
@@ -825,20 +1076,24 @@ onMounted(() => {
 }
 
 .operate {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 6px;
 }
 
 .search-area {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 8px;
 }
 
 .el-table {
     flex: 1;
     overflow: auto;
     width: 100%;
+    border-radius: 6px;
 }
 
 :deep(.el-table__body-wrapper) {
@@ -846,22 +1101,24 @@ onMounted(() => {
 }
 
 .paging {
-    margin-top: 15px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
 }
 
 .paging>span {
-    font-size: 14px;
-    margin-right: 18px;
-    color: #484848;
+    font-size: 13px;
+    margin-right: 16px;
+    color: #606266;
 }
 
 .dialog-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 12px;
 }
 
 .preview-btn {

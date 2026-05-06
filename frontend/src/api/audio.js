@@ -41,6 +41,14 @@ export function matchAudiosByAI(description) {
 }
 
 /**
+ * 获取AI配置状态
+ * @returns {Promise<Object>} AI配置状态
+ */
+export function getAIConfigStatus() {
+    return http.get('/api/ai/config-status')
+}
+
+/**
  * 下载音声（直接触发浏览器下载）
  * @param {number} classificationId - 分类ID，为null时下载全部
  */

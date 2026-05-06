@@ -1,5 +1,6 @@
 import express from 'express';
 import { createValidatedRouteHandler } from '../method/route-helpers.js';
+import { addLog } from '../services/logs.js';
 import { 
     getRedisKeys, 
     getRedisValue, 
@@ -7,6 +8,34 @@ import {
     deleteRedisKeys,
     getRedisInfo 
 } from '../services/redisAdmin.js';
+
+/**
+ * 记录Redis管理操作日志
+ * @param {object} req - 请求对象
+ * @param {string} action - 操作名称
+ * @param {object} details - 操作详情
+ */
+const logRedisOperation = (req, action, details) => {
+    try {
+        const user = req.user || {};
+        addLog({
+            logType: req.method,
+            logName: `Redis管理-${action}`,
+            logContent: req.originalUrl || req.url,
+            requestParams: JSON.stringify({
+                body: req.body,
+                params: req.params,
+                query: req.query,
+                details: details
+            }),
+            userName: user.username || user.name || '未知用户',
+            userIp: req.ip || req.connection?.remoteAddress || '',
+            logReturn: null
+        });
+    } catch (error) {
+        logger.error('记录Redis管理操作日志失败:', error);
+    }
+};
 
 const router = express.Router();
 
@@ -44,7 +73,18 @@ router.post('/admin/redis/value', ...createValidatedRouteHandler({
     ttl: { source: 'body', type: 'number', required: false }
 }, async (req) => {
     const { key, value, ttl } = req.body;
-    return await setRedisValue(key, value, ttl);
+    const result = await setRedisValue(key, value, ttl);
+    
+    // 记录高危操作日志
+    if (result.success) {
+        logRedisOperation(req, '设置键值', {
+            key,
+            hasTtl: !!ttl,
+            ttl: ttl || null
+        });
+    }
+    
+    return result;
 }));
 
 /**
@@ -55,7 +95,17 @@ router.delete('/admin/redis/keys', ...createValidatedRouteHandler({
     keys: { source: 'body', type: 'array', required: true }
 }, async (req) => {
     const { keys } = req.body;
-    return await deleteRedisKeys(keys);
+    const result = await deleteRedisKeys(keys);
+    
+    // 记录高危操作日志
+    if (result.success) {
+        logRedisOperation(req, '删除键', {
+            deletedKeys: keys,
+            deletedCount: keys.length
+        });
+    }
+    
+    return result;
 }));
 
 /**

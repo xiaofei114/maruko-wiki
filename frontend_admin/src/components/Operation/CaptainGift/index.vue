@@ -44,7 +44,10 @@ const giftForm = ref({
     isLimited: false,
     giftType: 1,
     includes: 0,
-    showProgress: 1
+    showProgress: 1,
+    hasDateLimit: false,  // 是否有日期限制
+    startDate: '',
+    endDate: ''
 })
 
 const giftFormRules = {
@@ -110,7 +113,10 @@ const openAddDialog = () => {
         isLimited: false,
         giftType: 1,
         includes: 0,
-        showProgress: 1
+        showProgress: 1,
+        hasDateLimit: false,
+        startDate: '',
+        endDate: ''
     }
     giftDialogVisible.value = true
 }
@@ -126,7 +132,10 @@ const openEditDialog = (gift) => {
         isLimited: gift.requiredFansCount > 0,
         giftType: gift.giftType || 1,
         includes: gift.includes || 0,
-        showProgress: gift.showProgress !== undefined && gift.showProgress !== null ? Number(gift.showProgress) : 1
+        showProgress: gift.showProgress !== undefined && gift.showProgress !== null ? Number(gift.showProgress) : 1,
+        hasDateLimit: !!(gift.startDate || gift.endDate),
+        startDate: gift.startDate || '',
+        endDate: gift.endDate || ''
     }
     giftDialogVisible.value = true
 }
@@ -148,7 +157,9 @@ const saveGift = async () => {
                     requiredFansCount: requiredFansCount,
                     giftType: giftForm.value.giftType,
                     includes: giftForm.value.includes,
-                    showProgress: giftForm.value.showProgress
+                    showProgress: giftForm.value.showProgress,
+                    startDate: giftForm.value.hasDateLimit ? giftForm.value.startDate : null,
+                    endDate: giftForm.value.hasDateLimit ? giftForm.value.endDate : null
                 }
                 
                 let res
@@ -295,6 +306,16 @@ onMounted(() => {
                         </el-tag>
                     </template>
                 </el-table-column>
+                <el-table-column label="有效期" width="120" align="center">
+                    <template #default="{ row }">
+                        <el-tag v-if="row.startDate || row.endDate" type="warning" size="small">
+                            限时
+                        </el-tag>
+                        <el-tag v-else type="success" size="small">
+                            整月
+                        </el-tag>
+                    </template>
+                </el-table-column>
                 <el-table-column label="操作" width="120" align="center" fixed="right">
                     <template #default="{ row }">
                         <el-button size="small" @click="openEditDialog(row)" type="primary">
@@ -402,6 +423,34 @@ onMounted(() => {
                         <el-radio :value="0">隐藏</el-radio>
                     </el-radio-group>
                     <el-text type="info" size="small" style="margin-left: 8px;">是否在进度条中显示</el-text>
+                </el-form-item>
+                <el-form-item label="日期限制">
+                    <el-radio-group v-model="giftForm.hasDateLimit">
+                        <el-radio :value="false">整月有效</el-radio>
+                        <el-radio :value="true">限时领取</el-radio>
+                    </el-radio-group>
+                </el-form-item>
+                <el-form-item label="有效日期" v-if="giftForm.hasDateLimit">
+                    <div class="date-range-picker">
+                        <el-date-picker
+                            v-model="giftForm.startDate"
+                            type="date"
+                            placeholder="开始日期"
+                            value-format="YYYY-MM-DD"
+                            style="width: 140px;"
+                        />
+                        <span class="date-separator">至</span>
+                        <el-date-picker
+                            v-model="giftForm.endDate"
+                            type="date"
+                            placeholder="结束日期（留空为月底）"
+                            value-format="YYYY-MM-DD"
+                            style="width: 180px;"
+                        />
+                    </div>
+                    <el-text type="info" size="small" style="margin-top: 4px; display: block;">
+                        不填结束日期则持续到当月最后一天
+                    </el-text>
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -580,6 +629,18 @@ onMounted(() => {
     .header-icon {
         font-size: 28px;
     }
+}
+
+/* 日期选择器样式 */
+.date-range-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.date-separator {
+    color: #909399;
+    font-size: 14px;
 }
 
 /* 对话框响应式 */

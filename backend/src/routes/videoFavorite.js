@@ -51,7 +51,7 @@ router.get('/video-favorite/favorites', async (req, res) => {
  * @desc 获取单个收藏夹详情
  * @access Public
  */
-router.get('/video-favorite/favorites/:id', async (req, res) => {
+router.get('/video-favorite/favorites/:id(\\d+)', async (req, res) => {
     try {
         const favoriteId = parseInt(req.params.id);
 
@@ -119,7 +119,7 @@ router.post('/video-favorite/favorites', authenticateToken, async (req, res) => 
  * @desc 更新收藏夹
  * @access Private
  */
-router.put('/video-favorite/favorites/:id', authenticateToken, async (req, res) => {
+router.put('/video-favorite/favorites/:id(\\d+)', authenticateToken, async (req, res) => {
     try {
         const favoriteId = parseInt(req.params.id);
         const { name, description, isPublic } = req.body;
@@ -150,7 +150,7 @@ router.put('/video-favorite/favorites/:id', authenticateToken, async (req, res) 
  * @desc 删除收藏夹
  * @access Private
  */
-router.delete('/video-favorite/favorites/:id', authenticateToken, async (req, res) => {
+router.delete('/video-favorite/favorites/:id(\\d+)', authenticateToken, async (req, res) => {
     try {
         const favoriteId = parseInt(req.params.id);
         const isAdmin = req.user.permission === 1 || req.user.permission === 2;
@@ -361,7 +361,7 @@ router.post('/video-favorite/:id/move', authenticateToken, async (req, res) => {
  * @desc 获取视频详情
  * @access Public
  */
-router.get('/video-favorite/:id', async (req, res) => {
+router.get('/video-favorite/:id(\\d+)', async (req, res) => {
     try {
         const videoId = parseInt(req.params.id);
 
@@ -390,7 +390,7 @@ router.get('/video-favorite/:id', async (req, res) => {
  * @desc 删除视频（软删除）
  * @access Private
  */
-router.delete('/video-favorite/:id', authenticateToken, async (req, res) => {
+router.delete('/video-favorite/:id(\\d+)', authenticateToken, async (req, res) => {
     try {
         const videoId = parseInt(req.params.id);
         const isAdmin = req.user.permission === 1 || req.user.permission === 2;

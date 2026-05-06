@@ -1,10 +1,10 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { get_userlist, api_setBanStatus, api_resetPassword, api_updatePermission, user_deleteUser } from "@/api/user.js"
+import { get_userlist, api_setBanStatus, api_resetPassword, api_updatePermission, user_deleteUser, api_resetUserName, api_resetUserAvatar } from "@/api/user.js"
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getSysDict } from '@/utils/sys.js'
 import { useUserStore } from '@/stores/user.js'
-import { Sort, Edit, Delete, Key } from '@element-plus/icons-vue'
+import { Sort, Edit, Delete, Key, Search, Refresh, User, Picture, InfoFilled } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const { sys_user_permission } = await getSysDict('sys_user_permission')
@@ -36,8 +36,28 @@ const queryParameters = ref({
     sortBy: 'permission',
     sortOrder: 'asc',
     showSensitive: true, // 是否显示敏感字段
+    keyword: '', // 搜索关键词
 })
 const ruleFormRef = ref(null)
+
+// 搜索相关
+const searchKeyword = ref('')
+
+// 重置用户名对话框
+const resetNameDialog = ref(false)
+const resetNameForm = ref({
+    id: null,
+    name: ''
+})
+
+// 重置头像对话框
+const resetAvatarDialog = ref(false)
+const resetAvatarForm = ref({
+    id: null,
+    file: null
+})
+const avatarPreview = ref('')
+
 //封禁单个用户
 const banChange = (val, data) => {
     const state = val ? 1 : 0
@@ -121,10 +141,101 @@ const sure_modifyPermissions = () => {
         modifyUserDialog.value = false
     })
 }
+
+// 搜索用户
+const handleSearch = () => {
+    queryParameters.value.keyword = searchKeyword.value
+    queryParameters.value.page = 1
+    getlist()
+}
+
+// 重置搜索
+const resetSearch = () => {
+    searchKeyword.value = ''
+    queryParameters.value.keyword = ''
+    queryParameters.value.page = 1
+    getlist()
+}
+
+// 打开重置用户名对话框
+const openResetNameDialog = (data) => {
+    resetNameForm.value = {
+        id: data.id,
+        name: ''
+    }
+    resetNameDialog.value = true
+}
+
+// 确认重置用户名（重置为默认名）
+const confirmResetName = () => {
+    ElMessageBox.confirm('确定要重置该用户的用户名为默认名称吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+    }).then(() => {
+        // 传入空字符串，后端会从配置读取默认名
+        api_resetUserName(resetNameForm.value.id, '').then(res => {
+            if (res.code == 200) {
+                ElMessage.success("重置用户名成功")
+                getlist()
+                resetNameDialog.value = false
+            }
+        })
+    })
+}
+
+// 打开重置头像对话框
+const openResetAvatarDialog = (data) => {
+    resetAvatarForm.value = {
+        id: data.id
+    }
+    resetAvatarDialog.value = true
+}
+
+// 确认重置头像（清空avatar字段）
+const confirmResetAvatar = () => {
+    ElMessageBox.confirm('确定要重置该用户的头像为默认头像吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+    }).then(() => {
+        // 传入null，后端会清空avatar字段
+        api_resetUserAvatar(resetAvatarForm.value.id, null).then(res => {
+            if (res.code == 200) {
+                ElMessage.success("重置头像成功")
+                getlist()
+                resetAvatarDialog.value = false
+            }
+        })
+    })
+}
 </script>
 
 <template>
-    <div>
+    <div class="user-management">
+        <!-- 搜索区域 -->
+        <div class="search-section">
+            <el-input
+                v-model="searchKeyword"
+                placeholder="搜索用户名或邮箱"
+                clearable
+                style="width: 220px; margin-right: 10px"
+                @keyup.enter="handleSearch"
+            >
+                <template #prefix>
+                    <el-icon><Search /></el-icon>
+                </template>
+            </el-input>
+            <el-button type="primary" @click="handleSearch">
+                <el-icon><Search /></el-icon>
+                搜索
+            </el-button>
+            <el-button @click="resetSearch">
+                <el-icon><Refresh /></el-icon>
+                重置
+            </el-button>
+        </div>
+
         <div class="operate">
             <div>
                 <el-select v-model="queryParameters.sortBy" size="small" style="width: 140px; margin-right: 10px"
@@ -166,7 +277,7 @@ const sure_modifyPermissions = () => {
                         v-model="data.row.is_banned" />
                 </template>
             </el-table-column>
-            <el-table-column align="center" label="操作" width="300">
+            <el-table-column align="center" label="操作" width="430">
                 <template #default=data>
                     <el-button type="primary" text class="button" @click="modifyPermissions(data.row)"
                         :disabled="data.row.permission === 1">
@@ -174,6 +285,16 @@ const sure_modifyPermissions = () => {
                             <Edit />
                         </el-icon>
                         修改权限
+                    </el-button>
+                    <el-button type="warning" text class="button" @click="openResetNameDialog(data.row)"
+                        :disabled="data.row.permission === 1">
+                        <el-icon><User /></el-icon>
+                        重置名称
+                    </el-button>
+                    <el-button type="success" text class="button" @click="openResetAvatarDialog(data.row)"
+                        :disabled="data.row.permission === 1">
+                        <el-icon><Picture /></el-icon>
+                        重置头像
                     </el-button>
                     <el-button type="warning" text class="button" @click="resetPassword(data.row)">
                         <el-icon>
@@ -186,7 +307,7 @@ const sure_modifyPermissions = () => {
                         <el-icon>
                             <Delete />
                         </el-icon>
-                        删除用户
+                        删除
                     </el-button>
                 </template>
             </el-table-column>
@@ -214,10 +335,53 @@ const sure_modifyPermissions = () => {
                 </div>
             </template>
         </el-dialog>
+
+        <!-- 重置用户名对话框 -->
+        <el-dialog v-model="resetNameDialog" title="重置用户名" width="400px" append-to-body>
+            <div class="reset-confirm">
+                <el-icon size="48" color="#E6A23C"><Warning /></el-icon>
+                <p>确定要将该用户的用户名重置为默认名称吗？</p>
+                <p class="reset-tip">重置后将使用系统配置的默认用户名（如重名会自动添加随机后缀）</p>
+            </div>
+            <template #footer>
+                <div class="dialog-footer">
+                    <el-button @click="resetNameDialog = false">取消</el-button>
+                    <el-button type="primary" @click="confirmResetName">确定重置</el-button>
+                </div>
+            </template>
+        </el-dialog>
+
+        <!-- 重置头像对话框 -->
+        <el-dialog v-model="resetAvatarDialog" title="重置用户头像" width="400px" append-to-body>
+            <div class="reset-confirm">
+                <el-icon size="48" color="#E6A23C"><Warning /></el-icon>
+                <p>确定要将该用户的头像重置为默认头像吗？</p>
+                <p class="reset-tip">重置后头像将恢复为系统默认头像</p>
+            </div>
+            <template #footer>
+                <div class="dialog-footer">
+                    <el-button @click="resetAvatarDialog = false">取消</el-button>
+                    <el-button type="primary" @click="confirmResetAvatar">确定重置</el-button>
+                </div>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
 <style scoped>
+.user-management {
+    padding: 20px;
+}
+
+.search-section {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: #f5f7fa;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+}
+
 .operate {
     width: 100%;
     margin-bottom: 15px;
@@ -244,6 +408,35 @@ const sure_modifyPermissions = () => {
     font-size: 14px;
     margin-right: 18px;
     color: #484848;
+}
+
+/* 头像上传样式 */
+.avatar-upload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+/* 重置确认对话框样式 */
+.reset-confirm {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    text-align: center;
+}
+
+.reset-confirm p {
+    margin: 10px 0 0 0;
+    font-size: 14px;
+    color: #303133;
+}
+
+.reset-confirm .reset-tip {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 8px;
 }
 
 @media screen and (max-width: 500px) {

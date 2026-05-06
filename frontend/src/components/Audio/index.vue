@@ -4,7 +4,7 @@ import { ElMessageBox, ElMessage, ElLoading } from 'element-plus'
 import { UploadFilled, Warning, VideoPlay, Download, TrendCharts } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios, recordAudioPlay, getWeeklyPopularAudios, getTotalPopularAudios, getMyAudioClassifications } from '@/api/audio'
+import { getAudioList, uploadAudio, matchAudiosByAI, downloadAudios, recordAudioPlay, getWeeklyPopularAudios, getTotalPopularAudios, getMyAudioClassifications, getAIConfigStatus } from '@/api/audio'
 import PageHero from '@/components/ComponentStyle/PageHero.vue'
 
 const nickName = import.meta.env.VITE_APP_NICK_NAME;
@@ -113,6 +113,7 @@ const aiMatchReasonDisplay = ref('') // 用于打字机效果的显示文本
 const isTypingReason = ref(false) // 是否正在打字
 const aiAutoPlayIndex = ref(-1) // AI自动播放的当前索引
 const isAiAutoPlaying = ref(false) // 是否正在AI自动播放模式
+const aiConfigEnabled = ref(false) // AI功能是否启用（根据后端配置）
 
 // 最热音声相关
 const hotAudioSortType = ref('week') // 'week' | 'total'
@@ -1160,10 +1161,26 @@ watch(volume, (newVolume) => {
     }
 })
 
-// 组件挂载时获取音声列表
+// 组件挂载时获取音声列表和AI配置状态
 onMounted(() => {
     fetchAudioList()
+    fetchAIConfigStatus()
 })
+
+// 获取AI配置状态
+async function fetchAIConfigStatus() {
+    try {
+        const result = await getAIConfigStatus()
+        // axios拦截器直接返回response.data，结构为 { code, data }
+        if (result.code === 200 && result.data) {
+            aiConfigEnabled.value = result.data.enabled
+        }
+    } catch (error) {
+        // 获取失败时默认隐藏AI按钮
+        aiConfigEnabled.value = false
+        console.log('AI配置状态获取失败:', error)
+    }
+}
 
 // 下载全部音声
 async function downloadAllAudios() {
@@ -1285,7 +1302,7 @@ onBeforeUnmount(() => {
                         <el-button type="danger" @click="startHellScroll" :disabled="isHellScrollMode" plain>
                             🔥 地狱绘卷模式
                         </el-button>
-                        <el-button @click="openAIMatchDialog" type="info" plain>
+                        <el-button v-if="aiConfigEnabled" @click="openAIMatchDialog" type="info" plain>
                             AI智能匹配
                         </el-button>
                         <el-button v-if="isAuthenticated" @click="downloadAllAudios" type="success" plain>

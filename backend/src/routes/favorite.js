@@ -96,7 +96,7 @@ router.get('/public', async (req, res) => {
  * @desc 获取收藏夹详情
  * @access Public/Private
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id(\\d+)', async (req, res) => {
     try {
         const favoriteId = parseInt(req.params.id);
         const userId = req.user?.id || 0;
@@ -126,7 +126,7 @@ router.get('/:id', async (req, res) => {
  * @desc 更新收藏夹
  * @access Private
  */
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id(\\d+)', authenticateToken, async (req, res) => {
     try {
         const favoriteId = parseInt(req.params.id);
 
@@ -155,7 +155,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
  * @desc 删除收藏夹
  * @access Private
  */
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id(\\d+)', authenticateToken, async (req, res) => {
     try {
         const favoriteId = parseInt(req.params.id);
 

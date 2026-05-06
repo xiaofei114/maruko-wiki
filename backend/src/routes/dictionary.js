@@ -2,6 +2,7 @@ import express from 'express';
 import { createAdminValidatedRouteHandler, createAdminRoute, createRouteHandler } from '../method/route-helpers.js';
 import { authenticateToken, requirePermission } from '../method/auth.js';
 import { handleServiceResult, sendError } from '../method/response.js';
+import { addLog } from '../services/logs.js';
 import {
     getTypesPaged,
     getItemsPaged,
@@ -12,6 +13,34 @@ import {
     banType,
     banItem
 } from '../services/dictionary.js';
+
+/**
+ * 记录字典管理操作日志
+ * @param {object} req - 请求对象
+ * @param {string} action - 操作名称
+ * @param {object} details - 操作详情
+ */
+const logDictionaryOperation = (req, action, details) => {
+    try {
+        const user = req.user || {};
+        addLog({
+            logType: req.method,
+            logName: `字典管理-${action}`,
+            logContent: req.originalUrl || req.url,
+            requestParams: JSON.stringify({
+                body: req.body,
+                params: req.params,
+                query: req.query,
+                details: details
+            }),
+            userName: user.username || user.name || '未知用户',
+            userIp: req.ip || req.connection?.remoteAddress || '',
+            logReturn: null
+        });
+    } catch (error) {
+        logger.error('记录字典管理操作日志失败:', error);
+    }
+};
 
 const router = express.Router();
 
@@ -49,11 +78,24 @@ router.post('/dictionary/types', ...createAdminValidatedRouteHandler({
     typeId: { required: false }
 }, async (req) => {
     const { typeId, name, dict_type } = req.body;
-    return await addOrUpdateType({
+    const result = await addOrUpdateType({
         typeId: typeId ? parseInt(typeId) : undefined,
         name,
         dict_type
     });
+    
+    // 记录操作日志
+    if (result.success) {
+        logDictionaryOperation(req, typeId ? '更新字典类型' : '创建字典类型', {
+            typeId: typeId || result.data?.typeId,
+            typeName: name,
+            typeCode: dict_type,
+            operatorId: req.user?.id,
+            operatorName: req.user?.name
+        });
+    }
+    
+    return result;
 }, 2, 500, { logName: '创建/更新字典类型' }));
 
 /**
@@ -63,7 +105,18 @@ router.post('/dictionary/types', ...createAdminValidatedRouteHandler({
 router.delete('/dictionary/types/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
-    return await deleteType(req.params.id);
+    const result = await deleteType(req.params.id);
+    
+    // 记录高危操作日志
+    if (result.success) {
+        logDictionaryOperation(req, '删除字典类型', {
+            typeId: req.params.id,
+            operatorId: req.user?.id,
+            operatorName: req.user?.name
+        });
+    }
+    
+    return result;
 }, 2, 500, { logName: '删除字典类型' }));
 
 /**
@@ -76,7 +129,18 @@ router.put('/dictionary/types/:id/ban', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
     banned: { type: 'boolean', required: true }
 }, async (req) => {
-    return await banType(req.params.id, req.body.banned);
+    const result = await banType(req.params.id, req.body.banned);
+    
+    // 记录操作日志
+    if (result.success) {
+        logDictionaryOperation(req, req.body.banned ? '禁用字典类型' : '启用字典类型', {
+            typeId: req.params.id,
+            operatorId: req.user?.id,
+            operatorName: req.user?.name
+        });
+    }
+    
+    return result;
 }, 2, 500, { logName: '禁用/启用字典类型' }));
 
 // ======================== 字典项接口 ========================
@@ -123,7 +187,7 @@ router.post('/dictionary/items', ...createAdminValidatedRouteHandler({
     itemId: { required: false }
 }, async (req) => {
     const { itemId, dict_type, dict_label, dict_key, dict_key2, sort, display_style } = req.body;
-    return await addOrUpdateItem({
+    const result = await addOrUpdateItem({
         itemId: itemId ? parseInt(itemId) : undefined,
         dict_type,
         dict_label,
@@ -132,6 +196,20 @@ router.post('/dictionary/items', ...createAdminValidatedRouteHandler({
         sort: sort ? parseInt(sort) : undefined,
         display_style
     });
+    
+    // 记录操作日志
+    if (result.success) {
+        logDictionaryOperation(req, itemId ? '更新字典项' : '创建字典项', {
+            itemId: itemId || result.data?.itemId,
+            dictType: dict_type,
+            dictLabel: dict_label,
+            dictKey: dict_key,
+            operatorId: req.user?.id,
+            operatorName: req.user?.name
+        });
+    }
+    
+    return result;
 }, 2, 500, { logName: '创建/更新字典项' }));
 
 /**
@@ -141,7 +219,18 @@ router.post('/dictionary/items', ...createAdminValidatedRouteHandler({
 router.delete('/dictionary/items/:id', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true }
 }, async (req) => {
-    return await deleteItem(req.params.id);
+    const result = await deleteItem(req.params.id);
+    
+    // 记录高危操作日志
+    if (result.success) {
+        logDictionaryOperation(req, '删除字典项', {
+            itemId: req.params.id,
+            operatorId: req.user?.id,
+            operatorName: req.user?.name
+        });
+    }
+    
+    return result;
 }, 2, 500, { logName: '删除字典项' }));
 
 /**
@@ -154,7 +243,18 @@ router.put('/dictionary/items/:id/ban', ...createAdminValidatedRouteHandler({
     id: { source: 'params', type: 'id', required: true },
     banned: { type: 'boolean', required: true }
 }, async (req) => {
-    return await banItem(req.params.id, req.body.banned);
+    const result = await banItem(req.params.id, req.body.banned);
+    
+    // 记录操作日志
+    if (result.success) {
+        logDictionaryOperation(req, req.body.banned ? '禁用字典项' : '启用字典项', {
+            itemId: req.params.id,
+            operatorId: req.user?.id,
+            operatorName: req.user?.name
+        });
+    }
+    
+    return result;
 }, 2, 500, { logName: '禁用/启用字典项' }));
 
 export default router;

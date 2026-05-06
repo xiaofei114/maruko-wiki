@@ -4,20 +4,82 @@ import { queryAll } from '../method/database.js';
 import { get7DayPlayCount } from './audioPlayCount.js';
 
 /**
+ * AI提供商默认配置
+ */
+const AI_PROVIDER_DEFAULTS = {
+    deepseek: {
+        baseURL: 'https://api.deepseek.com',
+        model: 'deepseek-v4-flash'
+    },
+    openai: {
+        baseURL: 'https://api.openai.com/v1',
+        model: 'gpt-3.5-turbo'
+    },
+    doubao: {
+        baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+        model: 'doubao-1.5-pro-32k'
+    },
+    kimi: {
+        baseURL: 'https://api.moonshot.cn/v1',
+        model: 'moonshot-v1-8k'
+    },
+    qwen: {
+        baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        model: 'qwen-turbo'
+    },
+    custom: {
+        baseURL: null, // 必须用户填写
+        model: null    // 必须用户填写
+    }
+};
+
+/**
+ * 获取AI配置
+ * @returns {Object|null} AI配置对象或null（如果未配置）
+ */
+export function getAIConfig() {
+    const config = global.appConfig;
+
+    // 优先使用新的 aiProvider 配置
+    if (config.aiProvider && config.aiProvider.apiKey && config.aiProvider.apiKey !== 'null') {
+        const provider = config.aiProvider.provider || 'deepseek';
+        const defaults = AI_PROVIDER_DEFAULTS[provider] || AI_PROVIDER_DEFAULTS.deepseek;
+
+        return {
+            provider: provider,
+            apiKey: config.aiProvider.apiKey,
+            baseURL: config.aiProvider.baseURL || defaults.baseURL,
+            model: config.aiProvider.model || defaults.model
+        };
+    }
+
+    return null;
+}
+
+/**
  * 获取AI客户端实例
  * @returns {OpenAI|null} OpenAI客户端实例或null（如果API Key未配置）
  */
 function getAIClient() {
-    const config = global.appConfig;
+    const aiConfig = getAIConfig();
 
-    if (!config.deepseek || !config.deepseek.apiKey || config.deepseek.apiKey === 'null' || config.deepseek.apiKey === null) {
+    if (!aiConfig || !aiConfig.baseURL) {
         return null;
     }
 
     return new OpenAI({
-        baseURL: 'https://api.deepseek.com',
-        apiKey: config.deepseek.apiKey,
+        baseURL: aiConfig.baseURL,
+        apiKey: aiConfig.apiKey,
     });
+}
+
+/**
+ * 获取AI模型名称
+ * @returns {string|null} 模型名称或null
+ */
+function getAIModel() {
+    const aiConfig = getAIConfig();
+    return aiConfig ? aiConfig.model : null;
 }
 
 /**
@@ -143,7 +205,7 @@ ${userInput}
 
         const completion = await openai.chat.completions.create({
             messages: messages,
-            model: "deepseek-chat",
+            model: getAIModel(),
             temperature: 0.1,
             response_format: { type: "json_object" }
         });

@@ -1,8 +1,37 @@
 import express from 'express';
 import path from 'path';
 import { createPublicRoute, createAdminUploadRouteHandler, createAdminRoute, createAdminValidatedRouteHandler } from '../method/route-helpers.js';
+import { addLog } from '../services/logs.js';
 import { uploadPlanDocument, getPlanDocuments, deletePlanDocument, setCurrentPlanDocument, getCurrentPlanDocument, getPlanDocumentsForAdmin, reviewPlanDocument, updatePlanDocument } from '../services/planDocument.js';
 import { getUploadLimit } from "../method/read.js"
+
+/**
+ * 记录企划文档操作日志
+ * @param {object} req - 请求对象
+ * @param {string} action - 操作名称
+ * @param {object} details - 操作详情
+ */
+const logPlanDocumentOperation = (req, action, details) => {
+    try {
+        const user = req.user || {};
+        addLog({
+            logType: req.method,
+            logName: `企划文档管理-${action}`,
+            logContent: req.originalUrl || req.url,
+            requestParams: JSON.stringify({
+                body: req.body,
+                params: req.params,
+                query: req.query,
+                details: details
+            }),
+            userName: user.username || user.name || '未知用户',
+            userIp: req.ip || req.connection?.remoteAddress || '',
+            logReturn: null
+        });
+    } catch (error) {
+        logger.error('记录企划文档操作日志失败:', error);
+    }
+};
 
 const router = express.Router();
 
@@ -32,6 +61,16 @@ router.post('/plan-documents', ...createAdminUploadRouteHandler({
     const result = await uploadPlanDocument(file, documentData, req.user.id, req.user.permission, originalName);
     if (result.success) {
         result.code = 201;
+        
+        // 记录操作日志
+        logPlanDocumentOperation(req, '上传文档', {
+            documentId: result.data?.documentId,
+            title: documentData.title,
+            fileName: originalName,
+            isCurrent: documentData.isCurrent,
+            userId: req.user.id,
+            userName: req.user.name
+        });
     }
     return result;
 }));

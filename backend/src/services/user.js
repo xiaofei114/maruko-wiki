@@ -1,4 +1,3 @@
-import { read_json } from '../method/read.js';
 import jwt from 'jsonwebtoken';
 import {
     hashPassword, verifyPassword, validateEmailFormat,
@@ -7,9 +6,8 @@ import {
     validateStringLength, validateRequired, validateEnum, validateId,
     PERMISSIONS, getUserInfo, isUserBanned
 } from '../method/business-utils.js';
-import { queryOne, queryAll, insert, update, exists } from '../method/database.js';
+import { queryOne, queryAll, insert, update } from '../method/database.js';
 import { createNotification } from '../method/notification.js';
-import fs from 'fs';
 import path from 'path';
 
 /**
@@ -318,7 +316,7 @@ function generateRandomPassword(length = 8) {
  */
 export async function getUsers(params = {}) {
     try {
-        const { page = 1, pageSize = null, sortBy = 'permission', sortOrder = 'asc' } = params;
+        const { page = 1, pageSize = null, sortBy = 'permission', sortOrder = 'asc', keyword = '' } = params;
 
         // 验证排序参数
         const validSortFields = ['permission', 'create_time'];
@@ -326,17 +324,27 @@ export async function getUsers(params = {}) {
         const finalSortBy = validSortFields.includes(sortBy) ? sortBy : 'permission';
         const finalSortOrder = validSortOrders.includes(sortOrder?.toLowerCase()) ? sortOrder.toLowerCase() : 'asc';
 
+        // 构建搜索条件
+        let whereClause = 'WHERE is_deleted = 0';
+        let queryParams = [];
+        
+        if (keyword && keyword.trim()) {
+            whereClause += ' AND (name LIKE ? OR account_number LIKE ?)';
+            const searchPattern = `%${keyword.trim()}%`;
+            queryParams.push(searchPattern, searchPattern);
+        }
+
         // 获取总数
-        const { total } = queryOne('SELECT COUNT(*) as total FROM user WHERE is_deleted = 0');
+        const { total } = queryOne(`SELECT COUNT(*) as total FROM user ${whereClause}`, queryParams);
 
         // 如果没有分页参数，返回全部用户
         if (!pageSize) {
             const users = queryAll(`
                 SELECT id, name, account_number, permission, is_banned, create_time
                 FROM user
-                WHERE is_deleted = 0
+                ${whereClause}
                 ORDER BY ${finalSortBy} ${finalSortOrder}, create_time ${finalSortOrder}
-            `);
+            `, queryParams);
             return createSuccessResponse('获取用户列表成功', users);
         }
 
@@ -350,10 +358,10 @@ export async function getUsers(params = {}) {
         const users = queryAll(`
             SELECT id, name, account_number, permission, is_banned, create_time
             FROM user
-            WHERE is_deleted = 0
+            ${whereClause}
             ORDER BY ${finalSortBy} ${finalSortOrder}, create_time ${finalSortOrder}
             LIMIT ? OFFSET ?
-        `, [size, offset]);
+        `, [...queryParams, size, offset]);
 
         return createSuccessResponse('获取用户列表成功', {
             pagination: {
@@ -658,24 +666,37 @@ export async function deleteUser(userId, adminId) {
 /**
  * 管理员重置用户名称
  * @param {number} userId - 用户ID
- * @param {string} newName - 新用户名
+ * @param {string} newName - 新用户名（为空则从配置读取默认名）
  * @param {number} adminId - 操作管理员ID
+ * @param {object} appConfig - 应用配置
  * @returns {object} 操作结果
  */
-export async function adminResetUserName(userId, newName, adminId) {
+export async function adminResetUserName(userId, newName, adminId, appConfig) {
     try {
-        // 验证参数
-        if (!newName || newName.trim().length === 0) {
-            return { success: false, message: '用户名不能为空', code: 400 };
-        }
-        if (newName.trim().length > 20) {
-            return { success: false, message: '用户名不能超过20个字符', code: 400 };
-        }
-
         // 检查用户是否存在
         const user = queryOne('SELECT id, name FROM user WHERE id = ? AND is_deleted = 0', [userId]);
         if (!user) {
             return { success: false, message: '用户不存在', code: 404 };
+        }
+
+        // 如果没有提供新用户名，从配置读取默认名
+        let finalName = newName ? newName.trim() : '';
+        if (!finalName) {
+            const defaultName = appConfig?.user?.defaultName || '猫丸伴';
+            finalName = defaultName;
+            
+            // 检查是否重名，如果重名则添加随机后缀
+            const existingUser = queryOne('SELECT 1 FROM user WHERE name = ? AND is_deleted = 0', [finalName]);
+            if (existingUser) {
+                // 生成4位随机数字
+                const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                finalName = `${defaultName}${randomSuffix}`;
+            }
+        }
+
+        // 验证用户名长度
+        if (finalName.length > 20) {
+            return { success: false, message: '用户名不能超过20个字符', code: 400 };
         }
 
         const oldName = user.name;
@@ -683,23 +704,23 @@ export async function adminResetUserName(userId, newName, adminId) {
 
         update(
             'UPDATE user SET name = ?, update_time = ? WHERE id = ?',
-            [newName.trim(), currentTime, userId]
+            [finalName, currentTime, userId]
         );
 
-        logger.info(`管理员重置用户名称: ${oldName} -> ${newName} by admin ${adminId}`);
+        logger.info(`管理员重置用户名称: ${oldName} -> ${finalName} by admin ${adminId}`);
 
         // 发送通知给用户
         await createNotification(
             userId,
             '账号信息变更',
-            `管理员已将您的用户名从「${oldName}」修改为「${newName.trim()}」`,
+            `管理员已将您的用户名从「${oldName}」修改为「${finalName}」`,
             'admin'
         );
 
         return {
             success: true,
             message: '重置用户名成功',
-            data: { userId, oldName, newName: newName.trim() }
+            data: { userId, oldName, newName: finalName }
         };
     } catch (error) {
         logger.error('管理员重置用户名失败:', error);
@@ -710,47 +731,51 @@ export async function adminResetUserName(userId, newName, adminId) {
 /**
  * 管理员重置用户头像
  * @param {number} userId - 用户ID
- * @param {object} file - multer文件对象
+ * @param {object} file - multer文件对象（为null则清空头像）
  * @param {number} adminId - 操作管理员ID
  * @returns {object} 操作结果
  */
 export async function adminResetUserAvatar(userId, file, adminId) {
     try {
-        if (!file) {
-            return { success: false, message: '请选择头像文件', code: 400 };
-        }
-
         // 检查用户是否存在
         const user = queryOne('SELECT id, name FROM user WHERE id = ? AND is_deleted = 0', [userId]);
         if (!user) {
             return { success: false, message: '用户不存在', code: 404 };
         }
 
-        // multer已经保存文件到 data/document/avatar 目录
-        // 构建数据库路径: avatar/xxx.jpg
-        const avatarFileName = file.filename;
-        const filePath = path.join('avatar', avatarFileName).replace(/\\/g, '/');
-
         const currentTime = getCurrentTimestamp();
+        let filePath = null;
+        let avatarUrl = null;
+
+        if (file) {
+            // multer已经保存文件到 data/document/avatar 目录
+            // 构建数据库路径: avatar/xxx.jpg
+            const avatarFileName = file.filename;
+            filePath = path.join('avatar', avatarFileName).replace(/\\/g, '/');
+            avatarUrl = `/file/${filePath}`;
+            logger.info(`管理员重置用户头像: ${user.name}(${userId}) by admin ${adminId}`);
+        } else {
+            // 清空头像字段，恢复默认头像
+            logger.info(`管理员清空用户头像: ${user.name}(${userId}) by admin ${adminId}`);
+        }
+
         update(
             'UPDATE user SET avatar = ?, update_time = ? WHERE id = ?',
             [filePath, currentTime, userId]
         );
 
-        logger.info(`管理员重置用户头像: ${user.name}(${userId}) by admin ${adminId}`);
-
         // 发送通知给用户
         await createNotification(
             userId,
             '账号信息变更',
-            '管理员已重置您的头像',
+            file ? '管理员已重置您的头像' : '管理员已将您的头像恢复为默认头像',
             'admin'
         );
 
         return {
             success: true,
             message: '重置头像成功',
-            data: { userId, avatar: `/file/${filePath}` }
+            data: { userId, avatar: avatarUrl }
         };
     } catch (error) {
         logger.error('管理员重置头像失败:', error);

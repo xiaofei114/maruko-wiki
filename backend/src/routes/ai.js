@@ -1,7 +1,7 @@
 import express from 'express';
 import { optionalAuth } from '../method/auth.js';
 import { createRouteHandler } from '../method/route-helpers.js';
-import { getAudioMatches } from '../services/ai.js';
+import { getAudioMatches, getAIConfig } from '../services/ai.js';
 
 const router = express.Router();
 
@@ -68,7 +68,7 @@ async function recordSuspiciousActivity(clientIP, reason) {
  */
 const aiRateLimit = async (req, res, next) => {
     try {
-        const config = read_json("configs", "config");
+        const config = global.appConfig;
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD格式
         const clientIP = getClientIP(req);
 
@@ -196,6 +196,28 @@ router.post('/match-audios', optionalAuth, aiRateLimit, createRouteHandler(async
     // 调用AI匹配服务
     const result = await getAudioMatches(description.trim());
     return result;
+}));
+
+/**
+ * 检查AI配置状态接口
+ * GET /api/ai/config-status
+ * 用于前端判断是否需要显示AI相关功能
+ */
+router.get('/config-status', createRouteHandler(async () => {
+    const aiConfig = getAIConfig();
+
+    // 检查 AI 是否配置
+    const isAIConfigured = aiConfig !== null;
+
+    return {
+        success: true,
+        data: {
+            enabled: isAIConfigured,
+            provider: aiConfig?.provider || null,
+            model: aiConfig?.model || null,
+            message: isAIConfigured ? 'AI服务已启用' : 'AI服务未配置'
+        }
+    };
 }));
 
 export default router;

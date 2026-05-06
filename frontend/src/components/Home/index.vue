@@ -663,6 +663,85 @@ const getGiftProgress = (gift) => {
   return Math.round((progressCaptainCount.value / gift.requiredFansCount) * 100)
 }
 
+// 获取舰礼日期状态（用于样式）
+const getGiftDateStatus = (startDate, endDate) => {
+  if (!startDate && !endDate) return 'whole_month'
+  
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  let start = null
+  if (startDate) {
+    start = new Date(startDate)
+    start.setHours(0, 0, 0, 0)
+  }
+  
+  let end = null
+  if (endDate) {
+    end = new Date(endDate)
+    end.setHours(23, 59, 59, 999)
+  }
+  
+  if (end && today > end) {
+    return 'expired' // 已过期
+  } else if (start && today < start) {
+    return 'upcoming' // 未开始
+  } else {
+    return 'active' // 进行中
+  }
+}
+
+// 获取舰礼日期状态样式类名
+const getGiftDateStatusClass = (startDate, endDate) => {
+  const status = getGiftDateStatus(startDate, endDate)
+  return `gift-date-${status}`
+}
+
+// 获取舰礼日期状态文本
+const getGiftDateStatusText = (startDate, endDate) => {
+  const status = getGiftDateStatus(startDate, endDate)
+  const statusMap = {
+    'whole_month': '整月',
+    'expired': '已结束',
+    'upcoming': '即将开始',
+    'active': '进行中'
+  }
+  return statusMap[status] || '限时'
+}
+
+// 格式化舰礼日期范围显示
+const formatGiftDateRange = (startDate, endDate) => {
+  if (!startDate && !endDate) return '整月有效'
+  
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  
+  // 提取日期中的日
+  let startDay = ''
+  let endDay = ''
+  
+  if (startDate) {
+    const parts = startDate.split('-')
+    startDay = parts[2] || ''
+  }
+  
+  if (endDate) {
+    const parts = endDate.split('-')
+    endDay = parts[2] || ''
+  }
+  
+  if (startDay && endDay) {
+    return `${startDay}日-${endDay}日`
+  } else if (startDay) {
+    return `${startDay}日起`
+  } else if (endDay) {
+    return `至${endDay}日`
+  }
+  
+  return '限时'
+}
+
 // 计算直播时长（分钟）
 const calculateSessionDuration = (startTime, endTime) => {
   // 处理时间戳格式（毫秒）
@@ -1741,9 +1820,9 @@ onUnmounted(() => {
                       :show-after="200"
                     >
                       <template #content>
-                        <div class="gift-tooltip-multi">
+                        <div class="gift-tooltip-content">
                           <div class="tooltip-title">该节点包含 {{ group.length }} 个礼物</div>
-                          <div class="tooltip-gifts-list">
+                          <div class="tooltip-gifts-wrapper">
                             <div v-for="gift in group" :key="gift.id" class="tooltip-gift-item">
                               <div class="tooltip-header" :style="{ color: giftTypeColors[gift.giftType] }">
                                 <el-icon size="14"><Present /></el-icon>
@@ -1757,6 +1836,10 @@ onUnmounted(() => {
                               <div class="tooltip-gift-tags" v-if="parseInt(gift.includes) > 0">
                                 <el-tag v-if="parseInt(gift.includes) & 1" type="info" size="small">含舰长礼</el-tag>
                                 <el-tag v-if="parseInt(gift.includes) & 2" type="info" size="small">含提督礼</el-tag>
+                              </div>
+                              <div class="tooltip-gift-date" v-if="gift.startDate || gift.endDate" :class="getGiftDateStatusClass(gift.startDate, gift.endDate)">
+                                <el-icon size="12"><Timer /></el-icon>
+                                {{ getGiftDateStatusText(gift.startDate, gift.endDate) }}: {{ formatGiftDateRange(gift.startDate, gift.endDate) }}
                               </div>
                             </div>
                           </div>
@@ -1863,6 +1946,16 @@ onUnmounted(() => {
                             </el-tag>
                             <el-tag v-if="parseInt(gift.includes) & 1" type="info" size="small" class="gift-tag">含舰长礼</el-tag>
                             <el-tag v-if="parseInt(gift.includes) & 2" type="info" size="small" class="gift-tag">含提督礼</el-tag>
+                            <el-tag 
+                              v-if="gift.startDate || gift.endDate" 
+                              :type="getGiftDateStatus(gift.startDate, gift.endDate) === 'active' ? 'success' : (getGiftDateStatus(gift.startDate, gift.endDate) === 'upcoming' ? 'warning' : 'info')" 
+                              size="small" 
+                              class="gift-tag" 
+                              effect="dark"
+                            >
+                              <el-icon size="10"><Timer /></el-icon>
+                              {{ getGiftDateStatusText(gift.startDate, gift.endDate) }} {{ formatGiftDateRange(gift.startDate, gift.endDate) }}
+                            </el-tag>
                           </div>
                         </div>
                       </div>
@@ -3640,6 +3733,11 @@ onUnmounted(() => {
 
   .tooltip-gift-item {
     padding: 6px 8px;
+    margin-bottom: 8px;
+  }
+
+  .tooltip-gift-item:last-child {
+    margin-bottom: 0;
   }
 
   .tooltip-gift-item .tooltip-header {
@@ -3968,16 +4066,45 @@ onUnmounted(() => {
 }
 
 /* 多礼物悬浮提示 */
-.gift-tooltip-multi {
+.gift-tooltip-multi,
+.gift-tooltip-content {
   max-width: 280px;
+  max-height: 350px;
+  overflow: hidden;
 }
 
-.gift-tooltip-multi > .tooltip-title {
+.gift-tooltip-multi > .tooltip-title,
+.gift-tooltip-content > .tooltip-title {
   font-size: 13px;
   color: #909399;
   margin-bottom: 8px;
   padding-bottom: 8px;
   border-bottom: 1px solid #e4e7ed;
+}
+
+/* tooltip 礼物列表滚动区域 */
+.tooltip-gifts-wrapper {
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* 自定义滚动条样式 */
+.tooltip-gifts-wrapper::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tooltip-gifts-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tooltip-gifts-wrapper::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 2px;
+}
+
+.tooltip-gifts-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #909399;
 }
 
 
@@ -3987,6 +4114,33 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
+}
+
+/* 舰礼日期状态样式 */
+.tooltip-gift-date {
+  margin-top: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gift-date-whole_month {
+  color: #67c23a;
+}
+
+.gift-date-active {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.gift-date-upcoming {
+  color: #e6a23c;
+}
+
+.gift-date-expired {
+  color: #909399;
+  text-decoration: line-through;
 }
 
 .tooltip-gift-item .tooltip-header {
@@ -4087,6 +4241,11 @@ onUnmounted(() => {
   background: #f5f7fa;
   border-radius: 6px;
   border-left: 3px solid #dcdfe6;
+  margin-bottom: 10px;
+}
+
+.tooltip-gift-item:last-child {
+  margin-bottom: 0;
 }
 
 .tooltip-gift-item:nth-child(3n+1) {
@@ -4427,6 +4586,11 @@ onUnmounted(() => {
 
   .tooltip-gift-item {
     padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+
+  .tooltip-gift-item:last-child {
+    margin-bottom: 0;
   }
 
   .tooltip-gift-name {

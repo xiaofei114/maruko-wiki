@@ -10,6 +10,35 @@ import {
     getConfigMetadata,
     validateConfig
 } from '../services/configManager.js';
+import { addLog } from '../services/logs.js';
+
+/**
+ * 记录配置管理操作日志
+ * @param {object} req - 请求对象
+ * @param {string} action - 操作名称
+ * @param {object} details - 操作详情
+ */
+const logConfigOperation = (req, action, details) => {
+    try {
+        const user = req.user || {};
+        addLog({
+            logType: req.method,
+            logName: `配置管理-${action}`,
+            logContent: req.originalUrl || req.url,
+            requestParams: JSON.stringify({
+                body: req.body,
+                params: req.params,
+                query: req.query,
+                details: details
+            }),
+            userName: user.username || user.name || '未知用户',
+            userIp: req.ip || req.connection?.remoteAddress || '',
+            logReturn: null
+        });
+    } catch (error) {
+        logger.error('记录配置管理操作日志失败:', error);
+    }
+};
 
 const router = express.Router();
 
@@ -75,6 +104,13 @@ router.post('/',
         // 保存展平配置（会自动转换类型并还原嵌套结构）
         saveFlatConfig(flatConfig);
 
+        // 记录高危操作日志
+        logConfigOperation(req, '保存配置', {
+            operatorId: req.user.id,
+            operatorName: req.user.name,
+            configKeys: Object.keys(flatConfig)
+        });
+
         return {
             success: true,
             code: 200,
@@ -118,6 +154,13 @@ router.post('/trigger-restart',
                 message: '当前未在 PM2 环境下运行，无法自动重启'
             };
         }
+
+        // 记录高危操作日志
+        logConfigOperation(req, '触发服务重启', {
+            operatorId: req.user.id,
+            operatorName: req.user.name,
+            pm2Running: pm2Status.running
+        });
 
         // 异步重启
         setTimeout(() => {

@@ -657,7 +657,8 @@ async function saveEdit() {
 
 // 打开B站绑定对话框
 function openBilibiliDialog() {
-  ElMessage.info('开发中...')
+  // TODO: 实现B站账号功能
+  ElMessage.info('功能开发中...')
   return
 
   bilibiliForm.value = { uid: '', agreed: false }

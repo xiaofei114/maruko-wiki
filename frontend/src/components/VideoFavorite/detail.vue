@@ -338,6 +338,7 @@ onMounted(async () => {
                 <span>{{ video.weeklyRecommend || 0 }}</span>
               </div>
               <el-button
+                v-if="isAuthenticated"
                 :type="userRecommendations.has(video.id) ? '' : 'primary'"
                 size="small"
                 :plain="!userRecommendations.has(video.id)"

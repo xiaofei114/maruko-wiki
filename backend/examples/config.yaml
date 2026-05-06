@@ -26,8 +26,13 @@ bilibili: # bilibili配置
   roomId: 1929354869 # 直播间ID
   userId: 3546938511198692 # 用户ID
   ttl: 60 # 直播间信息缓存时间（秒）
-deepseek: # deepseek配置
-  apiKey: null # deepseek API密钥
+# AI配置（支持多种AI提供商）
+# 支持的提供商: deepseek, openai, doubao, kimi, qwen, custom
+aiProvider:
+  provider: deepseek  # AI提供商类型
+  apiKey: null        # API密钥
+  baseURL: null       # 自定义API地址（可选，留空使用默认地址）
+  model: null         # 模型名称（可选，留空使用默认模型）
 ai: # AI配置
   limits: # 请求限制
     authenticated: 100 # 已登录用户每日使用次数
@@ -51,3 +56,5 @@ upload:
   avatar: 5     # 头像上传限制（MB）
   document: 50 # 文档上传限制（MB）
   default: 10   # 默认上传限制（MB）
+user:
+  defaultName: '猫丸伴'  # 用户重置默认用户名

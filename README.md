@@ -1,393 +1,185 @@
 # 小猫丸子Wiki
 
-一个面向小猫丸子社区的前后端一体项目，包含内容展示、公告系统、相册/音声/企划表与管理后台能力。
+<p align="center">
+  <img src="https://img.shields.io/badge/Vue-3.4+-green.svg" alt="Vue">
+  <img src="https://img.shields.io/badge/Node.js-20+-blue.svg" alt="Node.js">
+  <img src="https://img.shields.io/badge/License-BSD--3--Clause-orange.svg" alt="License">
+</p>
 
-> 提示：当前仓库数据可能为清空状态（0 相册 / 0 音声 / 0 企划 / 0 用户），但功能代码完整可用。
+<p align="center">
+  一个专为哔哩哔哩主播 猫丸子Maruko 创建的Wiki网站。「北立交桥 · 妖精管理局 · 猫猫祟祟」
+</p>
 
-## 功能说明
+<p align="center">
+  <a href="#功能特性">功能特性</a> •
+  <a href="#在线演示">在线演示</a> •
+  <a href="#快速开始">快速开始</a> •
+  <a href="#技术栈">技术栈</a> •
+  <a href="#贡献">贡献</a>
+</p>
 
-### 前台页面
+***
 
-- 首页（`/`）：主播信息、直播状态、粉丝数、舰长数、直播时长统计
-- 相册（`/photo-album`、`/photo-album/:id`）：相册与照片浏览
-- 音声（`/audio`）：音频分类与播放
-- 公告（`/announcement`）：公告列表与内容展示
-- 企划表（`/plan-document`）：Word 文档列表、选中联动实时预览
-- 登录（`/login`）、个人页（`/profile`）、后台（`/admin`）
+## 功能特性
+
+### 前台功能
+
+- **主播数据中心** - 实时展示粉丝数、舰长/提督/总督数、直播时长统计
+- **舰礼系统** - 支持月度舰礼设置，包含舰长/提督/总督分级礼物，支持日期区间特殊舰礼
+- **相册管理** - 相册分类浏览、照片展示、图片懒加载
+- **音声播放** - 音频分类管理、在线播放、播放次数统计
+- **公告系统** - 公告列表、分类筛选、置顶公告展示
+- **企划文档** - Word 文档在线预览、实时联动选中
+- **视频收藏** - B站视频收藏夹管理、本周热门视频推荐、视频推荐功能
+- **AI 助手** - 基于 DeepSeek 的智能问答助手
+- **个人中心** - 用户信息管理、B站账号绑定、消息通知
 
 ### 管理后台
 
-- 音频管理：审核、编辑、删除
-- 相册管理：审核、编辑、删除
-- 企划表管理：设置当前文档、删除、实时预览
-- 用户管理（超管可见）：权限调整、封禁/解封、重置密码、删除
+- **内容审核** - 音频、照片、视频、企划文档的审核管理
+- **舰礼配置** - 舰长/提督/总督礼物设置、日期区间舰礼、进度条展示控制
+- **用户管理** - 用户列表、权限调整、封禁/解封、重置密码、重置用户名/头像
+- **数据统计** - 主播数据追踪（粉丝/舰长/提督/总督）、每日数据记录、历史趋势图表
+- **系统管理** - 字典管理、日志查看、Redis 管理、系统配置
 
-### 后端服务
+***
 
-- JWT 鉴权与权限校验
-- SQLite 数据存储
-- 文件访问接口（`/api/file/*`）
-- 公告、相册、音声、企划表、用户、Bilibili 代理、AI 路由
+## 在线演示
 
-## 技术栈
+> 演示站点：<https://your-demo-site.com>
 
-| 类型 | 技术 |
-|-----|------|
-| 前端 | Vue 3 + Vite + Element Plus + Pinia + Vue Router + Axios |
-| 文档预览 | docx-preview |
-| 后端 | Node.js + Express + better-sqlite3 |
-| 缓存 | Redis（ioredis） |
-| 其他 | jsonwebtoken / bcrypt / multer / nodemailer / log4js |
+| 账号类型  | 账号                  | 密码       |
+| ----- | ------------------- | -------- |
+| 超级管理员 | <admin@example.com> | admin123 |
+| 普通用户  | <user@example.com>  | user123  |
 
-## 环境要求
-
-- Node.js `>= 20`
-- npm 或 pnpm
-- Redis
-- SQLite3（可选）
+***
 
 ## 快速开始
 
-### 1. 安装依赖
+### 环境要求
+
+- [Node.js](https://nodejs.org/) >= 20
+- [Redis](https://redis.io/) >= 6.0
+- [SQLite3](https://www.sqlite.org/)（可选，项目使用 better-sqlite3）
+
+### 安装
 
 ```bash
+# 克隆项目
+git clone https://github.com/your-username/maruko-wiki.git
+cd maruko-wiki
+
+# 安装后端依赖
 cd backend && npm install
+
+# 安装前端依赖
 cd ../frontend && npm install
 ```
 
-### 2. 准备配置
-
-在 `backend/configs/` 放置配置文件（可参考 `backend/examples/config.yaml`）。
-
-### 3. 启动项目
+### 配置
 
 ```bash
-# 终端1：后端
+# 后端配置
+cp backend/examples/config.yaml backend/configs/config.yaml
+# 编辑 backend/configs/config.yaml 进行配置
+
+# 前端配置
+cp frontend/.env.example frontend/.env.development
+# 编辑 frontend/.env.development 进行配置
+```
+
+### 启动
+
+```bash
+# 启动后端（端口 6660）
 cd backend && npm start
 
-# 终端2：前端（开发模式）
+# 启动前端（端口 5173）
 cd frontend && npm run dev
 ```
 
-默认地址：
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:6660`
+访问 <http://localhost:5173> 查看项目。
 
----
+详细的配置和部署说明请参考 [Extension.md](./Extension.md)。
 
-## 部署方案
+***
 
-### 1. 后端部署
+## 技术栈
 
-```bash
-cd backend
-npm install --production
-npm start
+### 前端
+
+| 技术                                        | 说明                |
+| ----------------------------------------- | ----------------- |
+| [Vue 3](https://vuejs.org/)               | 渐进式 JavaScript 框架 |
+| [Vite](https://vitejs.dev/)               | 下一代前端构建工具         |
+| [Element Plus](https://element-plus.org/) | 基于 Vue 3 的组件库     |
+| [Pinia](https://pinia.vuejs.org/)         | Vue 官方状态管理方案      |
+| [Vue Router](https://router.vuejs.org/)   | Vue.js 官方路由       |
+| [Axios](https://axios-http.com/)          | HTTP 客户端          |
+| [ECharts](https://echarts.apache.org/)    | 数据可视化图表库          |
+
+### 后端
+
+| 技术                                                           | 说明             |
+| ------------------------------------------------------------ | -------------- |
+| [Node.js](https://nodejs.org/)                               | JavaScript 运行时 |
+| [Express](https://expressjs.com/)                            | Web 应用框架       |
+| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) | SQLite 同步驱动    |
+| [ioredis](https://github.com/redis/ioredis)                  | Redis 客户端      |
+| [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken)   | JWT 实现         |
+| [bcrypt](https://github.com/kelektiv/node.bcrypt.js)         | 密码哈希           |
+| [multer](https://github.com/expressjs/multer)                | 文件上传处理         |
+
+***
+
+## 项目结构
+
+```
+maruko-wiki/
+├── frontend/              # 用户前台
+│   ├── src/
+│   │   ├── components/    # 组件
+│   │   ├── views/         # 页面
+│   │   ├── api/           # API 接口
+│   │   └── stores/        # Pinia 状态管理
+│   └── dist/              # 构建产物
+├── frontend_admin/        # 管理后台
+│   └── src/
+│       ├── components/    # 管理组件
+│       └── api/           # 管理后台 API
+├── backend/               # 后端服务
+│   ├── src/
+│   │   ├── routes/        # 路由
+│   │   ├── services/      # 业务逻辑
+│   │   └── method/        # 工具方法
+│   ├── configs/           # 配置文件
+│   └── sql/               # 数据库脚本
+├── Extension.md           # 详细配置文档
+├── sql.yaml               # 数据库结构文档
+└── LICENSE                # 许可证
 ```
 
-### 2. PM2 持续运行（推荐）
+***
 
-```bash
-# 安装 PM2
-npm install -g pm2
+## 贡献
 
-# 启动服务
-cd backend
-pm2 start app.js --name maruko-backend
+欢迎提交 Issue 和 Pull Request！
 
-# 查看状态
-pm2 status
+1. Fork 本项目
+2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交你的修改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开一个 Pull Request
 
-# 查看日志
-pm2 logs maruko-backend
-
-# 设置开机自启
-pm2 startup
-pm2 save
-
-# 其他命令
-pm2 restart maruko-backend    # 重启
-pm2 stop maruko-backend       # 停止
-pm2 delete maruko-backend     # 删除
-pm2 monit                     # 监控面板
-```
-
-```bash
-pm2 start ecosystem.config.js
-pm2 save
-```
-
-### 3. 前端部署
-
-```bash
-cd frontend
-npm install
-npm run build
-```
-
-将构建产物 `frontend/dist` 部署到 Nginx 静态目录。
-
-### 4. Nginx 配置
-
-#### 4.1 本地开发环境（Windows）
-
-**文件位置：**  `nginxconf_environment/nginx.conf`
-
-```nginx
-worker_processes auto;
-error_log logs/error.log warn;
-pid logs/nginx.pid;
-
-events {
-    worker_connections 2048;
-}
-
-http {
-    include mime.types;
-    default_type application/octet-stream;
-    sendfile on;
-
-    server {
-        listen 8080;
-        server_name maruko.test;
-        # 在 C:/windows/system32/drivers/etc/hosts 中添加：
-        # 127.0.0.1 maruko.test
-        client_max_body_size 100M;
-
-        location = /login {
-            limit_except POST { deny all; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location = /register {
-            limit_except POST { deny all; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location = /sendVerification {
-            limit_except POST { deny all; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location = /verifyCode {
-            limit_except POST { deny all; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location /api/ {
-            limit_except GET POST PUT DELETE { deny all; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location / {
-            root D:/Code/Maruko/maruko-wiki-kx/frontend/dist;
-            limit_except GET HEAD { deny all; }
-            try_files $uri $uri/ /index.html;
-        }
-    }
-}
-```
-
-#### 4.2 生产环境（Ubuntu Server）
-
-**文件位置：** `nginxconf_environment/nginx_services.conf`
-
-```nginx
-worker_processes auto;
-error_log /var/log/nginx/error.log warn;
-pid /var/run/nginx.pid;
-
-events {
-    worker_connections 2048;
-}
-
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-    sendfile on;
-
-    # 速率限制（防暴力破解）
-    limit_req_zone $binary_remote_addr zone=login_limit:10m rate=10r/m;
-    limit_req_zone $binary_remote_addr zone=verify_limit:10m rate=5r/m;
-    limit_req_zone $binary_remote_addr zone=register_limit:10m rate=5r/m;
-
-    server {
-        listen 80;
-        server_name your-domain.com;
-        client_max_body_size 100M;
-
-        # 安全头部
-        add_header X-Frame-Options "SAMEORIGIN" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header X-XSS-Protection "1; mode=block" always;
-
-        location = /login {
-            limit_req zone=login_limit burst=3 nodelay;
-            limit_except POST { deny all; access_log /var/log/nginx/illegal_requests.log; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location = /sendVerification {
-            limit_req zone=verify_limit burst=2 nodelay;
-            limit_except POST { deny all; access_log /var/log/nginx/illegal_requests.log; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location = /verifyCode {
-            limit_req zone=verify_limit burst=2 nodelay;
-            limit_except POST { deny all; access_log /var/log/nginx/illegal_requests.log; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location = /register {
-            limit_req zone=register_limit burst=2 nodelay;
-            limit_except POST { deny all; access_log /var/log/nginx/illegal_requests.log; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location /api/ {
-            limit_except GET POST PUT DELETE { deny all; access_log /var/log/nginx/illegal_requests.log; }
-            proxy_pass http://127.0.0.1:6660;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-
-        location / {
-            root /var/www/maruko-wiki/frontend/dist;
-            limit_except GET HEAD { deny all; access_log /var/log/nginx/illegal_requests.log; }
-            try_files $uri $uri/ /index.html;
-            
-            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-                expires 1y;
-                add_header Cache-Control "public, immutable";
-            }
-        }
-
-        location /health {
-            access_log off;
-            return 200 "healthy\n";
-            add_header Content-Type text/plain;
-        }
-
-        location ~ /\. {
-            deny all;
-            access_log off;
-            log_not_found off;
-        }
-    }
-}
-```
-
-#### 4.3 Ubuntu 部署命令
-
-```bash
-# 复制配置文件
-sudo cp nginx_services.conf /etc/nginx/sites-available/maruko-wiki
-
-# 启用配置
-sudo ln -s /etc/nginx/sites-available/maruko-wiki /etc/nginx/sites-enabled/
-
-# 测试配置
-sudo nginx -t
-
-# 重载 Nginx
-sudo systemctl reload nginx
-
-# 开机自启
-sudo systemctl enable nginx
-```
-
-### 5. 部署检查清单
-
-- [ ] 后端配置 `backend/configs/config.yaml` 中的 domainName 已添加域名
-- [ ] 前端已构建 `npm run build`
-- [ ] Nginx 已配置 `client_max_body_size`
-- [ ] Redis 服务已启动
-- [ ] PM2 已配置并启动后端服务
-- [ ] 防火墙已开放端口（80/443）
-
----
-
-## 常见问题
-
-### 1) 原生模块安装失败（better-sqlite3 / bcrypt）
-
-- Windows 需安装 Python 与 C++ Build Tools
-- 删除 `node_modules` 后重新安装
-- 使用 pnpm 时运行 `pnpm approve-builds`
-
-### 2) Redis 连接失败
-
-检查 Redis 服务是否启动，配置是否正确。
-
-### 3) 413 文件过大错误
-
-检查 Nginx 配置中的 `client_max_body_size` 是否足够大。
-
-### 4) CORS 跨域错误
-
-检查 `backend/configs/config.yaml` 中的 domainName 白名单。
-
-### 5) Token 无效/未授权
-
-清除浏览器 localStorage 重新登录。
-
-### 6) PM2 启动失败
-
-检查 Node.js 版本是否 >= 20，检查端口是否被占用。
-
----
-
-## 附录
-
-### 用户权限说明
-
-| permission值 | 角色 | 说明 |
-|------------|------|------|
-| 1 | 超级管理员 | 最高权限 |
-| 2 | 管理员 | 管理权限 |
-| 3 | 普通用户 | 基本权限 |
-
-### 创建用户
-
-```bash
-node create-user.js [用户名] [账号] [密码] [权限]
-# 示例
-node create-user.js 管理员 admin@123.com 123456 2
-```
-
-### 个性化修改指南
-
-详细的自定义修改指南请参考 [Extension.md](./Extension.md)。
+***
 
 ## 许可证
 
-BSD 3-Clause，详见 `LICENSE`。
+本项目基于 [BSD 3-Clause](./LICENSE) 许可证开源。
+
+***
+
+<p align="center">
+  Made with ❤️ by 小猫丸子社区
+</p>

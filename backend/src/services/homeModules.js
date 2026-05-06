@@ -132,14 +132,47 @@ export async function getHomeModulesData() {
             };
         }
 
-        // 4. 获取本周最热视频（按总推荐数）
-        const hotVideo = queryOne(`
-            SELECT v.id, v.title, v.cover_local, v.bvid
-            FROM video_favorite v
-            WHERE v.is_deleted = 0 AND v.is_review = 1
-            ORDER BY v.total_recommend DESC, v.create_time DESC
-            LIMIT 1
-        `);
+        // 4. 获取本周最热视频（按本周推荐数）
+        let hotVideo = null;
+        
+        try {
+            // 获取本周开始时间（周一0点）
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0是周日，1是周一
+            const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - daysSinceMonday);
+            weekStart.setHours(0, 0, 0, 0);
+            const weekStartTimestamp = Math.floor(weekStart.getTime() / 1000);
+            
+            // 查询本周推荐数最多的视频
+            const weeklyHotVideo = queryOne(`
+                SELECT v.id, v.title, v.cover_local, v.bvid, COUNT(vwr.id) as weekly_recommends
+                FROM video_favorite v
+                LEFT JOIN video_weekly_recommend vwr ON v.id = vwr.video_id AND vwr.week_start = ?
+                WHERE v.is_deleted = 0 AND v.is_review = 1
+                GROUP BY v.id
+                ORDER BY weekly_recommends DESC, v.create_time DESC
+                LIMIT 1
+            `, [weekStartTimestamp]);
+            
+            if (weeklyHotVideo && weeklyHotVideo.weekly_recommends > 0) {
+                hotVideo = weeklyHotVideo;
+            }
+        } catch (error) {
+            logger.warn('获取本周热门视频失败:', error);
+        }
+        
+        // 如果本周没有推荐数据，则按总推荐数取最热门的
+        if (!hotVideo) {
+            hotVideo = queryOne(`
+                SELECT v.id, v.title, v.cover_local, v.bvid
+                FROM video_favorite v
+                WHERE v.is_deleted = 0 AND v.is_review = 1
+                ORDER BY v.total_recommend DESC, v.create_time DESC
+                LIMIT 1
+            `);
+        }
 
         if (hotVideo) {
             result.video = {

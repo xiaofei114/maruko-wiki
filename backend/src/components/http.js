@@ -52,22 +52,22 @@ export default async () => {
         next();
     });
 
-    // 集成路由
+    // 集成路由 - 所有 :id 参数已添加正则约束 (\d+)，只匹配数字，避免与其他路由冲突
     App.use('/api', audioRoutes);
     App.use('/api', albumRoutes);
     App.use('/api', announcementRoutes); // 公告相关路由
     App.use('/api', planDocumentRoutes); // 企划文档相关路由
-    App.use('/api', captainGiftRoutes); // 舰长礼物路由（必须在 videoFavoriteRoutes 之前，避免路由冲突）
-    App.use('/api', homeModulesRoutes); // 首页功能模块数据路由（必须在 favoriteRoutes 之前）
-    App.use('/api', videoFavoriteRoutes); // 视频收藏夹相关路由
-    App.use('/api', favoriteRoutes); // 收藏夹相关路由
+    App.use('/api', captainGiftRoutes); // 舰长礼物路由
+    App.use('/api', anchorStatsRoutes); // 主播统计数据路由
+    App.use('/api', homeModulesRoutes); // 首页功能模块数据路由
+    App.use('/api', videoFavoriteRoutes); // 视频收藏夹相关路由（:id 已约束为数字）
+    App.use('/api', favoriteRoutes); // 收藏夹相关路由（:id 已约束为数字）
     App.use('/api/admin', adminRoutes);
     App.use('/api/admin', logsRoutes); // 日志查询路由
     App.use('/api/admin', dictionaryRoutes); // 字典管理路由
     App.use('/api/super-admin', superAdminRoutes);
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由
     App.use('/api/ai', aiRoutes); // AI相关路由
-    App.use('/api', anchorStatsRoutes); // 主播统计数据路由
     App.use('/api', redisAdminRoutes); // Redis 管理路由（超级管理员）
     App.use('/api/admin/config', configRoutes); // 系统配置管理路由
 

@@ -1,84 +1,89 @@
-# 用户账号表
+# ==================== 用户账号表 ====================
 user:
   id: 主键
   name: 用户名
   account_number: 账号
   password: 密码哈希
   permission: 权限 (1:超级管理员, 2:管理员, 3:普通用户)
-  is_banned: 是否封禁
-  is_deleted: 是否删除
+  is_banned: 是否封禁 (0:否, 1:是)
+  is_deleted: 是否删除 (0:否, 1:是)
+  bilibili_uid: B站UID
+  avatar: 头像文件名（存储在/data/document/avatar目录下）
+  fan_level: 粉丝等级
+  captain_type: 舰长类型 (0:无, 1:舰长, 2:提督, 3:总督)
+  is_bilibili_bound: 是否为B站绑定用户 (0:否, 1:是)
   create_time: 创建时间
   update_time: 更新时间
 
-# 相册
+# ==================== 相册表 ====================
 photo_album:
   id: 主键
   user_id: 创建相册的用户id（外键）
   name: 相册名
   introduction: 简介
-  is_deleted: 是否删除
-  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  is_deleted: 是否删除 (0:否, 1:是)
+  is_review: 是否审核 (0:未审核, 1:审核通过, 2:审核不通过)
   create_time: 创建时间
   update_time: 更新时间
 
-# 照片
+# ==================== 照片表 ====================
 photo:
   id: 主键
   album_id: 相册id（外键）
   user_id: 上传照片的用户id（外键）
   name: 照片名
   url: 照片url
-  is_deleted: 是否删除
-  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  is_deleted: 是否删除 (0:否, 1:是)
+  is_review: 是否审核 (0:未审核, 1:审核通过, 2:审核不通过)
   create_time: 创建时间
   update_time: 更新时间
 
-# 音声分类
+# ==================== 音声分类表 ====================
 audio_classification:
   id: 主键
   user_id: 创建分类的用户id（外键）
   name: 分类名
-  is_deleted: 是否删除
-  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  is_deleted: 是否删除 (0:否, 1:是)
+  is_review: 是否审核 (0:未审核, 1:审核通过, 2:审核不通过)
   create_time: 创建时间
   update_time: 更新时间
 
-# 音声
+# ==================== 音声表 ====================
 audio:
   id: 主键
   classification_id: 音声分类id（外键）
   user_id: 上传音声的用户id（外键）
   name: 音声名
   url: 音声url
-  is_deleted: 是否删除
-  is_review: 是否审核(0:未审核, 1:审核通过, 2:审核不通过)
+  is_deleted: 是否删除 (0:否, 1:是)
+  is_review: 是否审核 (0:未审核, 1:审核通过, 2:审核不通过)
   play_count: 播放次数
   create_time: 创建时间
   update_time: 更新时间
 
-# 直播时长
+# ==================== 直播时长表 ====================
 live_duration:
   id: 主键
-  start_time: 开始时间
-  end_time: 结束时间
-  title: 标题
-  create_time: 创建时间
-  update_time: 更新时间
+  start_time: 直播开始时间（毫秒时间戳）
+  end_time: 直播结束时间（毫秒时间戳），NULL表示正在直播
+  title: 直播标题
+  create_time: 记录创建时间（毫秒时间戳）
+  update_time: 记录更新时间（毫秒时间戳）
 
-# 公告
+# ==================== 公告表 ====================
 announcement:
   id: 主键
   title: 公告标题
-  content_html: 公告内容
+  content_html: 公告内容（HTML格式）
   author: 作者
-  publish_time: 发布时间
-  is_pinned: 是否置顶：0-否，1-是
-  category: 分类：system/feature/update/holiday
-  is_deleted: 软删除标记：0-未删除，1-已删除
+  publish_time: 发布时间（Unix时间戳）
+  is_pinned: 是否置顶 (0:否, 1:是)
+  category: 分类 (system/feature/update/holiday)
+  is_deleted: 软删除标记 (0:未删除, 1:已删除)
   create_time: 创建时间
   update_time: 更新时间
 
-# 企划文档
+# ==================== 企划文档表 ====================
 plan_document:
   id: 主键
   title: 文档标题
@@ -86,12 +91,13 @@ plan_document:
   file_name: 原始文件名
   upload_time: 上传时间（Unix时间戳）
   uploader_id: 上传者ID（外键）
-  is_current: 是否为当前显示文档：0-否，1-是
-  is_deleted: 软删除标记：0-未删除，1-已删除
+  is_current: 是否为当前显示文档 (0:否, 1:是)
+  is_review: 是否审核 (0:未审核, 1:已通过, 2:已拒绝)
+  is_deleted: 软删除标记 (0:未删除, 1:已删除)
   create_time: 创建时间
   update_time: 更新时间
 
-# 日志表
+# ==================== 日志表 ====================
 logs:
   id: 主键
   log_type: 日志类型
@@ -103,7 +109,7 @@ logs:
   user_ip: 用户IP
   created_at: 创建时间
 
-# 字典类型表
+# ==================== 字典类型表 ====================
 dictionary_type:
   id: 主键
   name: 类型名称
@@ -113,7 +119,7 @@ dictionary_type:
   created_at: 创建时间
   updated_at: 更新时间
 
-# 字典项表
+# ==================== 字典项表 ====================
 dictionary_item:
   id: 主键
   dict_type: 字典类型标识（外键）
@@ -127,10 +133,10 @@ dictionary_item:
   created_at: 创建时间
   updated_at: 更新时间
 
-# 粉丝舰长记录表
-anchor_stats: 
+# ==================== 粉丝舰长记录表 ====================
+anchor_stats:
   id: 主键
-  record_date: 记录日期
+  record_date: 记录日期（Unix时间戳，当天0点）
   fans_count: 粉丝数
   captain_count: 舰长数（普通舰长）
   commander_count: 总督数
@@ -139,7 +145,7 @@ anchor_stats:
   create_time: 记录创建时间
   update_time: 记录更新时间
 
-# 舰礼表
+# ==================== 舰礼表 ====================
 captain_gifts:
   id: 主键
   year: 年份
@@ -148,11 +154,60 @@ captain_gifts:
   gift_content: 礼物内容描述
   required_fans_count: 解锁所需粉丝数 (0表示无限制，为基础舰礼)
   gift_type: 礼物类型 (1=舰长礼, 2=提督礼, 3=总督礼)
-  includes: 礼物包含内容 1=包含舰长礼, 2=包含提督礼, 4=包含总督礼
-  show_progress: 是否显示进度条
+  includes: 礼物包含内容 (bitmap： 1=包含舰长礼, 2=包含提督礼, 4=包含总督礼)
+  show_progress: 是否显示进度条 (0:不显示, 1:显示)
   sort_order: 排序顺序
+  start_date: 开始日期 (格式： YYYY-MM-DD，为空表示整个月都有效)
+  end_date: 结束日期 (格式： YYYY-MM-DD，为空表示持续到月底)
   create_time: 创建时间
   update_time: 更新时间
+
+# ==================== 消息通知表 ====================
+notification:
+  id: 主键
+  user_id: 用户ID（外键）
+  title: 消息标题
+  content: 消息内容
+  type: 消息类型 (system:系统通知, review:审核通知)
+  is_read: 是否已读 (0:未读, 1:已读)
+  is_deleted: 软删除标记 (0:未删除, 1:已删除)
+  create_time: 创建时间
+  update_time: 更新时间
+
+# ==================== 收藏夹表 ====================
+favorite:
+  id: 主键
+  name: 收藏夹名称
+  description: 收藏夹描述
+  user_id: 创建用户ID（外键）
+  is_public: 是否公开 (0:私密, 1:公开)
+  is_deleted: 软删除标记 (0:未删除, 1:已删除)
+  create_time: 创建时间
+  update_time: 更新时间
+
+# ==================== 视频收藏夹表 ====================
+video_favorite:
+  id: 主键
+  bvid: B站视频BV号
+  title: 视频标题
+  cover_url: 视频封面URL（B站原始URL）
+  cover_local: 本地封面路径（下载到本地）
+  uploader_name: 视频UP主昵称
+  user_id: 上传用户ID（外键）
+  favorite_id: 所属收藏夹ID（外键，可为空）
+  is_review: 审核状态 (0:待审核, 1:已通过, 2:已拒绝)
+  total_recommend: 总推荐数（累计）
+  is_deleted: 软删除标记 (0:未删除, 1:已删除)
+  create_time: 创建时间
+  update_time: 更新时间
+
+# ==================== 视频每周推荐记录表 ====================
+video_weekly_recommend:
+  id: 主键
+  video_id: 视频ID（外键）
+  user_id: 推荐用户ID（外键）
+  week_start: 周开始时间（周一0点的Unix时间戳）
+  create_time: 创建时间
 
 
 # ==================== 说明 ====================
@@ -171,6 +226,11 @@ captain_gifts:
 # show_progress: 是否显示进度条
 #   0 = 不显示进度条 (如总督礼、提督礼通常不显示)
 #   1 = 显示进度条 (如舰长礼通常显示)
+#
+# is_review: 审核状态
+#   0 = 未审核/待审核
+#   1 = 审核通过/已通过
+#   2 = 审核不通过/已拒绝
 #
 # 使用示例:
 # 1. 基础舰长礼: gift_type=1, includes=0, show_progress=1

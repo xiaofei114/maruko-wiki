@@ -123,7 +123,9 @@ router.post('/captain-gifts', ...createValidatedRouteHandler({
     requiredFansCount: { source: 'body', type: 'number', required: false },
     giftType: { source: 'body', type: 'number', required: false },
     includes: { source: 'body', type: 'number', required: false },
-    showProgress: { source: 'body', type: 'number', required: false }
+    showProgress: { source: 'body', type: 'number', required: false },
+    startDate: { source: 'body', type: 'string', required: false },
+    endDate: { source: 'body', type: 'string', required: false }
 }, async (req) => {
     // 验证月份
     if (req.body.month < 1 || req.body.month > 12) {
@@ -143,6 +145,22 @@ router.post('/captain-gifts', ...createValidatedRouteHandler({
         };
     }
 
+    // 验证日期格式
+    if (req.body.startDate && !/^\d{4}-\d{2}-\d{2}$/.test(req.body.startDate)) {
+        return {
+            success: false,
+            message: '开始日期格式不正确，应为YYYY-MM-DD',
+            code: 400
+        };
+    }
+    if (req.body.endDate && !/^\d{4}-\d{2}-\d{2}$/.test(req.body.endDate)) {
+        return {
+            success: false,
+            message: '结束日期格式不正确，应为YYYY-MM-DD',
+            code: 400
+        };
+    }
+
     const result = await addGift(req.body);
 
     // 记录高危操作日志
@@ -151,7 +169,9 @@ router.post('/captain-gifts', ...createValidatedRouteHandler({
             giftName: req.body.giftName,
             year: req.body.year,
             month: req.body.month,
-            giftType: req.body.giftType || 1
+            giftType: req.body.giftType || 1,
+            startDate: req.body.startDate,
+            endDate: req.body.endDate
         });
     }
 
@@ -168,13 +188,31 @@ router.put('/captain-gifts/:id', ...createValidatedRouteHandler({
     requiredFansCount: { source: 'body', type: 'number', required: false },
     giftType: { source: 'body', type: 'number', required: false },
     includes: { source: 'body', type: 'number', required: false },
-    showProgress: { source: 'body', type: 'number', required: false }
+    showProgress: { source: 'body', type: 'number', required: false },
+    startDate: { source: 'body', type: 'string', required: false },
+    endDate: { source: 'body', type: 'string', required: false }
 }, async (req) => {
     // 验证礼物类型
     if (req.body.giftType && ![1, 2, 3].includes(req.body.giftType)) {
         return {
             success: false,
             message: '礼物类型必须是1(舰长)、2(提督)或3(总督)',
+            code: 400
+        };
+    }
+
+    // 验证日期格式
+    if (req.body.startDate && !/^\d{4}-\d{2}-\d{2}$/.test(req.body.startDate)) {
+        return {
+            success: false,
+            message: '开始日期格式不正确，应为YYYY-MM-DD',
+            code: 400
+        };
+    }
+    if (req.body.endDate && !/^\d{4}-\d{2}-\d{2}$/.test(req.body.endDate)) {
+        return {
+            success: false,
+            message: '结束日期格式不正确，应为YYYY-MM-DD',
             code: 400
         };
     }
@@ -187,7 +225,9 @@ router.put('/captain-gifts/:id', ...createValidatedRouteHandler({
         logGiftOperation(req, '编辑', {
             giftId: req.params.id,
             giftName: req.body.giftName,
-            giftType: req.body.giftType
+            giftType: req.body.giftType,
+            startDate: req.body.startDate,
+            endDate: req.body.endDate
         });
     }
 

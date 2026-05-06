@@ -1,6 +1,6 @@
 {
   "_comment": "配置字段映射表，用于前端表单渲染",
-  "_order": ["服务器", "安全", "日志", "Redis", "邮件", "Bilibili", "DeepSeek", "AI", "下载", "音频播放量记录", "上传"],
+  "_order": ["服务器", "安全", "用户", "日志", "Redis", "邮件", "Bilibili", "AI提供商", "AI", "下载", "音频播放量记录", "上传"],
   "fields": {
     "httpPort": {
       "type": "number",
@@ -110,10 +110,26 @@
       "label": "缓存时间(秒)",
       "group": "Bilibili"
     },
-    "deepseek.apiKey": {
+    "aiProvider.provider": {
+      "type": "select",
+      "label": "AI提供商",
+      "options": ["deepseek", "openai", "doubao", "kimi", "qwen", "custom"],
+      "group": "AI提供商"
+    },
+    "aiProvider.apiKey": {
       "type": "password",
-      "label": "DeepSeek API Key",
-      "group": "DeepSeek"
+      "label": "API密钥",
+      "group": "AI提供商"
+    },
+    "aiProvider.baseURL": {
+      "type": "string",
+      "label": "自定义API地址（可选）",
+      "group": "AI提供商"
+    },
+    "aiProvider.model": {
+      "type": "string",
+      "label": "自定义模型名称（可选）",
+      "group": "AI提供商"
     },
     "ai.limits.authenticated": {
       "type": "number",
@@ -210,6 +226,11 @@
       "label": "未登录用户每个音频在窗口期内最大记录次数",
       "min": 1,
       "group": "音频播放量记录"
+    },
+    "user.defaultName": {
+      "type": "string",
+      "label": "用户重置默认用户名",
+      "group": "用户"
     }
   }
 }

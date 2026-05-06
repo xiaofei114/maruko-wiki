@@ -4,6 +4,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAudios, reviewAudio, updateAudio, deleteAudio, updateAudioClassification, deleteAudioClassification } from '@/api/audio.js'
 import { Search, Refresh, Edit, Delete, VideoPlay, VideoPause, Headset, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 
+// 当前视图模式：'category' 按分类管理，'all' 全部列表
+const viewMode = ref('all')
+
 // 数据列表
 const audioList = ref([])
 const loading = ref(false)
@@ -124,6 +127,89 @@ const paginatedAudios = computed(() => {
     const end = start + audioPagination.value.pageSize
     return filteredAudios.value.slice(start, end)
 })
+
+// ==================== 全部列表视图 ====================
+
+// 全部音声列表（平铺所有分类下的音声）
+const allAudiosList = computed(() => {
+    const allAudios = []
+    audioList.value.forEach(category => {
+        if (category.audios && category.audios.length > 0) {
+            category.audios.forEach(audio => {
+                allAudios.push({
+                    ...audio,
+                    categoryName: category.name,
+                    categoryId: category.id
+                })
+            })
+        }
+    })
+    return allAudios
+})
+
+// 全部列表筛选条件
+const allAudioFilters = ref({
+    name: '',
+    status: ''
+})
+
+// 全部列表搜索参数
+const allAudioSearchParams = ref({
+    name: '',
+    status: ''
+})
+
+// 全部列表分页
+const allAudioPagination = ref({
+    page: 1,
+    pageSize: 10,
+    total: 0
+})
+
+// 筛选后的全部音声列表
+const filteredAllAudios = computed(() => {
+    let result = allAudiosList.value
+
+    // 名称筛选
+    if (allAudioSearchParams.value.name) {
+        result = result.filter(audio =>
+            audio.name.toLowerCase().includes(allAudioSearchParams.value.name.toLowerCase())
+        )
+    }
+
+    // 状态筛选
+    if (allAudioSearchParams.value.status !== '') {
+        result = result.filter(audio => audio.is_review === parseInt(allAudioSearchParams.value.status))
+    }
+
+    // 更新总数
+    allAudioPagination.value.total = result.length
+
+    return result
+})
+
+// 分页后的全部音声列表
+const paginatedAllAudios = computed(() => {
+    const start = (allAudioPagination.value.page - 1) * allAudioPagination.value.pageSize
+    const end = start + allAudioPagination.value.pageSize
+    return filteredAllAudios.value.slice(start, end)
+})
+
+// 全部列表搜索
+const handleAllAudioSearch = () => {
+    allAudioSearchParams.value.name = allAudioFilters.value.name
+    allAudioSearchParams.value.status = allAudioFilters.value.status
+    allAudioPagination.value.page = 1
+}
+
+// 重置全部列表筛选
+const resetAllAudioFilters = () => {
+    allAudioFilters.value.name = ''
+    allAudioFilters.value.status = ''
+    allAudioSearchParams.value.name = ''
+    allAudioSearchParams.value.status = ''
+    allAudioPagination.value.page = 1
+}
 
 // 获取音声列表
 const fetchAudios = async () => {
@@ -482,6 +568,11 @@ const handleAudioPageChange = (page) => {
     audioPagination.value.page = page
 }
 
+// 全部列表分页处理
+const handleAllAudioPageChange = (page) => {
+    allAudioPagination.value.page = page
+}
+
 // 获取审核状态标签
 const getReviewStatusType = (status) => {
     const types = { 0: 'warning', 1: 'success', 2: 'danger' }
@@ -507,7 +598,22 @@ onMounted(() => {
 
 <template>
     <div class="audio-management">
-        <div class="content-wrapper">
+        <!-- 视图切换 Tabs -->
+        <div class="view-tabs">
+            <el-radio-group v-model="viewMode" size="large">
+                <el-radio-button label="all">
+                    <el-icon><Search /></el-icon>
+                    全部列表
+                </el-radio-button>
+                <el-radio-button label="category">
+                    <el-icon><Headset /></el-icon>
+                    按分类管理
+                </el-radio-button>
+            </el-radio-group>
+        </div>
+
+        <!-- 按分类管理视图 -->
+        <div v-if="viewMode === 'category'" class="content-wrapper">
             <!-- 左侧分类列表 -->
             <div class="left-section">
                 <div class="section-header">
@@ -699,6 +805,118 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- 全部列表视图 -->
+        <div v-else class="all-audio-view">
+            <div class="section-header">
+                <el-icon><Headset /></el-icon>
+                <h3>全部音声列表</h3>
+            </div>
+
+            <div class="operate">
+                <div class="search-area">
+                    <el-input
+                        v-model="allAudioFilters.name"
+                        placeholder="请输入音声名称"
+                        clearable
+                        :trigger-on-focus="false"
+                        style="width: 200px; margin-right: 10px"
+                    />
+                    <el-select v-model="allAudioFilters.status" placeholder="审核状态" clearable style="width: 120px; margin-right: 10px">
+                        <el-option label="待审核" :value="0" />
+                        <el-option label="已通过" :value="1" />
+                        <el-option label="不通过" :value="2" />
+                    </el-select>
+                    <el-button type="primary" @click="handleAllAudioSearch">
+                        <el-icon><Search /></el-icon>
+                        搜索
+                    </el-button>
+                    <el-button @click="resetAllAudioFilters">
+                        <el-icon><Refresh /></el-icon>
+                        重置
+                    </el-button>
+                </div>
+            </div>
+
+            <el-table
+                :data="paginatedAllAudios"
+                style="width: 100%"
+                v-loading="loading"
+                :header-cell-style="{ 'text-align': 'center', 'color': '#000' }"
+            >
+                <el-table-column align="center" type="index" :index="(allAudioPagination.page - 1) * allAudioPagination.pageSize + 1" label="序号" width="60" />
+                <el-table-column align="center" prop="name" label="音声名称" min-width="180" show-overflow-tooltip />
+                <el-table-column align="center" prop="categoryName" label="所属分类" width="120" />
+                <el-table-column align="center" prop="user_name" label="上传者" width="100" />
+                <el-table-column align="center" label="审核状态" width="100">
+                    <template #default="scope">
+                        <el-tag :type="getReviewStatusType(scope.row.is_review)">
+                            {{ getReviewStatusLabel(scope.row.is_review) }}
+                        </el-tag>
+                    </template>
+                </el-table-column>
+                <el-table-column align="center" label="播放" width="80">
+                    <template #default="scope">
+                        <el-button
+                            type="primary"
+                            text
+                            circle
+                            @click="toggleAudioPlay(scope.row)"
+                        >
+                            <el-icon v-if="playingAudioId === scope.row.id"><VideoPause /></el-icon>
+                            <el-icon v-else><VideoPlay /></el-icon>
+                        </el-button>
+                    </template>
+                </el-table-column>
+                <el-table-column align="center" label="操作" width="220">
+                    <template #default="scope">
+                        <el-button
+                            v-if="scope.row.is_review === 0"
+                            type="primary"
+                            text
+                            @click="openReviewDialog(scope.row, 'review')" class="preview-btn"
+                        >
+                            <el-icon><CircleCheck /></el-icon>
+                            审核
+                        </el-button>
+                        <el-button
+                            v-if="scope.row.is_review === 1 || scope.row.is_review === 2"
+                            type="warning"
+                            text
+                            @click="openReviewDialog(scope.row, 'revoke')" class="preview-btn"
+                        >
+                            <el-icon><CircleClose /></el-icon>
+                            撤销
+                        </el-button>
+                        <el-button type="primary" text @click="handleEditAudio(scope.row)" class="preview-btn">
+                            <el-icon><Edit /></el-icon>
+                            编辑
+                        </el-button>
+                        <el-button type="danger" text @click="handleDeleteAudio(scope.row)" class="preview-btn">
+                            <el-icon><Delete /></el-icon>
+                            删除
+                        </el-button>
+                    </template>
+                </el-table-column>
+                <template #empty>
+                    暂无数据
+                </template>
+            </el-table>
+
+            <div class="paging">
+                <span>共 {{ allAudioPagination.total }} 条</span>
+                <el-pagination
+                    background
+                    prev-text="上一页"
+                    next-text="下一页"
+                    layout="prev, pager, next"
+                    :total="allAudioPagination.total"
+                    :pager-count="5"
+                    :current-page="allAudioPagination.page"
+                    @current-change="handleAllAudioPageChange"
+                />
+            </div>
+        </div>
+
         <!-- 编辑分类对话框 -->
         <el-dialog v-model="editCategoryDialog" title="编辑分类" width="400px" append-to-body>
             <el-form :model="editCategoryForm" label-width="80px">
@@ -776,30 +994,53 @@ onMounted(() => {
     height: calc(100vh - 100px);
 }
 
+.view-tabs {
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.view-tabs .el-radio-group {
+    display: flex;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.view-tabs .el-radio-button__inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
+}
+
 .content-wrapper {
     display: flex;
-    gap: 20px;
-    height: 90%;
+    gap: 16px;
+    height: calc(100% - 60px);
 }
 
 .left-section {
-    width: 45%;
+    width: 42%;
     background: #fff;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
+    border: 1px solid #f0f0f0;
 }
 
 .right-section {
     flex: 1;
     background: #fff;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
+    border: 1px solid #f0f0f0;
 }
 
 .right-section.empty-section {
@@ -810,14 +1051,14 @@ onMounted(() => {
 .section-header {
     display: flex;
     align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #ebeef5;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
 }
 
 .section-header h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: #303133;
 }
@@ -829,43 +1070,60 @@ onMounted(() => {
 }
 
 .operate {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 6px;
 }
 
 .search-area {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 8px;
 }
 
 .el-table {
     flex: 1;
     overflow: auto;
+    border-radius: 6px;
 }
 
 .paging {
-    margin-top: 15px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
 }
 
 .paging>span {
-    font-size: 14px;
-    margin-right: 18px;
-    color: #484848;
+    font-size: 13px;
+    margin-right: 16px;
+    color: #606266;
 }
 
 .dialog-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 12px;
 }
 
 .preview-btn {
     margin: 0;
     padding: 8px;
+}
+
+/* 全部列表视图样式 */
+.all-audio-view {
+    background: #fff;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 60px);
 }
 
 /* 手机端适配 */
@@ -874,6 +1132,15 @@ onMounted(() => {
         padding: 10px;
         height: auto;
         min-height: calc(100vh - 80px);
+    }
+
+    .view-tabs {
+        margin-bottom: 15px;
+    }
+
+    .view-tabs .el-radio-button__inner {
+        padding: 8px 12px;
+        font-size: 13px;
     }
 
     .content-wrapper {
@@ -889,6 +1156,11 @@ onMounted(() => {
 
     .right-section {
         padding: 15px;
+    }
+
+    .all-audio-view {
+        padding: 15px;
+        height: auto;
     }
 
     .section-header {

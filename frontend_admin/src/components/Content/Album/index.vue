@@ -4,6 +4,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAlbums, reviewAlbum, updateAlbum, deleteAlbum, reviewPhoto, updatePhoto, deletePhoto } from '@/api/album.js'
 import { Search, Refresh, Edit, Delete, View, CircleCheck, CircleClose, Picture } from '@element-plus/icons-vue'
 
+// 当前视图模式：'album' 按相册管理，'all' 全部照片列表
+const viewMode = ref('all')
+
 // 数据列表
 const albumList = ref([])
 const loading = ref(false)
@@ -126,6 +129,94 @@ const paginatedPhotos = computed(() => {
     const end = start + photoPagination.value.pageSize
     return filteredPhotos.value.slice(start, end)
 })
+
+// ==================== 全部列表视图 ====================
+
+// 全部照片列表（平铺所有相册下的照片）
+const allPhotosList = computed(() => {
+    const allPhotos = []
+    albumList.value.forEach(album => {
+        if (album.photos && album.photos.length > 0) {
+            album.photos.forEach(photo => {
+                allPhotos.push({
+                    ...photo,
+                    albumName: album.name,
+                    albumId: album.id
+                })
+            })
+        }
+    })
+    return allPhotos
+})
+
+// 全部列表筛选条件
+const allPhotoFilters = ref({
+    name: '',
+    status: ''
+})
+
+// 全部列表搜索参数
+const allPhotoSearchParams = ref({
+    name: '',
+    status: ''
+})
+
+// 全部列表分页
+const allPhotoPagination = ref({
+    page: 1,
+    pageSize: 10,
+    total: 0
+})
+
+// 筛选后的全部照片列表
+const filteredAllPhotos = computed(() => {
+    let result = allPhotosList.value
+
+    // 名称筛选
+    if (allPhotoSearchParams.value.name) {
+        result = result.filter(photo =>
+            photo.name.toLowerCase().includes(allPhotoSearchParams.value.name.toLowerCase())
+        )
+    }
+
+    // 状态筛选
+    if (allPhotoSearchParams.value.status !== '') {
+        result = result.filter(photo => photo.is_review === parseInt(allPhotoSearchParams.value.status))
+    }
+
+    // 更新总数
+    allPhotoPagination.value.total = result.length
+
+    return result
+})
+
+// 分页后的全部照片列表
+const paginatedAllPhotos = computed(() => {
+    const start = (allPhotoPagination.value.page - 1) * allPhotoPagination.value.pageSize
+    const end = start + allPhotoPagination.value.pageSize
+    return filteredAllPhotos.value.slice(start, end)
+})
+
+// 全部列表搜索
+const handleAllPhotoSearch = () => {
+    allPhotoSearchParams.value.name = allPhotoFilters.value.name
+    allPhotoSearchParams.value.status = allPhotoFilters.value.status
+    allPhotoPagination.value.page = 1
+}
+
+// 重置全部列表筛选
+const resetAllPhotoFilters = () => {
+    allPhotoFilters.value.name = ''
+    allPhotoFilters.value.status = ''
+    allPhotoSearchParams.value.name = ''
+    allPhotoSearchParams.value.status = ''
+    allPhotoPagination.value.page = 1
+}
+
+// 全部列表分页处理
+const handleAllPhotoPageChange = (page) => {
+    allPhotoPagination.value.page = page
+}
 
 // 获取相册列表
 const fetchAlbums = async () => {
@@ -457,7 +548,22 @@ onMounted(() => {
 
 <template>
     <div class="album-management">
-        <div class="content-wrapper">
+        <!-- 视图切换 Tabs -->
+        <div class="view-tabs">
+            <el-radio-group v-model="viewMode" size="large">
+                <el-radio-button label="all">
+                    <el-icon><Search /></el-icon>
+                    全部照片
+                </el-radio-button>
+                <el-radio-button label="album">
+                    <el-icon><Picture /></el-icon>
+                    按相册管理
+                </el-radio-button>
+            </el-radio-group>
+        </div>
+
+        <!-- 按相册管理视图 -->
+        <div v-if="viewMode === 'album'" class="content-wrapper">
             <!-- 左侧相册列表 -->
             <div class="left-section">
                 <div class="section-header">
@@ -642,6 +748,115 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- 全部照片列表视图 -->
+        <div v-else class="all-photos-view">
+            <div class="section-header">
+                <el-icon><Picture /></el-icon>
+                <h3>全部照片列表</h3>
+            </div>
+
+            <div class="operate">
+                <div class="search-area">
+                    <el-input
+                        v-model="allPhotoFilters.name"
+                        placeholder="请输入照片名称"
+                        clearable
+                        :trigger-on-focus="false"
+                        style="width: 200px; margin-right: 10px"
+                    />
+                    <el-select v-model="allPhotoFilters.status" placeholder="审核状态" clearable style="width: 120px; margin-right: 10px">
+                        <el-option label="待审核" :value="0" />
+                        <el-option label="已通过" :value="1" />
+                        <el-option label="不通过" :value="2" />
+                    </el-select>
+                    <el-button type="primary" @click="handleAllPhotoSearch">
+                        <el-icon><Search /></el-icon>
+                        搜索
+                    </el-button>
+                    <el-button @click="resetAllPhotoFilters">
+                        <el-icon><Refresh /></el-icon>
+                        重置
+                    </el-button>
+                </div>
+            </div>
+
+            <el-table
+                :data="paginatedAllPhotos"
+                style="width: 100%"
+                v-loading="loading"
+                :header-cell-style="{ 'text-align': 'center', 'color': '#000' }"
+            >
+                <el-table-column align="center" type="index" :index="(allPhotoPagination.page - 1) * allPhotoPagination.pageSize + 1" label="序号" width="60" />
+                <el-table-column align="center" label="照片预览" width="100">
+                    <template #default="scope">
+                        <el-image
+                            :src="getFullUrl(scope.row.url)"
+                            :preview-src-list="[getFullUrl(scope.row.url)]"
+                            fit="cover"
+                            style="width: 60px; height: 60px; border-radius: 4px; cursor: pointer;"
+                        />
+                    </template>
+                </el-table-column>
+                <el-table-column align="center" prop="name" label="照片名称" min-width="150" show-overflow-tooltip />
+                <el-table-column align="center" prop="albumName" label="所属相册" width="120" />
+                <el-table-column align="center" prop="user_name" label="上传者" width="100" />
+                <el-table-column align="center" label="审核状态" width="100">
+                    <template #default="scope">
+                        <el-tag :type="getReviewStatusType(scope.row.is_review)">
+                            {{ getReviewStatusLabel(scope.row.is_review) }}
+                        </el-tag>
+                    </template>
+                </el-table-column>
+                <el-table-column align="center" label="操作" width="220">
+                    <template #default="scope">
+                        <el-button
+                            v-if="scope.row.is_review === 0"
+                            type="primary"
+                            text
+                            @click="openReviewDialog(scope.row, 'review')" class="preview-btn"
+                        >
+                            <el-icon><CircleCheck /></el-icon>
+                            审核
+                        </el-button>
+                        <el-button
+                            v-if="scope.row.is_review === 1 || scope.row.is_review === 2"
+                            type="warning"
+                            text
+                            @click="openReviewDialog(scope.row, 'revoke')" class="preview-btn"
+                        >
+                            <el-icon><CircleClose /></el-icon>
+                            撤销
+                        </el-button>
+                        <el-button type="primary" text @click="handleEditPhoto(scope.row)" class="preview-btn">
+                            <el-icon><Edit /></el-icon>
+                            编辑
+                        </el-button>
+                        <el-button type="danger" text @click="handleDeletePhoto(scope.row)" class="preview-btn">
+                            <el-icon><Delete /></el-icon>
+                            删除
+                        </el-button>
+                    </template>
+                </el-table-column>
+                <template #empty>
+                    暂无数据
+                </template>
+            </el-table>
+
+            <div class="paging">
+                <span>共 {{ allPhotoPagination.total }} 条</span>
+                <el-pagination
+                    background
+                    prev-text="上一页"
+                    next-text="下一页"
+                    layout="prev, pager, next"
+                    :total="allPhotoPagination.total"
+                    :pager-count="5"
+                    :current-page="allPhotoPagination.page"
+                    @current-change="handleAllPhotoPageChange"
+                />
+            </div>
+        </div>
+
         <!-- 编辑相册对话框 -->
         <el-dialog v-model="editAlbumDialog" title="编辑相册" width="500px" append-to-body>
             <el-form :model="editAlbumForm" label-width="80px">
@@ -732,30 +947,64 @@ onMounted(() => {
     height: calc(100vh - 100px);
 }
 
+.view-tabs {
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.view-tabs .el-radio-group {
+    display: flex;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.view-tabs .el-radio-button__inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
+}
+
+.all-photos-view {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 60px);
+    border: 1px solid #f0f0f0;
+}
+
 .content-wrapper {
     display: flex;
-    gap: 20px;
-    height: 90%;
+    gap: 16px;
+    height: calc(100% - 60px);
 }
 
 .left-section {
-    width: 45%;
+    width: 42%;
     background: #fff;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
+    border: 1px solid #f0f0f0;
 }
 
 .right-section {
     flex: 1;
     background: #fff;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 20px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
+    border: 1px solid #f0f0f0;
 }
 
 .right-section.empty-section {
@@ -766,14 +1015,14 @@ onMounted(() => {
 .section-header {
     display: flex;
     align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #ebeef5;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
 }
 
 .section-header h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: #303133;
 }
@@ -785,38 +1034,44 @@ onMounted(() => {
 }
 
 .operate {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 6px;
 }
 
 .search-area {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 8px;
 }
 
 .el-table {
     flex: 1;
     overflow: auto;
+    border-radius: 6px;
 }
 
 .paging {
-    margin-top: 15px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
     display: flex;
     align-items: center;
     justify-content: flex-end;
 }
 
 .paging>span {
-    font-size: 14px;
-    margin-right: 18px;
-    color: #484848;
+    font-size: 13px;
+    margin-right: 16px;
+    color: #606266;
 }
 
 .dialog-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 12px;
 }
 
 .photo-preview-container {

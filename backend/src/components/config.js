@@ -85,10 +85,87 @@ function copyDirectoryContents(source, target) {
     return copiedCount;
 }
 
+// 深度合并对象（将默认值合并到现有配置）
+function deepMerge(target, source) {
+    for (const key in source) {
+        if (source.hasOwnProperty(key)) {
+            if (source[key] !== null && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                // 如果是对象，递归合并
+                if (!target[key] || typeof target[key] !== 'object') {
+                    target[key] = {};
+                }
+                deepMerge(target[key], source[key]);
+            } else if (!(key in target)) {
+                // 如果目标中不存在该字段，使用默认值
+                target[key] = source[key];
+            }
+        }
+    }
+    return target;
+}
+
+// 检查并补充缺失的配置字段
+function checkAndFillMissingConfig() {
+    try {
+        const exampleFile = path.join(exampleDir, 'config.yaml');
+
+        // 如果示例文件不存在，跳过检查
+        if (!fs.existsSync(exampleFile)) {
+            return false;
+        }
+
+        // 读取示例配置（作为默认值）
+        const exampleData = fs.readFileSync(exampleFile, 'utf8');
+        const exampleConfig = yaml.parse(exampleData);
+
+        // 读取当前配置
+        const configData = fs.readFileSync(configFile, 'utf8');
+        const currentConfig = yaml.parse(configData);
+
+        // 复制当前配置用于合并
+        const mergedConfig = JSON.parse(JSON.stringify(currentConfig));
+
+        // 深度合并，补充缺失字段
+        deepMerge(mergedConfig, exampleConfig);
+
+        // 检查是否有新增字段
+        const hasNewFields = JSON.stringify(currentConfig) !== JSON.stringify(mergedConfig);
+
+        if (hasNewFields) {
+            // 备份原配置到 data/backupConfigs
+            const backupDir = path.join(projectRoot, 'data', 'backupConfigs');
+            if (!fs.existsSync(backupDir)) {
+                fs.mkdirSync(backupDir, { recursive: true });
+            }
+            const backupFile = path.join(backupDir, `config.yaml.backup.${Date.now()}`);
+            fs.copyFileSync(configFile, backupFile);
+            log('info', `已备份原配置到: ${path.relative(projectRoot, backupFile)}`);
+
+            // 写入合并后的配置
+            const mergedYaml = yaml.stringify(mergedConfig, {
+                indent: 2,
+                lineWidth: 0
+            });
+            fs.writeFileSync(configFile, mergedYaml, 'utf8');
+
+            log('info', '已自动补充缺失的配置字段，请检查新添加的配置项');
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        log('error', '检查配置字段失败: ' + error.message);
+        return false;
+    }
+}
+
 // 加载配置文件的函数
 function loadConfig() {
     try {
         if (fs.existsSync(configFile)) {
+            // 先检查并补充缺失字段
+            checkAndFillMissingConfig();
+
             // 读取配置
             const configData = fs.readFileSync(configFile, 'utf8');
             const config = yaml.parse(configData);

@@ -18,18 +18,22 @@ export default {
     description: '记录主播每日粉丝数和舰长数',
     
     // 任务执行函数
-    task: async () => {
+    task: () => {
         logger.info('========== 开始执行主播统计数据记录任务 ==========');
-        try {
-            const result = await recordDailyStats();
-            if (result.success) {
-                logger.info('主播统计数据记录成功:', result.data);
-            } else {
-                logger.error('主播统计数据记录失败:', result.message);
+
+        // 使用 setImmediate 让任务在事件循环的下一个 tick 执行，避免阻塞 cron
+        setImmediate(async () => {
+            try {
+                const result = await recordDailyStats();
+                if (result.success) {
+                    logger.info('主播统计数据记录成功:', result.data);
+                } else {
+                    logger.error('主播统计数据记录失败:', result.message);
+                }
+            } catch (error) {
+                logger.error('主播统计数据定时任务执行异常:', error);
             }
-        } catch (error) {
-            logger.error('主播统计数据定时任务执行异常:', error);
-        }
-        logger.info('========== 主播统计数据记录任务执行完毕 ==========');
+            logger.info('========== 主播统计数据记录任务执行完毕 ==========');
+        });
     }
 };

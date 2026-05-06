@@ -2,6 +2,7 @@ import express from 'express';
 import cors from "cors";
 
 import { getFile } from '../services/file.js';
+import { securityMiddleware } from '../middleware/security.js';
 import audioRoutes from '../routes/audio.js';
 import albumRoutes from '../routes/album.js';
 import adminRoutes from '../routes/admin.js';
@@ -41,6 +42,10 @@ export default async () => {
     }));
     App.use(express.json());
     App.use(express.urlencoded({ extended: false }));
+
+    // 安全中间件 - 防护扫描攻击（放在日志之前，避免记录过多垃圾日志）
+    App.use(securityMiddleware);
+
     // 请求日志中间件
     App.use((req, res, next) => {
         const clientIp = req.headers["x-forwarded-for"] || req.ip;

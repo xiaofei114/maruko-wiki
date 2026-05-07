@@ -104,8 +104,23 @@ export async function restartWithPM2() {
  */
 export async function getPM2Status() {
     try {
+        // 首先检查 PM2 守护进程是否在运行
+        try {
+            await execAsync('pm2 ping');
+        } catch (pingError) {
+            // PM2 守护进程未运行
+            return { running: false, status: 'pm2_not_running', error: 'PM2 守护进程未启动' };
+        }
+
+        // 获取进程列表
         const { stdout } = await execAsync('pm2 jlist');
         const processes = JSON.parse(stdout);
+
+        // 如果没有进程在运行
+        if (!processes || processes.length === 0) {
+            return { running: false, status: 'no_processes', error: 'PM2 没有运行任何进程' };
+        }
+
         const marukoProcess = processes.find(p => p.name === 'maruko-node');
 
         if (marukoProcess) {
@@ -120,7 +135,7 @@ export async function getPM2Status() {
             };
         }
 
-        return { running: false, status: 'not_found' };
+        return { running: false, status: 'not_found', error: '未找到 maruko-node 进程' };
     } catch (error) {
         return { running: false, status: 'error', error: error.message };
     }

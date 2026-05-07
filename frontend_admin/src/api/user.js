@@ -45,6 +45,11 @@ export function api_resetUserAvatar(id, file) {
     })
 }
 
+// 管理员解绑用户B站账号
+export function api_unbindBilibili(id) {
+    return Client.post(`/api/super-admin/users/${id}/unbind-bilibili`)
+}
+
 //创建用户 (需要另外实现，暂时保留原接口或注释)
 // export function api_addUser(data) {
 //     return Client.post('/api/super-admin/users', data)

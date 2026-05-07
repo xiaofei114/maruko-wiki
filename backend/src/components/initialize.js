@@ -2,6 +2,7 @@ import { readdir, stat } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cron from 'node-cron';
+import { getTaskCron, isTaskEnabled } from '../services/taskConfigManager.js';
 
 // 获取当前文件的目录路径
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,17 @@ async function getAllJsFiles(dir) {
 }
 
 /**
+ * 从文件路径提取任务名称
+ * @param {string} filePath - 文件路径
+ * @returns {string} 任务名称
+ */
+function getTaskNameFromFile(filePath) {
+    // 从路径中提取文件名（不含扩展名）
+    const fileName = filePath.split(/[\\/]/).pop().replace('.js', '');
+    return fileName;
+}
+
+/**
  * 动态导入模块并合并方法
  * @returns {Promise<{get: Object, post: Object}>}
  */
@@ -44,12 +56,29 @@ async function loadAllMethods() {
         try {
             const module = await import(`file://${file}`);
             const defaultExport = module.default;
+            const taskName = getTaskNameFromFile(file);
 
-            cron.schedule(defaultExport.cron, defaultExport.task);
+            // 从配置读取 cron 表达式和启用状态
+            const configCron = getTaskCron(taskName, defaultExport.cron);
+            const enabled = isTaskEnabled(taskName);
 
-            logger.debug(`成功加载模块: ${file}`);
+            if (!enabled) {
+                logger.info(`[定时任务] ${taskName} 已禁用，跳过加载`);
+                continue;
+            }
+
+            // 验证 cron 表达式
+            if (!cron.validate(configCron)) {
+                logger.error(`[定时任务] ${taskName} 的 cron 表达式无效: ${configCron}`);
+                continue;
+            }
+
+            // 注册定时任务
+            cron.schedule(configCron, defaultExport.task);
+
+            logger.info(`[定时任务] ${taskName} 已加载，执行周期: ${configCron}`);
         } catch (error) {
-            logger.error(`加载模块失败: ${file}`, error);
+            logger.error(`[定时任务] 加载模块失败: ${file}`, error);
         }
     }
 }

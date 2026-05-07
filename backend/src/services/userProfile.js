@@ -662,8 +662,8 @@ export async function useBilibiliAvatar(userId) {
     }
 
     // 获取B站用户信息
-    const { getBilibiliUserInfo } = await import('./bilibiliBind.js');
-    const bilibiliInfo = await getBilibiliUserInfo(user.bilibili_uid);
+    const { fetchBilibiliUserInfo } = await import('./bilibiliBind.js');
+    const bilibiliInfo = await fetchBilibiliUserInfo(user.bilibili_uid);
 
     if (!bilibiliInfo || !bilibiliInfo.avatar) {
       return { success: false, message: '无法获取B站头像', code: 400 };

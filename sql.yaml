@@ -12,6 +12,7 @@ user:
   fan_level: 粉丝等级
   captain_type: 舰长类型 (0:无, 1:舰长, 2:提督, 3:总督)
   is_bilibili_bound: 是否为B站绑定用户 (0:否, 1:是)
+  fan_medal_extinguished: 是否已熄灭粉丝等级徽章 (0:否, 1:是)
   create_time: 创建时间
   update_time: 更新时间
 

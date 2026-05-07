@@ -1,11 +1,29 @@
 import { queryOne, update } from '../method/database.js';
 import { createNotification } from '../method/notification.js';
+import { getFanInfoOnBind } from './bilibiliFans.js';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 
 const logger = global.logger;
 const AVATAR_DIR = path.join(process.cwd(), 'data', 'document', 'avatar');
+
+/**
+ * 获取主播UID（从配置中读取）
+ * @returns {string|null} 主播UID
+ */
+function getAnchorRuid() {
+  try {
+    const config = global.appConfig;
+    if (config?.bilibili?.userId) {
+      return config.bilibili.userId.toString();
+    }
+    return null;
+  } catch (error) {
+    logger.error('获取主播UID失败:', error);
+    return null;
+  }
+}
 
 // 确保头像目录存在
 if (!fs.existsSync(AVATAR_DIR)) {
@@ -58,7 +76,7 @@ async function downloadAvatar(avatarUrl, userId) {
  * @param {string} uid - B站UID
  * @returns {Object} 用户信息
  */
-async function fetchBilibiliUserInfo(uid) {
+export async function fetchBilibiliUserInfo(uid) {
   try {
     // 使用B站API获取用户信息
     const response = await axios.get(`https://api.bilibili.com/x/web-interface/card`, {
@@ -93,8 +111,9 @@ async function fetchBilibiliUserInfo(uid) {
 export async function getBilibiliBindInfo(userId) {
   try {
     const user = queryOne(
-      `SELECT bilibili_uid as bilibiliUid, avatar, fan_level as fanLevel, 
-              captain_type as captainType, is_bilibili_bound as isBilibiliBound
+      `SELECT bilibili_uid as bilibiliUid, avatar, fan_level as fanLevel,
+              captain_type as captainType, is_bilibili_bound as isBilibiliBound,
+              fan_medal_extinguished as fanMedalExtinguished
        FROM user WHERE id = ?`,
       [userId]
     );
@@ -108,7 +127,8 @@ export async function getBilibiliBindInfo(userId) {
           username: '',
           avatar: '',
           fanLevel: 0,
-          captainType: 0
+          captainType: 0,
+          fanMedalExtinguished: 0
         }
       };
     }
@@ -128,7 +148,8 @@ export async function getBilibiliBindInfo(userId) {
         username: '', // 可以从其他表获取或缓存
         avatar: avatarUrl,
         fanLevel: user.fanLevel,
-        captainType: user.captainType
+        captainType: user.captainType,
+        fanMedalExtinguished: user.fanMedalExtinguished || 0
       }
     };
   } catch (error) {
@@ -173,6 +194,22 @@ export async function bindBilibiliAccount(userId, uid) {
       };
     }
 
+    // 获取粉丝等级和舰长信息（从Redis缓存）
+    let fanInfo = { fanLevel: 0, guardLevel: 0 };
+    const ruid = getAnchorRuid();
+    if (ruid) {
+      const fanResult = await getFanInfoOnBind(userId, uid.trim(), ruid);
+      if (fanResult.success) {
+        fanInfo = {
+          fanLevel: fanResult.fanLevel || 0,
+          guardLevel: fanResult.guardLevel || 0
+        };
+        logger.info(`用户 ${userId} 绑定B站，粉丝信息: level=${fanInfo.fanLevel}, guard=${fanInfo.guardLevel}`);
+      }
+    } else {
+      logger.warn('未配置主播UID，无法获取粉丝等级信息');
+    }
+
     // 下载头像到本地
     let avatarFileName = null;
     let avatarDbPath = null;
@@ -200,10 +237,11 @@ export async function bindBilibiliAccount(userId, uid) {
         bilibili_uid = ?, 
         avatar = ?, 
         fan_level = ?, 
+        captain_type = ?,
         is_bilibili_bound = 1, 
         update_time = ?
        WHERE id = ?`,
-      [uid.trim(), avatarDbPath, bilibiliInfo.fanLevel, currentTime, userId]
+      [uid.trim(), avatarDbPath, fanInfo.fanLevel, fanInfo.guardLevel, currentTime, userId]
     );
 
     logger.info(`用户 ${userId} 绑定了B站账号 ${uid}`);
@@ -223,7 +261,8 @@ export async function bindBilibiliAccount(userId, uid) {
         bilibiliUid: uid.trim(),
         username: bilibiliInfo.username,
         avatar: avatarDbPath ? `/file/${avatarDbPath}` : null,
-        fanLevel: bilibiliInfo.fanLevel
+        fanLevel: fanInfo.fanLevel,
+        guardLevel: fanInfo.guardLevel
       }
     };
   } catch (error) {
@@ -240,7 +279,7 @@ export async function bindBilibiliAccount(userId, uid) {
 export async function unbindBilibiliAccount(userId) {
   try {
     const user = queryOne(
-      `SELECT is_bilibili_bound, avatar FROM user WHERE id = ?`,
+      `SELECT is_bilibili_bound as isBilibiliBound, avatar FROM user WHERE id = ?`,
       [userId]
     );
 

@@ -19,6 +19,7 @@ import {
     deletePhoto,
     createAlbum
 } from '../services/album.js';
+import { syncFansToRedis, getFansDataStats } from '../services/bilibiliFans.js';
 
 const router = express.Router();
 
@@ -164,5 +165,39 @@ router.delete('/photos/:id', ...createAdminValidatedRouteHandler({
 }, async (req) => {
     return await deletePhoto(req.params.id, req.user.id);
 }, 2, 500, { logName: '删除照片' }));
+
+// ==================== B站粉丝管理 ====================
+
+/**
+ * 手动触发粉丝数据同步
+ * POST /api/admin/bilibili/fans-sync
+ */
+router.post('/bilibili/fans-sync', ...createAdminRoute(async (req) => {
+    const config = global.appConfig;
+    const ruid = config?.bilibili?.userId?.toString();
+    
+    if (!ruid) {
+        return { success: false, message: '未配置主播UID' };
+    }
+    
+    const result = await syncFansToRedis(ruid);
+    return result;
+}, 1, { logName: '手动同步B站粉丝数据' }));
+
+/**
+ * 获取粉丝缓存状态
+ * GET /api/admin/bilibili/fans-status
+ */
+router.get('/bilibili/fans-status', ...createAdminRoute(async (req) => {
+    const config = global.appConfig;
+    const ruid = config?.bilibili?.userId?.toString();
+    
+    if (!ruid) {
+        return { success: false, message: '未配置主播UID' };
+    }
+    
+    const stats = await getFansDataStats(ruid);
+    return { success: true, data: stats };
+}, 2, { logName: '获取B站粉丝缓存状态' }));
 
 export default router;

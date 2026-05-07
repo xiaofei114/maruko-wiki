@@ -352,6 +352,42 @@ const getIndentStyle = (level) => {
   return { paddingLeft: `${level * 20 + 10}px` }
 }
 
+// 递归解析嵌套的 JSON 字符串
+const parseJsonValue = (value, depth = 0) => {
+  // 防止无限递归
+  if (depth > 10) return value
+  
+  if (value === null || value === undefined) return null
+  
+  // 如果是数组，递归处理每个元素
+  if (Array.isArray(value)) {
+    return value.map(item => parseJsonValue(item, depth + 1))
+  }
+  
+  // 如果是对象，递归处理每个属性
+  if (typeof value === 'object') {
+    const result = {}
+    for (const key in value) {
+      result[key] = parseJsonValue(value[key], depth + 1)
+    }
+    return result
+  }
+  
+  // 尝试解析 JSON 字符串
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      // 如果解析成功，继续递归解析
+      return parseJsonValue(parsed, depth + 1)
+    } catch (e) {
+      // 不是有效的 JSON，返回原始字符串
+      return value
+    }
+  }
+  
+  return value
+}
+
 onMounted(() => {
   fetchKeys()
   fetchRedisInfo()
@@ -530,7 +566,7 @@ onMounted(() => {
     </el-dialog>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" title="键值详情" width="700px">
+    <el-dialog v-model="detailDialogVisible" title="键值详情" width="800px">
       <div v-loading="detailLoading" v-if="detailData">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="键名">{{ detailData.key }}</el-descriptions-item>
@@ -544,8 +580,15 @@ onMounted(() => {
         </el-descriptions>
         <div class="detail-value">
           <div class="detail-label">值:</div>
-          <pre class="value-content">{{ typeof detailData.value === 'object' ? JSON.stringify(detailData.value, null, 2) :
-            detailData.value }}</pre>
+          <div class="value-content">
+            <json-viewer 
+              :value="parseJsonValue(detailData.value)" 
+              :expand-depth="2" 
+              boxed 
+              copyable
+              sort
+            />
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -687,15 +730,20 @@ onMounted(() => {
 }
 
 .value-content {
-  background: #f5f7fa;
-  padding: 15px;
-  border-radius: 4px;
-  max-height: 400px;
+  max-height: 500px;
   overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-family: monospace;
-  font-size: 13px;
-  line-height: 1.5;
+}
+
+.value-content :deep(.jv-container) {
+  background: #f5f7fa;
+}
+
+.value-content :deep(.jv-container.boxed) {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+}
+
+.value-content :deep(.jv-code) {
+  padding: 10px;
 }
 </style>

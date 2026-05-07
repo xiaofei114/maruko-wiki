@@ -1,0 +1,35 @@
+# 定时任务配置
+# cron表达式格式: 秒 分 时 日 月 周 (部分任务使用: 分 时 日 月 周)
+
+tasks:
+  # 粉丝牌信息同步任务
+  # 每天凌晨3:00执行，同步B站粉丝列表到Redis并更新用户粉丝牌信息
+  bilibiliFansSync:
+    cron: "0 0 3 * * *"
+    enabled: true
+    name: "粉丝牌同步"
+    description: "B站粉丝牌信息同步"
+
+  # 主播统计数据记录任务
+  # 每天凌晨4:00执行，记录粉丝数和舰长数
+  anchorStats:
+    cron: "0 4 * * *"
+    enabled: true
+    name: "主播统计"
+    description: "主播统计数据记录"
+
+  # 直播时长统计任务
+  # 每分钟检查一次直播状态，记录直播时长
+  liveDuration:
+    cron: "*/1 * * * *"
+    enabled: true
+    name: "直播时长统计"
+    description: "直播时长统计"
+
+  # 视频每周推荐数据重置任务
+  # 每周一00:00执行，重置本周推荐数据
+  videoWeeklyReset:
+    cron: "0 0 * * 1"
+    enabled: true
+    name: "视频每周重置"
+    description: "视频每周推荐数据重置"

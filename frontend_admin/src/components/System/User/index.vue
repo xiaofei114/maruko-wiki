@@ -1,10 +1,10 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { get_userlist, api_setBanStatus, api_resetPassword, api_updatePermission, user_deleteUser, api_resetUserName, api_resetUserAvatar } from "@/api/user.js"
+import { get_userlist, api_setBanStatus, api_resetPassword, api_updatePermission, user_deleteUser, api_resetUserName, api_resetUserAvatar, api_unbindBilibili } from "@/api/user.js"
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getSysDict } from '@/utils/sys.js'
 import { useUserStore } from '@/stores/user.js'
-import { Sort, Edit, Delete, Key, Search, Refresh, User, Picture, InfoFilled } from '@element-plus/icons-vue'
+import { Sort, Edit, Delete, Key, Search, Refresh, User, Picture, InfoFilled, Link } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const { sys_user_permission } = await getSysDict('sys_user_permission')
@@ -209,6 +209,28 @@ const confirmResetAvatar = () => {
         })
     })
 }
+
+// 解绑B站账号
+const unbindBilibili = (data) => {
+    ElMessageBox.confirm(
+        `确定要解绑用户「${data.name}」的B站账号吗？`,
+        '解绑B站账号',
+        {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+        }
+    ).then(() => {
+        api_unbindBilibili(data.id).then(res => {
+            if (res.code == 200) {
+                ElMessage.success("解绑B站账号成功")
+                getlist()
+            } else {
+                ElMessage.error(res.message || "解绑失败")
+            }
+        })
+    })
+}
 </script>
 
 <template>
@@ -277,7 +299,14 @@ const confirmResetAvatar = () => {
                         v-model="data.row.is_banned" />
                 </template>
             </el-table-column>
-            <el-table-column align="center" label="操作" width="430">
+            <el-table-column align="center" label="B站绑定" width="100">
+                <template #default="data">
+                    <el-tag :type="data.row.isBilibiliBound ? 'success' : 'info'" size="small">
+                        {{ data.row.isBilibiliBound ? '已绑定' : '未绑定' }}
+                    </el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column align="center" label="操作" width="520">
                 <template #default=data>
                     <el-button type="primary" text class="button" @click="modifyPermissions(data.row)"
                         :disabled="data.row.permission === 1">
@@ -308,6 +337,16 @@ const confirmResetAvatar = () => {
                             <Delete />
                         </el-icon>
                         删除
+                    </el-button>
+                    <el-button 
+                        type="info" 
+                        text 
+                        class="button" 
+                        @click="unbindBilibili(data.row)"
+                        :disabled="data.row.permission === 1 || !data.row.isBilibiliBound"
+                    >
+                        <el-icon><Link /></el-icon>
+                        解绑B站
                     </el-button>
                 </template>
             </el-table-column>

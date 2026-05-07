@@ -1,6 +1,26 @@
+const fs = require('fs');
+const path = require('path');
+const YAML = require('yaml');
+
+// 读取配置文件
+function loadConfig() {
+    try {
+        const configPath = path.join(__dirname, 'configs', 'config.yaml');
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        const config = YAML.parse(configContent);
+        return config;
+    } catch (error) {
+        console.error('读取配置文件失败:', error);
+        return { log: { prefix: 'maruko-node' } };
+    }
+}
+
+const config = loadConfig();
+const appName = config.log?.prefix || 'maruko-node';
+
 module.exports = {
     apps: [{
-        name: 'maruko-node',
+        name: appName,
         script: './app.js',
         cwd: __dirname,
 
@@ -30,44 +50,15 @@ module.exports = {
             NODE_ENV: 'production'
         },
 
-        // 文件监听（用于配置热更新）
-        watch: false,  // 默认关闭，通过配置管理开启
-        watch_delay: 2000,
-        ignore_watch: ['node_modules', 'logs', 'data', 'uploads', '.git'],
+        // 监控
+        watch: false,
+        ignore_watch: ['node_modules', 'logs', 'data'],
 
-        // 优雅关闭
+        // 启动配置
         kill_timeout: 5000,
         listen_timeout: 10000,
 
-        // 重启延迟
-        restart_delay: 2000,
-
         // 错误处理
-        stop_exit_codes: [0],
-
-        // 元数据
-        instance_var: 'INSTANCE_ID',
-        merge_logs: true,
-
-        // 启动参数
-        node_args: [],
-
-        // PM2 模块配置
-        pmx: false,
-        automation: false,
-
-        // 健康检查
-        // health_check_grace_period: 30000,
-
-        // 自定义指标
-        // metrics: {
-        //     http_latency: {
-        //         type: 'histogram',
-        //         name: 'http_request_duration_seconds',
-        //         help: 'Duration of HTTP requests in seconds',
-        //         labelNames: ['method', 'route', 'status_code'],
-        //         buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5, 7, 10]
-        //     }
-        // }
+        exp_backoff_restart_delay: 100
     }]
 };

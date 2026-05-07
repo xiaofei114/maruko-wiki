@@ -677,14 +677,8 @@ location / {
 
 ### B. 友情链接
 
-编辑 `frontend/src/components/Top.vue`：
-
-```javascript
-const friendlyLinks = [
-  { name: '友站名称', url: 'https://example.com' },
-]
-```
+从[友链接口网站](https://www.maruko-wiki.com/)获取友情链接。
 
 ***
 
-*本文档最后更新于 2026-05-06*
+*本文档最后更新于 2026-05-07*

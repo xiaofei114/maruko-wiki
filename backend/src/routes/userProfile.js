@@ -20,6 +20,7 @@ import {
   useBilibiliAvatar
 } from '../services/userProfile.js';
 import { getBilibiliBindInfo, bindBilibiliAccount, unbindBilibiliAccount } from '../services/bilibiliBind.js';
+import { getFansDataStats, hasFansDataInRedis } from '../services/bilibiliFans.js';
 import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, getUnreadNotificationCount } from '../services/notification.js';
 import { getUserAlbums } from '../services/album.js';
 import { getUserAudioClassifications } from '../services/audio.js';
@@ -259,6 +260,22 @@ router.post('/bilibili/bind', createRouteHandler(async (req) => {
  */
 router.delete('/bilibili/bind', createRouteHandler(async (req) => {
   return await unbindBilibiliAccount(req.user.id);
+}));
+
+/**
+ * 获取B站粉丝缓存状态
+ * GET /api/user/bilibili/fans-status
+ */
+router.get('/bilibili/fans-status', createRouteHandler(async (req) => {
+  const config = global.appConfig;
+  const ruid = config?.bilibili?.userId?.toString();
+  
+  if (!ruid) {
+    return { success: false, message: '未配置主播UID' };
+  }
+  
+  const stats = await getFansDataStats(ruid);
+  return { success: true, data: stats };
 }));
 
 /**

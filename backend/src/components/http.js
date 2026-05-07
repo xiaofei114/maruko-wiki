@@ -21,6 +21,7 @@ import anchorStatsRoutes from '../routes/anchorStats.js';
 import captainGiftRoutes from '../routes/captainGift.js';
 import redisAdminRoutes from '../routes/redisAdmin.js';
 import configRoutes from '../routes/config.js';
+import taskConfigRoutes from '../routes/taskConfig.js';
 import homeModulesRoutes from '../routes/homeModules.js';
 import chalk from 'chalk';
 
@@ -75,6 +76,7 @@ export default async () => {
     App.use('/api/ai', aiRoutes); // AI相关路由
     App.use('/api', redisAdminRoutes); // Redis 管理路由（超级管理员）
     App.use('/api/admin/config', configRoutes); // 系统配置管理路由
+    App.use('/api/admin/task-config', taskConfigRoutes); // 定时任务配置管理路由
 
     // 通过url获取/data/document下的文件 - 必须在用户路由之前
     App.get('/api/file/*', async (req, res) => {

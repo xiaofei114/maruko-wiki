@@ -7,7 +7,8 @@ import {
     resetUserPassword,
     deleteUser,
     adminResetUserName,
-    adminResetUserAvatar
+    adminResetUserAvatar,
+    adminUnbindBilibili
 } from '../services/user.js';
 import { getDashboardStats } from '../services/dashboard.js';
 import { getUploadLimit } from "../method/read.js"
@@ -205,5 +206,23 @@ router.post('/users/:id/reset-avatar', upload.single('avatar'), ...createAdminVa
     
     return result;
 }, 1, 500, { logName: '重置用户头像' }));
+
+// 管理员解绑用户B站账号
+router.post('/users/:id/unbind-bilibili', ...createAdminValidatedRouteHandler({
+    id: { source: 'params', type: 'id', required: true }
+}, async (req) => {
+    const result = await adminUnbindBilibili(req.params.id, req.user.id);
+
+    // 记录高危操作日志
+    if (result.success) {
+        logUserOperation(req, '解绑B站账号', {
+            userId: req.params.id,
+            operatorId: req.user.id,
+            operatorName: req.user.name
+        });
+    }
+
+    return result;
+}, 1, 500, { logName: '解绑B站账号' }));
 
 export default router;

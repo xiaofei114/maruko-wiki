@@ -340,7 +340,8 @@ export async function getUsers(params = {}) {
         // 如果没有分页参数，返回全部用户
         if (!pageSize) {
             const users = queryAll(`
-                SELECT id, name, account_number, permission, is_banned, create_time
+                SELECT id, name, account_number, permission, is_banned, create_time,
+                       is_bilibili_bound as isBilibiliBound, bilibili_uid as bilibiliUid
                 FROM user
                 ${whereClause}
                 ORDER BY ${finalSortBy} ${finalSortOrder}, create_time ${finalSortOrder}
@@ -356,7 +357,8 @@ export async function getUsers(params = {}) {
 
         // 分页查询
         const users = queryAll(`
-            SELECT id, name, account_number, permission, is_banned, create_time
+            SELECT id, name, account_number, permission, is_banned, create_time,
+                   is_bilibili_bound as isBilibiliBound, bilibili_uid as bilibiliUid
             FROM user
             ${whereClause}
             ORDER BY ${finalSortBy} ${finalSortOrder}, create_time ${finalSortOrder}
@@ -840,5 +842,63 @@ export async function resetPasswordByEmail(email, verificationCode, newPassword)
     } catch (error) {
         logger.error('重置密码失败:', error);
         return createErrorResponse('重置密码失败: ' + error.message, 500);
+    }
+}
+
+/**
+ * 管理员解绑用户B站账号
+ * @param {number} userId - 用户ID
+ * @param {number} adminId - 操作管理员ID
+ * @returns {object} 操作结果
+ */
+export async function adminUnbindBilibili(userId, adminId) {
+    try {
+        // 检查用户是否存在
+        const user = queryOne(
+            'SELECT id, name, is_bilibili_bound, bilibili_uid, avatar FROM user WHERE id = ? AND is_deleted = 0',
+            [userId]
+        );
+        if (!user) {
+            return { success: false, message: '用户不存在', code: 404 };
+        }
+
+        // 检查是否绑定了B站账号
+        if (!user.is_bilibili_bound) {
+            return { success: false, message: '该用户未绑定B站账号', code: 400 };
+        }
+
+        const currentTime = getCurrentTimestamp();
+
+        // 更新用户表，清除B站绑定信息
+        update(
+            `UPDATE user SET
+                bilibili_uid = NULL,
+                avatar = NULL,
+                fan_level = 0,
+                captain_type = 0,
+                is_bilibili_bound = 0,
+                update_time = ?
+             WHERE id = ?`,
+            [currentTime, userId]
+        );
+
+        logger.info(`管理员 ${adminId} 解绑了用户 ${userId} 的B站账号`);
+
+        // 发送通知给用户
+        await createNotification(
+            userId,
+            '账号解绑通知',
+            '管理员已为您解绑B站账号',
+            'security'
+        );
+
+        return {
+            success: true,
+            message: '解绑B站账号成功',
+            data: { userId, bilibiliUid: user.bilibili_uid }
+        };
+    } catch (error) {
+        logger.error('管理员解绑B站账号失败:', error);
+        return { success: false, message: '解绑B站账号失败', code: 500 };
     }
 }

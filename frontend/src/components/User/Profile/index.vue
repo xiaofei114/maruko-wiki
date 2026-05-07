@@ -10,6 +10,9 @@ import {
   InfoFilled, Message, ArrowLeft, Delete, More, ZoomIn, ArrowRight, Lock, Star, Link, Plus, Setting
 } from '@element-plus/icons-vue'
 import defaultAvatar from '@/assets/猫玩伴.png'
+import zongduIcon from '@/assets/bilibili/总督.png'
+import tiduIcon from '@/assets/bilibili/提督.png'
+import jianzhangIcon from '@/assets/bilibili/舰长.png'
 import {
   getUserProfile,
   getUserPhotos,
@@ -41,6 +44,8 @@ import { deleteVideo, moveVideoToFavorite, getMyFavorites } from '@/api/videoFav
 const router = useRouter()
 const userStore = useUserStore()
 const { user, isAuthenticated } = storeToRefs(userStore)
+
+const ddName = import.meta.env.VITE_APP_DD_NAME
 
 // 构建文件URL（根据环境添加/api前缀）
 const baseUrl = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : (import.meta.env.VITE_APP_BASE_URL?.replace(/\/api\/?$/, '') || '')
@@ -131,8 +136,33 @@ const bilibiliBind = ref({
   uid: '',
   username: '',
   avatar: '',
-  fanLevel: 0
+  fanLevel: 0,
+  guardLevel: 0,
+  fanMedalExtinguished: 0
 })
+
+// 舰长等级图标映射
+const guardLevelIcons = {
+  1: zongduIcon,    // 总督
+  2: tiduIcon,      // 提督
+  3: jianzhangIcon  // 舰长
+}
+
+// 舰长等级样式映射
+const guardLevelStyles = {
+  0: { label: `${import.meta.env.VITE_APP_DD_NAME}`, bgColor: '#e3f2fd', textColor: '#2196f3', borderColor: '#bbdefb' },      // 未上舰 - 浅蓝
+  1: { label: '总督', bgColor: '#fff8e1', textColor: '#ff8f00', borderColor: '#ffecb3' },         // 总督 - 金色
+  2: { label: '提督', bgColor: '#f3e5f5', textColor: '#7b1fa2', borderColor: '#e1bee7' },         // 提督 - 紫色
+  3: { label: '舰长', bgColor: '#e8eaf6', textColor: '#303f9f', borderColor: '#c5cae9' }          // 舰长 - 蓝色
+}
+
+// 粉丝牌熄灭样式
+const extinguishedStyle = {
+  label: `${import.meta.env.VITE_APP_DD_NAME}`,
+  bgColor: '#f5f5f5',
+  textColor: '#9e9e9e',
+  borderColor: '#e0e0e0'
+}
 const bilibiliDialogVisible = ref(false)
 const bilibiliForm = ref({
   uid: '',
@@ -372,7 +402,9 @@ async function fetchUserInfo() {
     if (bilibiliRes.code === 200) {
       bilibiliBind.value = {
         ...bilibiliRes.data,
-        avatar: buildFileUrl(bilibiliRes.data.avatar)
+        avatar: buildFileUrl(bilibiliRes.data.avatar),
+        guardLevel: bilibiliRes.data.captainType || 0,  // captainType 对应 guardLevel
+        fanMedalExtinguished: bilibiliRes.data.fanMedalExtinguished || 0
       }
     }
   } catch (err) {
@@ -458,12 +490,12 @@ function startEditName() {
 async function saveName() {
   // 防止重复提交
   if (isSavingName.value) return
-  
+
   if (editingName.value.trim() === originalName.value) {
     isEditingName.value = false
     return
   }
-  
+
   isSavingName.value = true
   try {
     await ElMessageBox.confirm(`确定要修改为"${editingName.value.trim()}"吗？`, '确认修改', {
@@ -561,14 +593,14 @@ async function openEditDialog(type, item) {
     albumId: item.album_id || null,
     classificationId: item.classification_id || null
   }
-  
+
   // 根据类型获取分类或相册列表
   if (type === 'audio') {
     await fetchAudioClassifications()
   } else if (type === 'photo') {
     await fetchUserAlbums()
   }
-  
+
   editDialogVisible.value = true
 }
 
@@ -657,10 +689,6 @@ async function saveEdit() {
 
 // 打开B站绑定对话框
 function openBilibiliDialog() {
-  // TODO: 实现B站账号功能
-  ElMessage.info('功能开发中...')
-  return
-
   bilibiliForm.value = { uid: '', agreed: false }
   bilibiliDialogVisible.value = true
 }
@@ -723,7 +751,9 @@ async function bindBilibili() {
         uid: res.data.uid,
         username: res.data.username,
         avatar: buildFileUrl(res.data.avatar),
-        fanLevel: res.data.fanLevel
+        fanLevel: res.data.fanLevel,
+        guardLevel: res.data.guardLevel || 0,
+        fanMedalExtinguished: res.data.isExtinguished ? 1 : 0
       }
       ElMessage.success('B站账号绑定成功')
       bilibiliDialogVisible.value = false
@@ -756,6 +786,8 @@ async function unbindBilibili() {
         avatar: '',
         fanLevel: 0
       }
+      // 刷新用户信息，更新头像等数据
+      await fetchUserInfo()
       ElMessage.success('已解绑B站账号')
     } else {
       ElMessage.error(res.message || '解绑失败')
@@ -1078,7 +1110,9 @@ watch(activeMenu, async (newMenu) => {
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="back-btn" @click="goBack">
-          <el-icon><ArrowLeft /></el-icon>
+          <el-icon>
+            <ArrowLeft />
+          </el-icon>
           <span>返回</span>
         </div>
       </div>
@@ -1091,65 +1125,51 @@ watch(activeMenu, async (newMenu) => {
       </div>
 
       <nav class="sidebar-nav">
-        <div
-          class="nav-item"
-          :class="{ active: activeMenu === 'home' }"
-          @click="activeMenu = 'home'"
-        >
-          <el-icon><HomeFilled /></el-icon>
+        <div class="nav-item" :class="{ active: activeMenu === 'home' }" @click="activeMenu = 'home'">
+          <el-icon>
+            <HomeFilled />
+          </el-icon>
           <span>我的主页</span>
         </div>
-        <div
-          class="nav-item"
-          :class="{ active: activeMenu === 'messages' }"
-          @click="activeMenu = 'messages'"
-        >
-          <el-icon><Bell /></el-icon>
+        <div class="nav-item" :class="{ active: activeMenu === 'messages' }" @click="activeMenu = 'messages'">
+          <el-icon>
+            <Bell />
+          </el-icon>
           <span>消息</span>
           <el-badge v-if="unreadCount > 0" :value="unreadCount" class="message-badge" />
         </div>
-        <div
-          class="nav-item"
-          :class="{ active: activeMenu === 'account' }"
-          @click="activeMenu = 'account'"
-        >
-          <el-icon><InfoFilled /></el-icon>
+        <div class="nav-item" :class="{ active: activeMenu === 'account' }" @click="activeMenu = 'account'">
+          <el-icon>
+            <InfoFilled />
+          </el-icon>
           <span>账号信息</span>
         </div>
         <div class="nav-divider"></div>
-        <div
-          class="nav-item"
-          :class="{ active: activeMenu === 'audios' }"
-          @click="activeMenu = 'audios'"
-        >
-          <el-icon><Headset /></el-icon>
+        <div class="nav-item" :class="{ active: activeMenu === 'audios' }" @click="activeMenu = 'audios'">
+          <el-icon>
+            <Headset />
+          </el-icon>
           <span>我的音声</span>
           <span class="nav-count">{{ audioTotal }}</span>
         </div>
-        <div
-          class="nav-item"
-          :class="{ active: activeMenu === 'photos' }"
-          @click="activeMenu = 'photos'"
-        >
-          <el-icon><Picture /></el-icon>
+        <div class="nav-item" :class="{ active: activeMenu === 'photos' }" @click="activeMenu = 'photos'">
+          <el-icon>
+            <Picture />
+          </el-icon>
           <span>我的相片</span>
           <span class="nav-count">{{ photoTotal }}</span>
         </div>
-        <div
-          class="nav-item"
-          :class="{ active: activeMenu === 'plans' }"
-          @click="activeMenu = 'plans'"
-        >
-          <el-icon><Document /></el-icon>
+        <div class="nav-item" :class="{ active: activeMenu === 'plans' }" @click="activeMenu = 'plans'">
+          <el-icon>
+            <Document />
+          </el-icon>
           <span>我的企划</span>
           <span class="nav-count">{{ planTotal }}</span>
         </div>
-        <div
-          class="nav-item"
-          :class="{ active: activeMenu === 'videos' }"
-          @click="activeMenu = 'videos'"
-        >
-          <el-icon><VideoPlay /></el-icon>
+        <div class="nav-item" :class="{ active: activeMenu === 'videos' }" @click="activeMenu = 'videos'">
+          <el-icon>
+            <VideoPlay />
+          </el-icon>
           <span>我的视频</span>
           <span class="nav-count">{{ videoTotal }}</span>
         </div>
@@ -1161,32 +1181,40 @@ watch(activeMenu, async (newMenu) => {
       <!-- 我的主页 -->
       <div v-if="activeMenu === 'home'" class="content-section">
         <h2 class="section-title">我的主页</h2>
-        
+
         <!-- 统计卡片 -->
         <div class="home-stats">
           <div class="stat-card" @click="activeMenu = 'photos'">
-            <el-icon class="stat-icon picture"><Picture /></el-icon>
+            <el-icon class="stat-icon picture">
+              <Picture />
+            </el-icon>
             <div class="stat-info">
               <span class="stat-number">{{ photoTotal }}</span>
               <span class="stat-label">照片</span>
             </div>
           </div>
           <div class="stat-card" @click="activeMenu = 'audios'">
-            <el-icon class="stat-icon audio"><Headset /></el-icon>
+            <el-icon class="stat-icon audio">
+              <Headset />
+            </el-icon>
             <div class="stat-info">
               <span class="stat-number">{{ audioTotal }}</span>
               <span class="stat-label">音声</span>
             </div>
           </div>
           <div class="stat-card" @click="activeMenu = 'plans'">
-            <el-icon class="stat-icon plan"><Document /></el-icon>
+            <el-icon class="stat-icon plan">
+              <Document />
+            </el-icon>
             <div class="stat-info">
               <span class="stat-number">{{ planTotal }}</span>
               <span class="stat-label">企划</span>
             </div>
           </div>
           <div class="stat-card" @click="activeMenu = 'videos'">
-            <el-icon class="stat-icon video"><VideoPlay /></el-icon>
+            <el-icon class="stat-icon video">
+              <VideoPlay />
+            </el-icon>
             <div class="stat-info">
               <span class="stat-number">{{ videoTotal }}</span>
               <span class="stat-label">视频</span>
@@ -1200,31 +1228,41 @@ watch(activeMenu, async (newMenu) => {
           <div class="action-grid">
             <div class="action-item" @click="$router.push('/photo-album')">
               <div class="action-icon photo-action">
-                <el-icon><Picture /></el-icon>
+                <el-icon>
+                  <Picture />
+                </el-icon>
               </div>
               <span class="action-text">上传照片</span>
             </div>
             <div class="action-item" @click="$router.push('/audio')">
               <div class="action-icon audio-action">
-                <el-icon><Headset /></el-icon>
+                <el-icon>
+                  <Headset />
+                </el-icon>
               </div>
               <span class="action-text">上传音声</span>
             </div>
             <div class="action-item" @click="$router.push('/plan-document')">
               <div class="action-icon plan-action">
-                <el-icon><Document /></el-icon>
+                <el-icon>
+                  <Document />
+                </el-icon>
               </div>
               <span class="action-text">上传企划</span>
             </div>
             <div class="action-item" @click="$router.push('/video-favorite')">
               <div class="action-icon video-action">
-                <el-icon><VideoPlay /></el-icon>
+                <el-icon>
+                  <VideoPlay />
+                </el-icon>
               </div>
               <span class="action-text">上传视频</span>
             </div>
             <div class="action-item" @click="activeMenu = 'account'">
               <div class="action-icon setting-action">
-                <el-icon><User /></el-icon>
+                <el-icon>
+                  <User />
+                </el-icon>
               </div>
               <span class="action-text">编辑资料</span>
             </div>
@@ -1236,16 +1274,14 @@ watch(activeMenu, async (newMenu) => {
           <div class="section-header">
             <h3>最近照片</h3>
             <el-button type="primary" link @click="activeMenu = 'photos'">
-              查看全部 <el-icon><ArrowRight /></el-icon>
+              查看全部 <el-icon>
+                <ArrowRight />
+              </el-icon>
             </el-button>
           </div>
           <div class="recent-photos">
-            <div
-              v-for="photo in uploads.photos.slice(0, 8)"
-              :key="photo.id"
-              class="recent-photo-item"
-              @click="openImageViewer(photo.url)"
-            >
+            <div v-for="photo in uploads.photos.slice(0, 8)" :key="photo.id" class="recent-photo-item"
+              @click="openImageViewer(photo.url)">
               <el-image :src="photo.url" fit="cover" />
             </div>
           </div>
@@ -1256,29 +1292,25 @@ watch(activeMenu, async (newMenu) => {
           <div class="section-header">
             <h3>最近音声</h3>
             <el-button type="primary" link @click="activeMenu = 'audios'">
-              查看全部 <el-icon><ArrowRight /></el-icon>
+              查看全部 <el-icon>
+                <ArrowRight />
+              </el-icon>
             </el-button>
           </div>
           <div class="recent-audios-list">
-            <div
-              v-for="audio in uploads.audios.slice(0, 5)"
-              :key="audio.id"
-              class="recent-audio-row"
-              @click="toggleAudioPlay(audio)"
-            >
+            <div v-for="audio in uploads.audios.slice(0, 5)" :key="audio.id" class="recent-audio-row"
+              @click="toggleAudioPlay(audio)">
               <div class="audio-row-icon">
-                <el-icon><Headset /></el-icon>
+                <el-icon>
+                  <Headset />
+                </el-icon>
               </div>
               <div class="audio-row-info">
                 <div class="audio-row-name">{{ audio.name }}</div>
                 <div class="audio-row-meta">{{ audio.classification_name }} · {{ audio.upload_time }}</div>
               </div>
-              <el-button
-                type="primary"
-                link
-                :icon="playingAudioId === audio.id ? VideoPause : VideoPlay"
-                class="audio-play-btn"
-              >
+              <el-button type="primary" link :icon="playingAudioId === audio.id ? VideoPause : VideoPlay"
+                class="audio-play-btn">
                 {{ playingAudioId === audio.id ? '暂停' : '播放' }}
               </el-button>
             </div>
@@ -1290,17 +1322,17 @@ watch(activeMenu, async (newMenu) => {
           <div class="section-header">
             <h3>最近企划</h3>
             <el-button type="primary" link @click="activeMenu = 'plans'">
-              查看全部 <el-icon><ArrowRight /></el-icon>
+              查看全部 <el-icon>
+                <ArrowRight />
+              </el-icon>
             </el-button>
           </div>
           <div class="recent-plans">
-            <div
-              v-for="plan in uploads.plans.slice(0, 3)"
-              :key="plan.id"
-              class="recent-plan-item"
-            >
+            <div v-for="plan in uploads.plans.slice(0, 3)" :key="plan.id" class="recent-plan-item">
               <div class="plan-icon-small">
-                <el-icon><Document /></el-icon>
+                <el-icon>
+                  <Document />
+                </el-icon>
               </div>
               <div class="plan-info">
                 <div class="plan-title">{{ plan.title }}</div>
@@ -1317,19 +1349,18 @@ watch(activeMenu, async (newMenu) => {
           <div class="section-header">
             <h3>最新通知</h3>
             <el-button type="primary" link @click="activeMenu = 'messages'">
-              查看全部 <el-icon><ArrowRight /></el-icon>
+              查看全部 <el-icon>
+                <ArrowRight />
+              </el-icon>
             </el-button>
           </div>
           <div class="recent-messages">
-            <div
-              v-for="msg in messages.slice(0, 3)"
-              :key="msg.id"
-              class="recent-message-item"
-              :class="{ unread: !msg.read }"
-              @click="markAsRead(msg)"
-            >
+            <div v-for="msg in messages.slice(0, 3)" :key="msg.id" class="recent-message-item"
+              :class="{ unread: !msg.read }" @click="markAsRead(msg)">
               <div class="message-icon-small">
-                <el-icon><Bell /></el-icon>
+                <el-icon>
+                  <Bell />
+                </el-icon>
               </div>
               <div class="message-info">
                 <div class="message-title">{{ msg.title }}</div>
@@ -1345,33 +1376,26 @@ watch(activeMenu, async (newMenu) => {
       <div v-else-if="activeMenu === 'messages'" class="content-section">
         <div class="section-header-with-action">
           <h2 class="section-title">消息通知</h2>
-          <el-button
-            v-if="unreadCount > 0"
-            type="primary"
-            link
-            :icon="Check"
-            @click="markAllAsRead"
-          >
+          <el-button v-if="unreadCount > 0" type="primary" link :icon="Check" @click="markAllAsRead">
             全部已读
           </el-button>
         </div>
         <!-- 空状态提示 -->
         <div v-if="messages.length === 0" class="empty-state">
-          <el-icon :size="48" class="empty-icon"><Bell /></el-icon>
+          <el-icon :size="48" class="empty-icon">
+            <Bell />
+          </el-icon>
           <div class="empty-text">暂无消息</div>
           <div class="empty-subtext">当有新通知时，会显示在这里</div>
         </div>
         <template v-else>
           <div class="message-list">
-            <div
-              v-for="msg in paginatedMessages"
-              :key="msg.id"
-              class="message-item"
-              :class="{ unread: !msg.read }"
-              @click="markAsRead(msg)"
-            >
+            <div v-for="msg in paginatedMessages" :key="msg.id" class="message-item" :class="{ unread: !msg.read }"
+              @click="markAsRead(msg)">
               <div class="message-icon">
-                <el-icon><Bell /></el-icon>
+                <el-icon>
+                  <Bell />
+                </el-icon>
               </div>
               <div class="message-content">
                 <div class="message-title">{{ msg.title }}</div>
@@ -1382,14 +1406,9 @@ watch(activeMenu, async (newMenu) => {
             </div>
           </div>
           <div v-if="messageTotal > messagePagination.pageSize" class="pagination-wrapper">
-            <el-pagination
-              small
-              layout="prev, pager, next"
-              :total="messageTotal"
-              :page-size="messagePagination.pageSize"
-              :current-page="messagePagination.currentPage"
-              @current-change="handleMessagePageChange"
-            />
+            <el-pagination small layout="prev, pager, next" :total="messageTotal"
+              :page-size="messagePagination.pageSize" :current-page="messagePagination.currentPage"
+              @current-change="handleMessagePageChange" />
           </div>
         </template>
       </div>
@@ -1397,7 +1416,7 @@ watch(activeMenu, async (newMenu) => {
       <!-- 账号信息 -->
       <div v-else-if="activeMenu === 'account'" class="content-section">
         <h2 class="section-title">账号信息</h2>
-        
+
         <!-- 头像卡片 -->
         <div class="account-avatar-card" @click="openAvatarDialog">
           <div class="avatar-wrapper">
@@ -1405,7 +1424,9 @@ watch(activeMenu, async (newMenu) => {
               <User />
             </el-avatar>
             <div class="avatar-overlay">
-              <el-icon><Camera /></el-icon>
+              <el-icon>
+                <Camera />
+              </el-icon>
               <span>更换头像</span>
             </div>
           </div>
@@ -1418,38 +1439,40 @@ watch(activeMenu, async (newMenu) => {
         <!-- 基本信息 -->
         <div class="account-info-card">
           <div class="info-card-header">
-            <el-icon><InfoFilled /></el-icon>
+            <el-icon>
+              <InfoFilled />
+            </el-icon>
             <span>基本信息</span>
           </div>
           <div class="info-list">
             <div class="info-item">
               <div class="info-label">
-                <el-icon><User /></el-icon>
+                <el-icon>
+                  <User />
+                </el-icon>
                 <span>用户名</span>
               </div>
               <div class="info-content">
                 <template v-if="!isEditingName">
                   <span class="info-value">{{ userInfo.name }}</span>
                   <el-button type="primary" link size="small" @click="startEditName">
-                    <el-icon><Edit /></el-icon>
+                    <el-icon>
+                      <Edit />
+                    </el-icon>
                     修改
                   </el-button>
                 </template>
                 <template v-else>
-                  <el-input
-                    v-model="editingName"
-                    size="small"
-                    @blur="saveName"
-                    @keyup.enter="saveName"
-                    ref="nameInput"
-                    style="width: 200px"
-                  />
+                  <el-input v-model="editingName" size="small" @blur="saveName" @keyup.enter="saveName" ref="nameInput"
+                    style="width: 200px" />
                 </template>
               </div>
             </div>
             <div class="info-item">
               <div class="info-label">
-                <el-icon><Message /></el-icon>
+                <el-icon>
+                  <Message />
+                </el-icon>
                 <span>邮箱</span>
               </div>
               <div class="info-content">
@@ -1458,7 +1481,9 @@ watch(activeMenu, async (newMenu) => {
             </div>
             <div class="info-item">
               <div class="info-label">
-                <el-icon><Document /></el-icon>
+                <el-icon>
+                  <Document />
+                </el-icon>
                 <span>角色</span>
               </div>
               <div class="info-content">
@@ -1469,11 +1494,41 @@ watch(activeMenu, async (newMenu) => {
             </div>
             <div class="info-item">
               <div class="info-label">
-                <el-icon><Clock /></el-icon>
+                <el-icon>
+                  <Clock />
+                </el-icon>
                 <span>注册时间</span>
               </div>
               <div class="info-content">
                 <span class="info-value">{{ formatTime(userInfo.createTime) }}</span>
+              </div>
+            </div>
+            <!-- 粉丝牌信息（仅绑定B站后显示） -->
+            <div class="info-item" v-if="bilibiliBind.isBound">
+              <div class="info-label">
+                <img src="https://www.bilibili.com/favicon.ico" class="platform-icon-small" alt="B站" />
+                <span>粉丝牌</span>
+              </div>
+              <div class="info-content">
+                <img v-if="!bilibiliBind.fanMedalExtinguished && guardLevelIcons[bilibiliBind.guardLevel]"
+                  :src="guardLevelIcons[bilibiliBind.guardLevel]" class="guard-icon" alt="" />
+                <span class="fan-guard-badge"
+                  :class="[!bilibiliBind.fanMedalExtinguished && guardLevelIcons[bilibiliBind.guardLevel] ? 'with-icon' : 'no-icon']"
+                  :style="{
+                    backgroundColor: bilibiliBind.fanMedalExtinguished
+                      ? extinguishedStyle.bgColor
+                      : guardLevelStyles[bilibiliBind.guardLevel || 0].bgColor,
+                    color: bilibiliBind.fanMedalExtinguished
+                      ? extinguishedStyle.textColor
+                      : guardLevelStyles[bilibiliBind.guardLevel || 0].textColor,
+                    borderColor: bilibiliBind.fanMedalExtinguished
+                      ? extinguishedStyle.borderColor
+                      : guardLevelStyles[bilibiliBind.guardLevel || 0].borderColor
+                  }">
+                  <span class="badge-text">
+                    {{ ddName }} {{ bilibiliBind.fanLevel > 0 ? bilibiliBind.fanLevel : '-' }}
+                  </span>
+                </span>
               </div>
             </div>
           </div>
@@ -1482,7 +1537,9 @@ watch(activeMenu, async (newMenu) => {
         <!-- 账号绑定 -->
         <div class="account-info-card">
           <div class="info-card-header">
-            <el-icon><Link /></el-icon>
+            <el-icon>
+              <Link />
+            </el-icon>
             <span>账号绑定</span>
           </div>
           <div class="security-list">
@@ -1496,21 +1553,13 @@ watch(activeMenu, async (newMenu) => {
                   <template v-if="bilibiliBind.isBound">
                     <span class="bind-info">
                       {{ bilibiliBind.username }}
-                      <el-tag v-if="bilibiliBind.fanLevel > 0" type="warning" size="small" effect="dark" class="fan-level">
-                        <el-icon><Star /></el-icon>
-                        粉丝等级 {{ bilibiliBind.fanLevel }}
-                      </el-tag>
                     </span>
                   </template>
                   <template v-else>绑定B站账号，可使用B站头像</template>
                 </div>
               </div>
-              <el-button 
-                :type="bilibiliBind.isBound ? 'danger' : 'primary'" 
-                plain 
-                size="small"
-                @click="bilibiliBind.isBound ? unbindBilibili() : openBilibiliDialog()"
-              >
+              <el-button :type="bilibiliBind.isBound ? 'danger' : 'primary'" plain size="small"
+                @click="bilibiliBind.isBound ? unbindBilibili() : openBilibiliDialog()">
                 {{ bilibiliBind.isBound ? '解绑' : '绑定' }}
               </el-button>
             </div>
@@ -1520,7 +1569,9 @@ watch(activeMenu, async (newMenu) => {
         <!-- 安全设置 -->
         <div class="account-info-card">
           <div class="info-card-header">
-            <el-icon><Lock /></el-icon>
+            <el-icon>
+              <Lock />
+            </el-icon>
             <span>安全设置</span>
           </div>
           <div class="security-list">
@@ -1537,7 +1588,9 @@ watch(activeMenu, async (newMenu) => {
         <!-- 偏好设置 -->
         <div class="account-info-card" v-if="userStore.user?.permission === 1 || userStore.user?.permission === 2">
           <div class="info-card-header">
-            <el-icon><Setting /></el-icon>
+            <el-icon>
+              <Setting />
+            </el-icon>
             <span>偏好设置</span>
           </div>
           <div class="preference-list">
@@ -1564,13 +1617,11 @@ watch(activeMenu, async (newMenu) => {
           <div v-if="uploads.audios.length === 0" class="empty-state">
             <el-empty description="暂无音声" :image-size="80" />
           </div>
-          <div
-            v-for="audio in paginatedAudios"
-            :key="audio.id"
-            class="list-item"
-          >
+          <div v-for="audio in paginatedAudios" :key="audio.id" class="list-item">
             <div class="list-icon audio-bg">
-              <el-icon><Headset /></el-icon>
+              <el-icon>
+                <Headset />
+              </el-icon>
             </div>
             <div class="list-content">
               <div class="list-title">{{ audio.name }}</div>
@@ -1583,12 +1634,8 @@ watch(activeMenu, async (newMenu) => {
               {{ getStatusText(audio.status) }}
             </el-tag>
             <div class="list-actions">
-              <el-button
-                type="primary"
-                link
-                :icon="playingAudioId === audio.id ? VideoPause : VideoPlay"
-                @click="toggleAudioPlay(audio)"
-              >
+              <el-button type="primary" link :icon="playingAudioId === audio.id ? VideoPause : VideoPlay"
+                @click="toggleAudioPlay(audio)">
                 {{ playingAudioId === audio.id ? '暂停' : '播放' }}
               </el-button>
               <el-button type="primary" link :icon="Edit" @click="openEditDialog('audio', audio)">编辑</el-button>
@@ -1597,14 +1644,8 @@ watch(activeMenu, async (newMenu) => {
           </div>
         </div>
         <div v-if="audioTotal > audioPagination.pageSize" class="pagination-wrapper">
-          <el-pagination
-            background
-            layout="prev, pager, next"
-            :total="audioTotal"
-            :page-size="audioPagination.pageSize"
-            :current-page="audioPagination.currentPage"
-            @current-change="handleAudioPageChange"
-          />
+          <el-pagination background layout="prev, pager, next" :total="audioTotal" :page-size="audioPagination.pageSize"
+            :current-page="audioPagination.currentPage" @current-change="handleAudioPageChange" />
         </div>
       </div>
 
@@ -1615,11 +1656,7 @@ watch(activeMenu, async (newMenu) => {
           <div v-if="uploads.photos.length === 0" class="empty-state">
             <el-empty description="暂无相片" :image-size="80" />
           </div>
-          <div
-            v-for="photo in paginatedPhotos"
-            :key="photo.id"
-            class="list-item"
-          >
+          <div v-for="photo in paginatedPhotos" :key="photo.id" class="list-item">
             <el-image :src="photo.url" fit="cover" class="list-thumb" @click="openImageViewer(photo.url)" />
             <div class="list-content">
               <div class="list-title">{{ photo.name }}</div>
@@ -1639,14 +1676,8 @@ watch(activeMenu, async (newMenu) => {
           </div>
         </div>
         <div v-if="photoTotal > photoPagination.pageSize" class="pagination-wrapper">
-          <el-pagination
-            background
-            layout="prev, pager, next"
-            :total="photoTotal"
-            :page-size="photoPagination.pageSize"
-            :current-page="photoPagination.currentPage"
-            @current-change="handlePhotoPageChange"
-          />
+          <el-pagination background layout="prev, pager, next" :total="photoTotal" :page-size="photoPagination.pageSize"
+            :current-page="photoPagination.currentPage" @current-change="handlePhotoPageChange" />
         </div>
       </div>
 
@@ -1657,13 +1688,11 @@ watch(activeMenu, async (newMenu) => {
           <div v-if="uploads.plans.length === 0" class="empty-state">
             <el-empty description="暂无企划" :image-size="80" />
           </div>
-          <div
-            v-for="plan in paginatedPlans"
-            :key="plan.id"
-            class="list-item"
-          >
+          <div v-for="plan in paginatedPlans" :key="plan.id" class="list-item">
             <div class="list-icon plan-bg">
-              <el-icon><Document /></el-icon>
+              <el-icon>
+                <Document />
+              </el-icon>
             </div>
             <div class="list-content">
               <div class="list-title">{{ plan.title }}</div>
@@ -1683,14 +1712,8 @@ watch(activeMenu, async (newMenu) => {
           </div>
         </div>
         <div v-if="planTotal > planPagination.pageSize" class="pagination-wrapper">
-          <el-pagination
-            background
-            layout="prev, pager, next"
-            :total="planTotal"
-            :page-size="planPagination.pageSize"
-            :current-page="planPagination.currentPage"
-            @current-change="handlePlanPageChange"
-          />
+          <el-pagination background layout="prev, pager, next" :total="planTotal" :page-size="planPagination.pageSize"
+            :current-page="planPagination.currentPage" @current-change="handlePlanPageChange" />
         </div>
       </div>
 
@@ -1701,15 +1724,14 @@ watch(activeMenu, async (newMenu) => {
           <div v-if="uploads.videos.length === 0" class="empty-state">
             <el-empty description="暂无视频" :image-size="80" />
           </div>
-          <div
-            v-for="video in paginatedVideos"
-            :key="video.id"
-            class="list-item video-item"
-          >
-            <el-image :src="video.cover" fit="cover" class="list-thumb video-thumb" @click="openBilibiliVideo(video.bvid)">
+          <div v-for="video in paginatedVideos" :key="video.id" class="list-item video-item">
+            <el-image :src="video.cover" fit="cover" class="list-thumb video-thumb"
+              @click="openBilibiliVideo(video.bvid)">
               <template #error>
                 <div class="video-thumb-placeholder">
-                  <el-icon><VideoPlay /></el-icon>
+                  <el-icon>
+                    <VideoPlay />
+                  </el-icon>
                 </div>
               </template>
             </el-image>
@@ -1721,7 +1743,9 @@ watch(activeMenu, async (newMenu) => {
               </div>
               <div class="video-stats">
                 <span class="stat-item">
-                  <el-icon><Star /></el-icon>
+                  <el-icon>
+                    <Star />
+                  </el-icon>
                   {{ video.totalRecommend }} 推荐
                 </span>
                 <span class="stat-item weekly-stat" v-if="video.weeklyRecommend > 0">
@@ -1740,14 +1764,8 @@ watch(activeMenu, async (newMenu) => {
           </div>
         </div>
         <div v-if="videoTotal > videoPagination.pageSize" class="pagination-wrapper">
-          <el-pagination
-            background
-            layout="prev, pager, next"
-            :total="videoTotal"
-            :page-size="videoPagination.pageSize"
-            :current-page="videoPagination.currentPage"
-            @current-change="handleVideoPageChange"
-          />
+          <el-pagination background layout="prev, pager, next" :total="videoTotal" :page-size="videoPagination.pageSize"
+            :current-page="videoPagination.currentPage" @current-change="handleVideoPageChange" />
         </div>
       </div>
     </main>
@@ -1758,42 +1776,34 @@ watch(activeMenu, async (newMenu) => {
       <div v-if="bilibiliBind.isBound" class="bilibili-avatar-option">
         <div class="option-title">选择头像来源</div>
         <div class="avatar-source-grid">
-          <div 
-            class="avatar-source-item" 
-            :class="{ active: avatarSource === 'bilibili' }"
-            @click="selectBilibiliAvatar"
-          >
+          <div class="avatar-source-item" :class="{ active: avatarSource === 'bilibili' }"
+            @click="selectBilibiliAvatar">
             <el-avatar :size="80" :src="bilibiliBind.avatar" />
             <span class="source-name">使用B站头像</span>
             <span class="source-username">{{ bilibiliBind.username }}</span>
           </div>
-          <div 
-            class="avatar-source-item" 
-            :class="{ active: avatarSource === 'custom' }"
-            @click="avatarSource = 'custom'"
-          >
+          <div class="avatar-source-item" :class="{ active: avatarSource === 'custom' }"
+            @click="avatarSource = 'custom'">
             <div class="custom-avatar-placeholder">
-              <el-icon><Plus /></el-icon>
+              <el-icon>
+                <Plus />
+              </el-icon>
             </div>
             <span class="source-name">上传自定义</span>
             <span class="source-username">选择本地图片</span>
           </div>
         </div>
       </div>
-      
+
       <!-- 自定义上传 -->
       <div v-if="!bilibiliBind.isBound || avatarSource === 'custom'" class="avatar-upload-container">
-        <el-upload
-          class="avatar-uploader"
-          action=""
-          :auto-upload="false"
-          :show-file-list="false"
-          :on-change="handleAvatarChange"
-          accept="image/*"
-        >
+        <el-upload class="avatar-uploader" action="" :auto-upload="false" :show-file-list="false"
+          :on-change="handleAvatarChange" accept="image/*">
           <img v-if="avatarPreviewUrl" :src="avatarPreviewUrl" class="avatar-preview" />
           <div v-else class="avatar-uploader-trigger">
-            <el-icon class="el-icon--upload"><Camera /></el-icon>
+            <el-icon class="el-icon--upload">
+              <Camera />
+            </el-icon>
             <div class="el-upload__text">点击上传</div>
           </div>
         </el-upload>
@@ -1808,13 +1818,11 @@ watch(activeMenu, async (newMenu) => {
     <el-dialog v-model="bilibiliDialogVisible" title="绑定哔哩哔哩账号" width="450px">
       <el-form :model="bilibiliForm" label-position="top">
         <el-form-item label="B站主页ID">
-          <el-input 
-            v-model="bilibiliForm.uid" 
-            placeholder="请输入B站主页ID（如：12345678）"
-            clearable
-          />
+          <el-input v-model="bilibiliForm.uid" placeholder="请输入B站主页ID（如：12345678）" clearable />
           <div class="form-tip">
-            <el-icon><InfoFilled /></el-icon>
+            <el-icon>
+              <InfoFilled />
+            </el-icon>
             <span>主页ID是B站个人空间链接中的数字部分</span>
           </div>
         </el-form-item>
@@ -1845,20 +1853,10 @@ watch(activeMenu, async (newMenu) => {
     <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px">
       <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-position="top">
         <el-form-item label="新密码" prop="newPassword">
-          <el-input
-            v-model="passwordForm.newPassword"
-            type="password"
-            placeholder="请输入新密码（至少6位）"
-            show-password
-          />
+          <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码（至少6位）" show-password />
         </el-form-item>
         <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input
-            v-model="passwordForm.confirmPassword"
-            type="password"
-            placeholder="请再次输入新密码"
-            show-password
-          />
+          <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请再次输入新密码" show-password />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1868,40 +1866,21 @@ watch(activeMenu, async (newMenu) => {
     </el-dialog>
 
     <!-- 编辑对话框 -->
-    <el-dialog
-      v-model="editDialogVisible"
-      :title="editType === 'audio' ? '编辑音声' : editType === 'photo' ? '编辑相片' : '编辑企划'"
-      width="500px"
-    >
+    <el-dialog v-model="editDialogVisible"
+      :title="editType === 'audio' ? '编辑音声' : editType === 'photo' ? '编辑相片' : '编辑企划'" width="500px">
       <el-form ref="editFormRef" :model="editForm" label-width="80px">
-        <el-form-item
-          :label="editType === 'plan' ? '标题' : '名称'"
-          prop="name"
-          :rules="[{ required: true, message: editType === 'plan' ? '请输入标题' : '请输入名称', trigger: 'blur' }]"
-        >
-          <el-input
-            v-model="editForm.name"
-            :placeholder="editType === 'plan' ? '请输入标题' : '请输入名称'"
-          />
+        <el-form-item :label="editType === 'plan' ? '标题' : '名称'" prop="name"
+          :rules="[{ required: true, message: editType === 'plan' ? '请输入标题' : '请输入名称', trigger: 'blur' }]">
+          <el-input v-model="editForm.name" :placeholder="editType === 'plan' ? '请输入标题' : '请输入名称'" />
         </el-form-item>
         <el-form-item v-if="editType === 'audio'" label="分类">
           <el-select v-model="editForm.classificationId" placeholder="选择分类" clearable>
-            <el-option
-              v-for="item in classifications"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
+            <el-option v-for="item in classifications" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item v-if="editType === 'photo'" label="相册">
           <el-select v-model="editForm.albumId" placeholder="选择相册" clearable>
-            <el-option
-              v-for="item in albums"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
+            <el-option v-for="item in albums" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -1912,23 +1891,15 @@ watch(activeMenu, async (newMenu) => {
     </el-dialog>
 
     <!-- 照片预览 -->
-    <el-image-viewer
-      v-if="imageViewerVisible"
-      :url-list="[currentImageUrl]"
-      @close="imageViewerVisible = false"
-    />
+    <el-image-viewer v-if="imageViewerVisible" :url-list="[currentImageUrl]" @close="imageViewerVisible = false" />
 
     <!-- 视频移动对话框 -->
     <el-dialog v-model="videoMoveDialogVisible" title="移动到收藏夹" width="400px">
       <el-form ref="videoMoveFormRef" :model="videoMoveForm" label-position="top">
-        <el-form-item label="选择收藏夹" prop="favoriteId" :rules="[{ required: true, message: '请选择收藏夹', trigger: 'change' }]">
+        <el-form-item label="选择收藏夹" prop="favoriteId"
+          :rules="[{ required: true, message: '请选择收藏夹', trigger: 'change' }]">
           <el-select v-model="videoMoveForm.favoriteId" placeholder="请选择目标收藏夹" style="width: 100%">
-            <el-option
-              v-for="item in myFavorites"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
+            <el-option v-for="item in myFavorites" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -2697,6 +2668,7 @@ watch(activeMenu, async (newMenu) => {
 }
 
 .info-content {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
@@ -3194,10 +3166,43 @@ watch(activeMenu, async (newMenu) => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .fan-level {
   font-size: 11px;
+}
+
+/* 粉丝等级和舰长徽章 */
+.fan-guard-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 12px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.fan-guard-badge.with-icon {
+  padding: 2px 8px 2px 28px;
+}
+
+.fan-guard-badge.no-icon {
+  padding: 2px 8px 2px 8px;
+}
+
+.guard-icon {
+  position: absolute;
+  left: -3px;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.badge-text {
+  white-space: nowrap;
 }
 
 /* 偏好设置 */

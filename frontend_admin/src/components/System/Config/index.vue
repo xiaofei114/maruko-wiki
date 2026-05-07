@@ -2,15 +2,32 @@
 import { ref, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getConfig, getConfigMetadata, saveConfig, getPM2Status, triggerRestart } from '@/api/config.js'
+import { getTaskConfig, getTaskConfigMetadata, saveTaskConfig, resetTaskConfig, executeTask } from '@/api/taskConfig.js'
+import CronGenerator from '@/components/Common/CronGenerator/index.vue'
 
-// 配置数据（展平格式，所有值都是字符串）
+// 当前激活的配置类型
+const activeTab = ref('system')
+
+// ========== 系统配置相关 ==========
 const config = ref({})
 const originalConfig = ref({})
 const configMetadata = ref({ groups: [], fields: {} })
 
+// ========== 任务配置相关 ==========// 任务配置相关
+const taskConfig = ref({ tasks: {} })
+const originalTaskConfig = ref({ tasks: {} })
+const taskConfigMetadata = ref({ tasks: {} })
+
+// Cron 生成器相关
+const cronDialogVisible = ref(false)
+const currentEditingTask = ref('')
+const currentCronValue = ref('0 0 * * * *')
+
 const loading = ref(false)
 const saving = ref(false)
 const restarting = ref(false)
+const resetting = ref(false)
+const executingTasks = ref(new Set())
 
 // PM2 状态
 const pm2Status = ref({
@@ -24,12 +41,16 @@ const arrayInputVisible = ref({})
 const arrayInputValue = ref({})
 const arrayInputRefs = ref({})
 
-// 计算是否有修改（简单字符串比较）
+// 计算是否有修改
 const hasChanges = computed(() => {
-  for (const key of Object.keys(config.value)) {
-    if (String(config.value[key]) !== String(originalConfig.value[key])) {
-      return true
+  if (activeTab.value === 'system') {
+    for (const key of Object.keys(config.value)) {
+      if (String(config.value[key]) !== String(originalConfig.value[key])) {
+        return true
+      }
     }
+  } else {
+    return JSON.stringify(taskConfig.value) !== JSON.stringify(originalTaskConfig.value)
   }
   return false
 })
@@ -37,7 +58,7 @@ const hasChanges = computed(() => {
 // 安全获取 PM2 状态
 const isPM2Running = () => pm2Status.value?.running || false
 
-// 获取配置
+// 获取系统配置
 const fetchConfig = async () => {
   loading.value = true
   try {
@@ -51,7 +72,6 @@ const fetchConfig = async () => {
     }
 
     if (configRes.code === 200 && configRes.data) {
-      // 展平配置数据并统一转为字符串
       const flatConfig = flattenObject(configRes.data)
       config.value = objectToStrings(flatConfig)
       originalConfig.value = { ...config.value }
@@ -59,6 +79,35 @@ const fetchConfig = async () => {
   } catch (error) {
     ElMessage.error('获取配置失败: ' + error.message)
     console.error('获取配置错误:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取任务配置
+const fetchTaskConfig = async () => {
+  loading.value = true
+  try {
+    const [configRes, metadataRes] = await Promise.all([
+      getTaskConfig(),
+      getTaskConfigMetadata()
+    ])
+
+    if (metadataRes.code === 200 && metadataRes.data) {
+      taskConfigMetadata.value = metadataRes.data
+    }
+
+    if (configRes.code === 200 && configRes.data) {
+      // 确保数据结构完整
+      if (!configRes.data.tasks) {
+        configRes.data = { tasks: configRes.data }
+      }
+      taskConfig.value = configRes.data
+      originalTaskConfig.value = JSON.parse(JSON.stringify(configRes.data))
+    }
+  } catch (error) {
+    ElMessage.error('获取任务配置失败: ' + error.message)
+    console.error('获取任务配置错误:', error)
   } finally {
     loading.value = false
   }
@@ -114,23 +163,34 @@ const handleSave = async () => {
 
   saving.value = true
   try {
-    // 准备提交的数据（数组类型需要转为逗号分隔字符串）
-    const submitConfig = {}
-    for (const [key, value] of Object.entries(config.value)) {
-      const fieldType = configMetadata.value.fields?.[key]?.type
-      if (fieldType === 'array' && Array.isArray(value)) {
-        submitConfig[key] = value.join(',')
-      } else {
-        submitConfig[key] = value
+    if (activeTab.value === 'system') {
+      // 准备提交的数据
+      const submitConfig = {}
+      for (const [key, value] of Object.entries(config.value)) {
+        const fieldType = configMetadata.value.fields?.[key]?.type
+        if (fieldType === 'array' && Array.isArray(value)) {
+          submitConfig[key] = value.join(',')
+        } else {
+          submitConfig[key] = value
+        }
       }
-    }
 
-    const res = await saveConfig(submitConfig)
-    if (res.code === 200) {
-      ElMessage.success(res.message)
-      originalConfig.value = { ...config.value }
+      const res = await saveConfig(submitConfig)
+      if (res.code === 200) {
+        ElMessage.success(res.message)
+        originalConfig.value = { ...config.value }
+      } else {
+        ElMessage.error(res.message)
+      }
     } else {
-      ElMessage.error(res.message)
+      // 保存任务配置
+      const res = await saveTaskConfig(taskConfig.value)
+      if (res.code === 200) {
+        ElMessage.success(res.message)
+        originalTaskConfig.value = JSON.parse(JSON.stringify(taskConfig.value))
+      } else {
+        ElMessage.error(res.message)
+      }
     }
   } catch (error) {
     ElMessage.error('保存失败: ' + error.message)
@@ -156,7 +216,7 @@ const unflattenObject = (flatObj) => {
   return result
 }
 
-// 重启服务 - 双重确认
+// 重启服务
 const handleRestart = async () => {
   if (hasChanges.value) {
     ElMessage.warning('请先保存配置再重启')
@@ -220,9 +280,51 @@ const handleReset = () => {
       type: 'warning'
     }
   ).then(() => {
-    config.value = { ...originalConfig.value }
+    if (activeTab.value === 'system') {
+      config.value = { ...originalConfig.value }
+    } else {
+      taskConfig.value = JSON.parse(JSON.stringify(originalTaskConfig.value))
+    }
     ElMessage.success('已重置')
   }).catch(() => {})
+}
+
+// 重置任务配置为默认值
+const handleResetTaskConfig = () => {
+  ElMessageBox.confirm(
+    '确定要重置为默认配置吗？这将恢复所有定时任务的默认设置。',
+    '警告',
+    {
+      confirmButtonText: '确定重置',
+      cancelButtonText: '取消',
+      type: 'danger'
+    }
+  ).then(async () => {
+    resetting.value = true
+    try {
+      const res = await resetTaskConfig()
+      if (res.code === 200) {
+        ElMessage.success(res.message)
+        await fetchTaskConfig()
+      } else {
+        ElMessage.error(res.message)
+      }
+    } catch (error) {
+      ElMessage.error('重置失败: ' + error.message)
+    } finally {
+      resetting.value = false
+    }
+  }).catch(() => {})
+}
+
+// 切换标签
+const handleTabChange = (tab) => {
+  activeTab.value = tab
+  if (tab === 'system' && Object.keys(config.value).length === 0) {
+    fetchConfig()
+  } else if (tab === 'task' && Object.keys(taskConfig.value.tasks || {}).length === 0) {
+    fetchTaskConfig()
+  }
 }
 
 onMounted(() => {
@@ -232,30 +334,25 @@ onMounted(() => {
 
 // ========== 数组操作相关方法 ==========
 
-// 获取数组项列表
 const getArrayItems = (value) => {
   if (!value) return []
   return value.split(',').filter(item => item.trim() !== '')
 }
 
-// 显示数组输入框
 const showArrayInput = (fieldKey) => {
   arrayInputVisible.value[fieldKey] = true
   arrayInputValue.value[fieldKey] = ''
-  // 下一个 tick 聚焦输入框
   nextTick(() => {
     arrayInputRefs.value[fieldKey]?.focus()
   })
 }
 
-// 设置数组输入框 ref
 const setArrayInputRef = (el, fieldKey) => {
   if (el) {
     arrayInputRefs.value[fieldKey] = el
   }
 }
 
-// 确认添加数组项
 const confirmArrayItem = (fieldKey) => {
   const value = arrayInputValue.value[fieldKey]?.trim()
   if (value) {
@@ -269,11 +366,99 @@ const confirmArrayItem = (fieldKey) => {
   arrayInputValue.value[fieldKey] = ''
 }
 
-// 删除数组项
 const removeArrayItem = (fieldKey, index) => {
   const currentItems = getArrayItems(config.value[fieldKey])
   currentItems.splice(index, 1)
   config.value[fieldKey] = currentItems.join(',')
+}
+
+// ========== 任务配置相关方法 ==========
+
+const updateTaskCron = (taskName, value) => {
+  if (taskConfig.value.tasks && taskConfig.value.tasks[taskName]) {
+    taskConfig.value.tasks[taskName].cron = value
+  }
+}
+
+const updateTaskEnabled = (taskName, value) => {
+  if (taskConfig.value.tasks && taskConfig.value.tasks[taskName]) {
+    taskConfig.value.tasks[taskName].enabled = value
+  }
+}
+
+// 任务名称显示映射
+
+
+// 获取任务显示名称
+const getTaskDisplayName = (taskName) => {
+  return taskConfigMetadata.value.tasks?.[taskName]?.name || taskName
+}
+
+// 初始化任务配置（如果不存在）
+const initTaskConfig = (taskName) => {
+  if (!taskConfig.value.tasks) {
+    taskConfig.value.tasks = {}
+  }
+  if (!taskConfig.value.tasks[taskName]) {
+    taskConfig.value.tasks[taskName] = {
+      cron: '',
+      enabled: true,
+      description: ''
+    }
+  }
+}
+
+// 打开 Cron 生成器
+const openCronGenerator = (taskName) => {
+  currentEditingTask.value = taskName
+  currentCronValue.value = taskConfig.value.tasks?.[taskName]?.cron || '0 0 * * * *'
+  cronDialogVisible.value = true
+}
+
+// 确认使用生成的 Cron 表达式
+const handleCronConfirm = (cron) => {
+  if (currentEditingTask.value && taskConfig.value.tasks?.[currentEditingTask.value]) {
+    taskConfig.value.tasks[currentEditingTask.value].cron = cron
+  }
+  cronDialogVisible.value = false
+  ElMessage.success('Cron 表达式已应用')
+}
+
+// 立即执行任务
+const handleExecuteTask = async (taskName) => {
+  if (executingTasks.value.has(taskName)) {
+    ElMessage.warning('任务正在执行中，请稍后再试')
+    return
+  }
+
+  // 二次确认
+  const taskDisplayName = getTaskDisplayName(taskName)
+  ElMessageBox.confirm(
+    `确定要立即执行任务「${taskDisplayName}」吗？`,
+    '确认执行',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      executingTasks.value.add(taskName)
+      const res = await executeTask(taskName)
+
+      if (res.code === 200) {
+        ElMessage.success(res.message)
+      } else {
+        ElMessage.error(res.message)
+      }
+    } catch (error) {
+      ElMessage.error('执行任务失败: ' + error.message)
+    } finally {
+      executingTasks.value.delete(taskName)
+    }
+  }).catch(() => {
+    // 取消执行
+  })
 }
 </script>
 
@@ -305,12 +490,30 @@ const removeArrayItem = (fieldKey, index) => {
       </div>
     </div>
 
+    <!-- 标签切换 -->
+    <div class="tab-bar">
+      <el-radio-group v-model="activeTab" @change="handleTabChange">
+        <el-radio-button label="system">系统配置</el-radio-button>
+        <el-radio-button label="task">定时任务</el-radio-button>
+      </el-radio-group>
+    </div>
+
     <!-- 操作栏 -->
     <div class="action-bar">
       <div class="action-left">
-        <span class="config-path">配置文件: configs/config.yaml</span>
+        <span class="config-path">
+          配置文件: configs/{{ activeTab === 'system' ? 'config.yaml' : 'task.yaml' }}
+        </span>
       </div>
       <div class="action-right">
+        <el-button 
+          v-if="activeTab === 'task'" 
+          @click="handleResetTaskConfig" 
+          :loading="resetting"
+        >
+          <el-icon><RefreshLeft /></el-icon>
+          恢复默认
+        </el-button>
         <el-button @click="handleReset" :disabled="!hasChanges">
           <el-icon><RefreshLeft /></el-icon>
           重置
@@ -322,9 +525,8 @@ const removeArrayItem = (fieldKey, index) => {
       </div>
     </div>
 
-    <!-- 配置表单 -->
-    <div v-loading="loading" class="config-form">
-      <!-- 按分组显示配置 -->
+    <!-- 系统配置表单 -->
+    <div v-if="activeTab === 'system'" v-loading="loading" class="config-form">
       <template v-for="group in configMetadata.groups" :key="group.name">
         <div class="config-section">
           <div class="section-header">
@@ -342,7 +544,6 @@ const removeArrayItem = (fieldKey, index) => {
                 </label>
 
                 <div class="item-input">
-                  <!-- 数字输入 -->
                   <el-input
                     v-if="configMetadata.fields[fieldKey]?.type === 'number'"
                     v-model="config[fieldKey]"
@@ -350,7 +551,6 @@ const removeArrayItem = (fieldKey, index) => {
                     class="input-compact"
                   />
 
-                  <!-- 下拉选择 -->
                   <el-select
                     v-else-if="configMetadata.fields[fieldKey]?.type === 'select'"
                     v-model="config[fieldKey]"
@@ -364,7 +564,6 @@ const removeArrayItem = (fieldKey, index) => {
                     />
                   </el-select>
 
-                  <!-- 密码输入 -->
                   <el-input
                     v-else-if="configMetadata.fields[fieldKey]?.type === 'password'"
                     v-model="config[fieldKey]"
@@ -373,7 +572,6 @@ const removeArrayItem = (fieldKey, index) => {
                     class="input-full"
                   />
 
-                  <!-- 数组输入（标签形式） -->
                   <div
                     v-else-if="configMetadata.fields[fieldKey]?.type === 'array'"
                     class="array-input-wrapper"
@@ -407,7 +605,6 @@ const removeArrayItem = (fieldKey, index) => {
                     </div>
                   </div>
 
-                  <!-- 布尔值 -->
                   <el-select
                     v-else-if="configMetadata.fields[fieldKey]?.type === 'boolean'"
                     v-model="config[fieldKey]"
@@ -417,7 +614,6 @@ const removeArrayItem = (fieldKey, index) => {
                     <el-option label="否" value="false" />
                   </el-select>
 
-                  <!-- 文本输入 -->
                   <el-input
                     v-else
                     v-model="config[fieldKey]"
@@ -429,26 +625,87 @@ const removeArrayItem = (fieldKey, index) => {
           </div>
         </div>
       </template>
+    </div>
 
-      <!-- 未分组的配置项 -->
-      <div class="config-section" v-if="Object.keys(config).length > Object.keys(configMetadata.fields || {}).length">
+    <!-- 定时任务配置表单 -->
+    <div v-else v-loading="loading" class="config-form">
+      <div class="config-section">
         <div class="section-header">
-          <h3 class="section-title">其他配置</h3>
+          <h3 class="section-title">定时任务配置</h3>
+          <span class="section-count">{{ Object.keys(taskConfigMetadata.tasks || {}).length }} 个任务</span>
         </div>
-        <div class="section-items">
-          <div
-            v-for="(value, key) in config"
-            :key="key"
-            class="form-item"
-            v-if="!configMetadata.fields?.[key]"
+        <div class="task-items">
+          <div 
+            v-for="(task, taskName) in taskConfigMetadata.tasks" 
+            :key="taskName"
+            class="task-item"
           >
-            <label class="item-label">{{ key }}</label>
-            <div class="item-input">
-              <el-input v-model="config[key]" class="input-full" />
+            <div class="task-header">
+              <div class="task-name">
+                <el-tag :type="taskConfig.tasks?.[taskName]?.enabled !== false ? 'success' : 'info'" size="small">
+                  {{ taskConfig.tasks?.[taskName]?.enabled !== false ? '启用' : '禁用' }}
+                </el-tag>
+                <span class="task-title">{{ getTaskDisplayName(taskName) }}</span>
+                <span class="task-desc">{{ task.description }}</span>
+              </div>
+              <el-button
+                type="warning"
+                size="small"
+                :loading="executingTasks.has(taskName)"
+                @click="handleExecuteTask(taskName)"
+              >
+                <el-icon><VideoPlay /></el-icon>
+                立即执行
+              </el-button>
+            </div>
+            <div class="task-config">
+              <div class="form-item">
+                <label class="item-label">Cron 表达式</label>
+                <div class="item-input">
+                  <el-input
+                    v-model="taskConfig.tasks[taskName].cron"
+                    @focus="initTaskConfig(taskName)"
+                    placeholder="0 0 3 * * *"
+                    class="input-cron"
+                  />
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    @click="openCronGenerator(taskName)"
+                    class="cron-btn"
+                  >
+                    生成器
+                  </el-button>
+                </div>
+              </div>
+              <div class="form-item">
+                <label class="item-label">启用状态</label>
+                <div class="item-input">
+                  <el-switch
+                    v-model="taskConfig.tasks[taskName].enabled"
+                    @change="initTaskConfig(taskName)"
+                    :active-value="true"
+                    :inactive-value="false"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Cron 生成器弹窗 -->
+      <el-dialog
+        v-model="cronDialogVisible"
+        title="Cron 表达式生成器"
+        width="700px"
+        destroy-on-close
+      >
+        <CronGenerator
+          v-model="currentCronValue"
+          @confirm="handleCronConfirm"
+        />
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -505,6 +762,11 @@ const removeArrayItem = (fieldKey, index) => {
 
 .status-tag :deep(.el-icon) {
   margin-right: 4px;
+}
+
+/* 标签切换 */
+.tab-bar {
+  margin-bottom: 16px;
 }
 
 /* 操作栏 */
@@ -607,6 +869,17 @@ const removeArrayItem = (fieldKey, index) => {
 .item-input {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-cron {
+  flex: 1;
+}
+
+.cron-btn {
+  flex-shrink: 0;
 }
 
 /* 输入框宽度控制 */
@@ -617,6 +890,11 @@ const removeArrayItem = (fieldKey, index) => {
 .input-full {
   width: 100%;
   max-width: 280px;
+}
+
+.input-cron {
+  width: 180px;
+  font-family: 'Courier New', monospace;
 }
 
 /* 数组输入样式 */
@@ -648,6 +926,101 @@ const removeArrayItem = (fieldKey, index) => {
   text-overflow: ellipsis;
 }
 
+/* 任务配置样式 */
+.task-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-item {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.task-item:last-child {
+  border-bottom: none;
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.task-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.task-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.task-desc {
+  font-size: 13px;
+  color: #909399;
+}
+
+.task-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-left: 0;
+}
+
+.task-config .form-item {
+  border: none;
+  padding: 8px 0;
+}
+
+/* Cron 帮助 */
+.cron-help {
+  padding: 16px;
+}
+
+.cron-format {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.cron-format code {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: #409eff;
+}
+
+.cron-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.example-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.example-item code {
+  font-family: 'Courier New', monospace;
+  background-color: #f5f7fa;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #606266;
+  min-width: 140px;
+}
+
+.example-item span {
+  color: #909399;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .section-items {
@@ -672,6 +1045,11 @@ const removeArrayItem = (fieldKey, index) => {
 
   .action-right {
     justify-content: flex-end;
+  }
+
+  .task-config {
+    flex-direction: column;
+    gap: 8px;
   }
 }
 </style>

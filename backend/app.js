@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { execSync, spawn } from 'child_process';
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
@@ -26,9 +26,8 @@ switch (cmd) {
         execSync(`pm2 restart ${appName}`, { stdio: 'inherit' });
         process.exit(0);
     case 'logs':
-        spawn('pm2', ['logs', appName, ...args], { stdio: 'inherit' })
-            .on('exit', (code) => process.exit(code));
-        break;
+        execSync(`pm2 logs ${appName} ${args.join(' ')}`, { stdio: 'inherit' });
+        process.exit(0);
 }
 
 // 启动应用

@@ -37,6 +37,9 @@ const queryParameters = ref({
     sortOrder: 'asc',
     showSensitive: true, // 是否显示敏感字段
     keyword: '', // 搜索关键词
+    permission: '', // 权限筛选
+    isBilibiliBound: '', // B站绑定状态筛选
+    isBanned: '', // 封禁状态筛选
 })
 const ruleFormRef = ref(null)
 
@@ -153,6 +156,9 @@ const handleSearch = () => {
 const resetSearch = () => {
     searchKeyword.value = ''
     queryParameters.value.keyword = ''
+    queryParameters.value.permission = ''
+    queryParameters.value.isBilibiliBound = ''
+    queryParameters.value.isBanned = ''
     queryParameters.value.page = 1
     getlist()
 }
@@ -241,13 +247,41 @@ const unbindBilibili = (data) => {
                 v-model="searchKeyword"
                 placeholder="搜索用户名或邮箱"
                 clearable
-                style="width: 220px; margin-right: 10px"
+                style="width: 180px; margin-right: 10px"
                 @keyup.enter="handleSearch"
             >
                 <template #prefix>
                     <el-icon><Search /></el-icon>
                 </template>
             </el-input>
+            <el-select
+                v-model="queryParameters.permission"
+                placeholder="权限筛选"
+                clearable
+                style="width: 130px; margin-right: 10px"
+            >
+                <el-option label="超级管理员" :value="1" />
+                <el-option label="管理员" :value="2" />
+                <el-option label="普通用户" :value="3" />
+            </el-select>
+            <el-select
+                v-model="queryParameters.isBilibiliBound"
+                placeholder="B站绑定"
+                clearable
+                style="width: 120px; margin-right: 10px"
+            >
+                <el-option label="已绑定" :value="1" />
+                <el-option label="未绑定" :value="0" />
+            </el-select>
+            <el-select
+                v-model="queryParameters.isBanned"
+                placeholder="封禁状态"
+                clearable
+                style="width: 120px; margin-right: 10px"
+            >
+                <el-option label="正常" :value="0" />
+                <el-option label="已封禁" :value="1" />
+            </el-select>
             <el-button type="primary" @click="handleSearch">
                 <el-icon><Search /></el-icon>
                 搜索

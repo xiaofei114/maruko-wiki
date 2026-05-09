@@ -87,8 +87,8 @@ router.get('/dashboard', ...createAdminRoute(async () => {
 
 // 获取用户列表
 router.get('/users', ...createAdminRoute(async (req) => {
-    const { page, pageSize, sortBy, sortOrder, keyword } = req.query;
-    return await getUsers({ page, pageSize, sortBy, sortOrder, keyword });
+    const { page, pageSize, sortBy, sortOrder, keyword, permission, isBilibiliBound, isBanned } = req.query;
+    return await getUsers({ page, pageSize, sortBy, sortOrder, keyword, permission, isBilibiliBound, isBanned });
 }, 1, { logName: '获取用户列表' }));
 
 // 封禁/解封用户

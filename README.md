@@ -151,6 +151,25 @@ maruko-wiki/
 
 ***
 
+## Vibe Coding
+
+如果你使用 **Vibe Coding**（AI 辅助编程）方式开发本项目，推荐使用项目内置的 Skill 文件：
+
+```bash
+# Skill 文件位置
+.skill/maruko-wiki-dev/
+```
+
+该 Skill 包含：
+- 项目结构说明
+- 代码编写规范
+- 常见错误排查方法
+- API 开发指南
+
+在支持 Skill 的 AI 编辑器（如 Trae）中，系统会自动加载该 Skill，为你提供更精准的项目上下文支持。
+
+***
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！

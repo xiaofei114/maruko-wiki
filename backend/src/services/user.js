@@ -312,11 +312,24 @@ function generateRandomPassword(length = 8) {
  * @param {number} params.pageSize - 每页数量，默认null（返回全部）
  * @param {string} params.sortBy - 排序字段，默认 'permission'（可选值：permission, create_time）
  * @param {string} params.sortOrder - 排序方向，默认 'asc'（可选值：asc, desc）
+ * @param {string} params.keyword - 搜索关键词（用户名或邮箱）
+ * @param {number} params.permission - 权限筛选（1:超级管理员, 2:管理员, 3:普通用户）
+ * @param {number} params.isBilibiliBound - B站绑定状态筛选（0:未绑定, 1:已绑定）
+ * @param {number} params.isBanned - 封禁状态筛选（0:正常, 1:已封禁）
  * @returns {object} 用户列表结果
  */
 export async function getUsers(params = {}) {
     try {
-        const { page = 1, pageSize = null, sortBy = 'permission', sortOrder = 'asc', keyword = '' } = params;
+        const { 
+            page = 1, 
+            pageSize = null, 
+            sortBy = 'permission', 
+            sortOrder = 'asc', 
+            keyword = '',
+            permission = null,
+            isBilibiliBound = null,
+            isBanned = null
+        } = params;
 
         // 验证排序参数
         const validSortFields = ['permission', 'create_time'];
@@ -328,10 +341,38 @@ export async function getUsers(params = {}) {
         let whereClause = 'WHERE is_deleted = 0';
         let queryParams = [];
         
+        // 关键词搜索
         if (keyword && keyword.trim()) {
             whereClause += ' AND (name LIKE ? OR account_number LIKE ?)';
             const searchPattern = `%${keyword.trim()}%`;
             queryParams.push(searchPattern, searchPattern);
+        }
+        
+        // 权限筛选
+        if (permission !== null && permission !== '' && permission !== undefined) {
+            const permValue = parseInt(permission);
+            if ([1, 2, 3].includes(permValue)) {
+                whereClause += ' AND permission = ?';
+                queryParams.push(permValue);
+            }
+        }
+        
+        // B站绑定状态筛选
+        if (isBilibiliBound !== null && isBilibiliBound !== '' && isBilibiliBound !== undefined) {
+            const boundValue = parseInt(isBilibiliBound);
+            if ([0, 1].includes(boundValue)) {
+                whereClause += ' AND is_bilibili_bound = ?';
+                queryParams.push(boundValue);
+            }
+        }
+        
+        // 封禁状态筛选
+        if (isBanned !== null && isBanned !== '' && isBanned !== undefined) {
+            const bannedValue = parseInt(isBanned);
+            if ([0, 1].includes(bannedValue)) {
+                whereClause += ' AND is_banned = ?';
+                queryParams.push(bannedValue);
+            }
         }
 
         // 获取总数

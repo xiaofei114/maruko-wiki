@@ -32,3 +32,5 @@ pnpm-lock.yaml
 pnpm-workspace.yaml
 
 .vscode
+
+.trae

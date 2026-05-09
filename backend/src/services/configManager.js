@@ -78,6 +78,19 @@ export function saveConfig(config) {
 }
 
 /**
+ * 从配置文件获取应用名称
+ * @returns {string} 应用名称
+ */
+function getAppName() {
+    try {
+        const config = yaml.parse(fs.readFileSync(configFile, 'utf8'));
+        return config.log?.prefix || 'maruko-node';
+    } catch {
+        return 'maruko-node';
+    }
+}
+
+/**
  * 触发 PM2 重启
  * @returns {Promise<boolean>}
  */
@@ -85,8 +98,9 @@ export async function restartWithPM2() {
     try {
         // 检查是否在 PM2 环境下运行
         if (process.env.PM2_USAGE) {
-            logger.info('正在通过 PM2 重启服务...');
-            await execAsync('pm2 restart maruko-node');
+            const appName = getAppName();
+            logger.info(`正在通过 PM2 重启服务: ${appName}`);
+            await execAsync(`pm2 restart ${appName}`);
             return true;
         } else {
             logger.warn('当前不在 PM2 环境下运行，无法自动重启');

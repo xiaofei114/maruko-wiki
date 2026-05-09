@@ -80,6 +80,24 @@ export async function fetchCurrentStatsFromBilibili() {
 }
 
 /**
+ * 异步执行数据库操作，避免阻塞事件循环
+ * @param {Function} fn - 同步数据库操作函数
+ * @returns {Promise<any>} 操作结果
+ */
+function runAsync(fn) {
+    return new Promise((resolve, reject) => {
+        setImmediate(() => {
+            try {
+                const result = fn();
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    });
+}
+
+/**
  * 记录当天的统计数据
  * 如果当天已有记录则更新，否则插入新记录
  * @returns {Promise<object>} 操作结果
@@ -88,30 +106,36 @@ export async function recordDailyStats() {
     try {
         const todayStart = getTodayStartTimestamp();
 
-        // 从B站获取当前数据
+        // 从B站获取当前数据（异步网络请求，不会阻塞）
         const stats = await fetchCurrentStatsFromBilibili();
 
-        // 检查今天是否已有记录
-        const existingRecord = queryOne(
-            'SELECT id FROM anchor_stats WHERE record_date = ?',
-            [todayStart]
+        // 检查今天是否已有记录（异步执行数据库操作）
+        const existingRecord = await runAsync(() => 
+            queryOne(
+                'SELECT id FROM anchor_stats WHERE record_date = ?',
+                [todayStart]
+            )
         );
 
         if (existingRecord) {
-            // 更新现有记录
-            update(
-                `UPDATE anchor_stats 
-                 SET fans_count = ?, captain_count = ?, commander_count = ?, vice_commander_count = ?, fans_member_count = ?
-                 WHERE record_date = ?`,
-                [stats.fansCount, stats.captainCount, stats.commanderCount, stats.viceCommanderCount, stats.fansMemberCount, todayStart]
+            // 更新现有记录（异步执行）
+            await runAsync(() => 
+                update(
+                    `UPDATE anchor_stats 
+                     SET fans_count = ?, captain_count = ?, commander_count = ?, vice_commander_count = ?, fans_member_count = ?
+                     WHERE record_date = ?`,
+                    [stats.fansCount, stats.captainCount, stats.commanderCount, stats.viceCommanderCount, stats.fansMemberCount, todayStart]
+                )
             );
             logger.info(`更新主播统计数据: 粉丝${stats.fansCount}, 舰长${stats.captainCount}, 总督${stats.commanderCount}, 提督${stats.viceCommanderCount}, 日期${new Date(todayStart * 1000).toLocaleDateString()}`);
         } else {
-            // 插入新记录
-            insert(
-                `INSERT INTO anchor_stats (record_date, fans_count, captain_count, commander_count, vice_commander_count, fans_member_count) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [todayStart, stats.fansCount, stats.captainCount, stats.commanderCount, stats.viceCommanderCount, stats.fansMemberCount]
+            // 插入新记录（异步执行）
+            await runAsync(() => 
+                insert(
+                    `INSERT INTO anchor_stats (record_date, fans_count, captain_count, commander_count, vice_commander_count, fans_member_count) 
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [todayStart, stats.fansCount, stats.captainCount, stats.commanderCount, stats.viceCommanderCount, stats.fansMemberCount]
+                )
             );
             logger.info(`记录主播统计数据: 粉丝${stats.fansCount}, 舰长${stats.captainCount}, 总督${stats.commanderCount}, 提督${stats.viceCommanderCount}, 日期${new Date(todayStart * 1000).toLocaleDateString()}`);
         }

@@ -8,6 +8,11 @@ import { queryOne } from '../method/database.js';
 
 const logger = global.logger;
 
+// 任务执行锁，防止重复执行
+let isRunning = false;
+let taskStartTime = 0;
+const TASK_TIMEOUT = 30 * 60 * 1000; // 30分钟超时，粉丝同步任务可能耗时较长
+
 /**
  * B站粉丝信息定时同步任务
  *
@@ -95,6 +100,20 @@ async function syncAllUsersFanInfo(ruid, users) {
  * 执行粉丝信息同步任务
  */
 async function runFansSyncTask() {
+    // 检查是否正在执行，防止重复执行
+    // 但如果任务执行超过超时时间，则允许重新执行（可能卡住了）
+    if (isRunning) {
+        const elapsed = Date.now() - taskStartTime;
+        if (elapsed < TASK_TIMEOUT) {
+            logger.warn(`[粉丝同步] 任务正在执行中（已执行 ${Math.floor(elapsed / 1000)} 秒），跳过本次执行`);
+            return;
+        } else {
+            logger.warn(`[粉丝同步] 任务执行超过 ${TASK_TIMEOUT / 60000} 分钟，可能已卡住，强制重新执行`);
+        }
+    }
+
+    isRunning = true;
+    taskStartTime = Date.now();
     const startTime = Date.now();
     logger.info('[粉丝同步] 开始执行粉丝牌信息同步任务');
 
@@ -131,6 +150,9 @@ async function runFansSyncTask() {
     } catch (error) {
         logger.error('[粉丝同步] 任务执行失败:', error);
         throw error;
+    } finally {
+        isRunning = false;
+        taskStartTime = 0;
     }
 }
 

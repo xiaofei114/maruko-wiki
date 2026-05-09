@@ -8,6 +8,11 @@ import { update } from '../method/database.js';
  * 3. 清空数据库中的本周推荐记录
  */
 
+// 任务执行锁，防止重复执行
+let isRunning = false;
+let taskStartTime = 0;
+const TASK_TIMEOUT = 10 * 60 * 1000; // 10分钟超时
+
 const VIDEO_WEEKLY_RECOMMEND_KEY = 'video:weekly:recommend';
 const VIDEO_USER_RECOMMEND_KEY = 'video:user:recommend';
 
@@ -110,9 +115,23 @@ async function cleanDatabaseRecords() {
  * 执行每周重置任务
  */
 async function runWeeklyReset() {
-    try {
-        logger.info('========== 开始执行视频收藏夹每周重置任务 ==========');
+    // 检查是否正在执行，防止重复执行
+    // 但如果任务执行超过超时时间，则允许重新执行（可能卡住了）
+    if (isRunning) {
+        const elapsed = Date.now() - taskStartTime;
+        if (elapsed < TASK_TIMEOUT) {
+            logger.warn(`[每周重置] 任务正在执行中（已执行 ${Math.floor(elapsed / 1000)} 秒），跳过本次执行`);
+            return;
+        } else {
+            logger.warn(`[每周重置] 任务执行超过 ${TASK_TIMEOUT / 60000} 分钟，可能已卡住，强制重新执行`);
+        }
+    }
 
+    isRunning = true;
+    taskStartTime = Date.now();
+    logger.info('========== 开始执行视频收藏夹每周重置任务 ==========');
+
+    try {
         // 1. 持久化上周数据
         await persistLastWeekData();
 
@@ -126,6 +145,9 @@ async function runWeeklyReset() {
     } catch (error) {
         logger.error('视频收藏夹每周重置任务失败:', error);
         throw error;
+    } finally {
+        isRunning = false;
+        taskStartTime = 0;
     }
 }
 

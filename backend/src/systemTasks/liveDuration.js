@@ -204,7 +204,24 @@ const OFFLINE_INTERVAL = 30 * 60 * 1000; // 未开播时30分钟
 const ONLINE_INTERVAL = 3 * 60 * 1000;   // 开播后3分钟
 const TOLERANCE = 5000;                  // 允许5秒误差
 
+// 任务执行锁，防止重复执行
+let isRunning = false;
+let taskStartTime = 0;
+const TASK_TIMEOUT = 5 * 60 * 1000; // 5分钟超时
+
 async function controlledTask() {
+    // 检查是否正在执行，防止重复执行
+    // 但如果任务执行超过超时时间，则允许重新执行（可能卡住了）
+    if (isRunning) {
+        const elapsed = Date.now() - taskStartTime;
+        if (elapsed < TASK_TIMEOUT) {
+            logger.debug(`[直播监控] 任务正在执行中（已执行 ${Math.floor(elapsed / 1000)} 秒），跳过本次执行`);
+            return;
+        } else {
+            logger.warn(`[直播监控] 任务执行超过 ${TASK_TIMEOUT / 60000} 分钟，可能已卡住，强制重新执行`);
+        }
+    }
+
     const now = Date.now();
     const interval = lastLiveStatus === 1 ? ONLINE_INTERVAL : OFFLINE_INTERVAL;
 
@@ -214,8 +231,16 @@ async function controlledTask() {
         return;
     }
 
+    isRunning = true;
+    taskStartTime = Date.now();
     lastCheckTime = now;
-    await task();
+
+    try {
+        await task();
+    } finally {
+        isRunning = false;
+        taskStartTime = 0;
+    }
 }
 
 export default {

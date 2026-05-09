@@ -74,7 +74,26 @@ async function loadAllMethods() {
             }
 
             // 注册定时任务
-            cron.schedule(configCron, defaultExport.task);
+            const scheduledTask = cron.schedule(configCron, defaultExport.task, {
+                scheduled: true,
+                timezone: 'Asia/Shanghai'
+            });
+
+            // 监听 missed execution 事件，手动补执行（node-cron v4.1.0 不支持 recoverMissedExecutions）
+            scheduledTask.on('execution:missed', (executionDate) => {
+                logger.warn(`[定时任务] ${taskName} 错过了预定执行时间: ${executionDate}，尝试补执行`);
+                // 使用 setImmediate 确保不阻塞事件循环
+                setImmediate(async () => {
+                    try {
+                        // 直接执行任务，执行锁在任务内部处理
+                        // 如果任务正在执行，执行锁会跳过，但不会报错
+                        await defaultExport.task();
+                        logger.info(`[定时任务] ${taskName} 补执行完成`);
+                    } catch (error) {
+                        logger.error(`[定时任务] ${taskName} 补执行失败:`, error);
+                    }
+                });
+            });
 
             logger.info(`[定时任务] ${taskName} 已加载，执行周期: ${configCron}`);
         } catch (error) {

@@ -148,13 +148,13 @@ export async function getFavoriteDetail(favoriteId) {
         }
 
         const videoCount = queryOne(
-            'SELECT COUNT(*) as count FROM video_favorite WHERE favorite_id = ? AND is_deleted = 0',
+            'SELECT COUNT(*) as count FROM video_favorite WHERE favorite_id = ? AND is_deleted = 0 AND is_review = 1',
             [favoriteId]
         );
 
         const latestCover = queryOne(
             `SELECT cover_local FROM video_favorite
-            WHERE favorite_id = ? AND is_deleted = 0
+            WHERE favorite_id = ? AND is_deleted = 0 AND is_review = 1
             ORDER BY create_time DESC LIMIT 1`,
             [favoriteId]
         );
@@ -191,17 +191,17 @@ export async function getFavoriteList() {
                 f.description,
                 f.create_time,
                 u.name as user_name,
-                -- 视频数量子查询（包含所有未删除视频）
+                -- 视频数量子查询（包含所有已审核通过的未删除视频）
                 (
                     SELECT COUNT(*)
                     FROM video_favorite vf
-                    WHERE vf.favorite_id = f.id AND vf.is_deleted = 0
+                    WHERE vf.favorite_id = f.id AND vf.is_deleted = 0 AND vf.is_review = 1
                 ) as video_count,
-                -- 最新视频封面子查询（包含所有未删除视频）
+                -- 最新视频封面子查询（包含所有已审核通过的未删除视频）
                 (
                     SELECT vf.cover_local
                     FROM video_favorite vf
-                    WHERE vf.favorite_id = f.id AND vf.is_deleted = 0
+                    WHERE vf.favorite_id = f.id AND vf.is_deleted = 0 AND vf.is_review = 1
                     ORDER BY vf.create_time DESC
                     LIMIT 1
                 ) as latest_video_cover

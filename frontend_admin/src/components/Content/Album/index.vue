@@ -791,9 +791,9 @@ onMounted(() => {
                     <template #default="scope">
                         <el-image
                             :src="getFullUrl(scope.row.url)"
-                            :preview-src-list="[getFullUrl(scope.row.url)]"
                             fit="cover"
                             style="width: 60px; height: 60px; border-radius: 4px; cursor: pointer;"
+                            @click="handlePreviewPhoto(scope.row)"
                         />
                     </template>
                 </el-table-column>
@@ -1183,4 +1183,5 @@ onMounted(() => {
         font-size: 16px;
     }
 }
+
 </style>

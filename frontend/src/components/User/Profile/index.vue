@@ -238,8 +238,8 @@ const planTotal = ref(0)
 const videoTotal = ref(0)
 const messageTotal = ref(0)
 
-// 未读消息数
-const unreadCount = computed(() => messages.value.filter(m => !m.read).length)
+// 未读消息数（从API获取，不是基于当前页消息计算）
+const unreadCount = ref(0)
 
 // 播放/暂停音频
 function toggleAudioPlay(audio) {
@@ -301,14 +301,15 @@ async function fetchUserInfo() {
     error.value = null
 
     // 并行获取所有数据
-    const [profileRes, photosRes, audiosRes, plansRes, videosRes, notificationsRes, bilibiliRes] = await Promise.all([
+    const [profileRes, photosRes, audiosRes, plansRes, videosRes, notificationsRes, bilibiliRes, unreadRes] = await Promise.all([
       getUserProfile(),
       getUserPhotos({ page: photoPagination.value.currentPage, pageSize: photoPagination.value.pageSize }),
       getUserAudios({ page: audioPagination.value.currentPage, pageSize: audioPagination.value.pageSize }),
       getUserPlans({ page: planPagination.value.currentPage, pageSize: planPagination.value.pageSize }),
       getUserVideos({ page: videoPagination.value.currentPage, pageSize: videoPagination.value.pageSize }),
       getUserNotifications({ page: messagePagination.value.currentPage, pageSize: messagePagination.value.pageSize }),
-      getBilibiliBindInfo()
+      getBilibiliBindInfo(),
+      getUnreadNotificationCount()
     ])
 
     // 处理用户信息
@@ -387,7 +388,7 @@ async function fetchUserInfo() {
 
     // 处理消息列表
     if (notificationsRes.code === 200) {
-      messages.value = notificationsRes.data.map(m => ({
+      messages.value = notificationsRes.data.list.map(m => ({
         id: m.id,
         title: m.title,
         content: m.content,
@@ -395,7 +396,7 @@ async function fetchUserInfo() {
         read: m.read,
         type: m.type
       }))
-      messageTotal.value = notificationsRes.pagination?.total || 0
+      messageTotal.value = notificationsRes.data.pagination?.total || 0
     }
 
     // 处理B站绑定信息
@@ -406,6 +407,11 @@ async function fetchUserInfo() {
         guardLevel: bilibiliRes.data.captainType || 0,  // captainType 对应 guardLevel
         fanMedalExtinguished: bilibiliRes.data.fanMedalExtinguished || 0
       }
+    }
+
+    // 处理未读消息数
+    if (unreadRes.code === 200) {
+      unreadCount.value = unreadRes.data.count || 0
     }
   } catch (err) {
     error.value = '获取用户信息失败'
@@ -528,6 +534,7 @@ async function refreshUnreadCount() {
   try {
     const res = await getUnreadNotificationCount()
     if (res.code === 200) {
+      unreadCount.value = res.data.count || 0
       // 触发自定义事件通知Top组件更新
       window.dispatchEvent(new CustomEvent('refresh-unread-count', { detail: res.data.count || 0 }))
     }
@@ -996,9 +1003,9 @@ async function fetchUserMessages() {
         id: m.id,
         title: m.title,
         content: m.content,
-        type: m.type,
-        is_read: m.isRead,
-        create_time: formatTime(m.createTime)
+        time: formatTime(m.time),
+        read: m.read,
+        type: m.type
       }))
       messageTotal.value = res.data.pagination?.total || 0
     }
@@ -1083,7 +1090,7 @@ watch(activeMenu, async (newMenu) => {
     try {
       const res = await getUserNotifications({ page: 1, pageSize: messagePagination.value.pageSize })
       if (res.code === 200) {
-        messages.value = res.data.map(m => ({
+        messages.value = res.data.list.map(m => ({
           id: m.id,
           title: m.title,
           content: m.content,
@@ -1091,7 +1098,7 @@ watch(activeMenu, async (newMenu) => {
           read: m.read,
           type: m.type
         }))
-        messageTotal.value = res.pagination?.total || 0
+        messageTotal.value = res.data.pagination?.total || 0
         messagePagination.value.currentPage = 1
       }
     } catch (error) {
@@ -1406,7 +1413,7 @@ watch(activeMenu, async (newMenu) => {
             </div>
           </div>
           <div v-if="messageTotal > messagePagination.pageSize" class="pagination-wrapper">
-            <el-pagination small layout="prev, pager, next" :total="messageTotal"
+            <el-pagination background layout="prev, pager, next" :total="messageTotal"
               :page-size="messagePagination.pageSize" :current-page="messagePagination.currentPage"
               @current-change="handleMessagePageChange" />
           </div>

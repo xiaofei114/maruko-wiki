@@ -468,18 +468,14 @@ export async function uploadVideo(bvid, favoriteId, userId, userPermission = 0) 
         const isAdmin = userPermission === 1 || userPermission === 2;
         const reviewStatus = isAdmin ? 1 : 0;
 
-        // 如果指定了收藏夹，检查收藏夹是否存在且属于该用户
+        // 如果指定了收藏夹，检查收藏夹是否存在
         if (favoriteId) {
             const favorite = queryOne(
-                'SELECT id, user_id FROM favorite WHERE id = ? AND is_deleted = 0',
+                'SELECT id FROM favorite WHERE id = ? AND is_deleted = 0',
                 [favoriteId]
             );
             if (!favorite) {
                 return createErrorResponse('收藏夹不存在');
-            }
-            // 只能上传到自己的收藏夹（管理员可以上传到任意收藏夹）
-            if (!isAdmin && favorite.user_id !== userId) {
-                return createErrorResponse('无权上传到该收藏夹');
             }
         }
 

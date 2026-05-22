@@ -35,20 +35,22 @@ export async function getUserNotifications(userId, pagination = { page: 1, pageS
 
     return {
       success: true,
-      data: notifications.map(n => ({
-        id: n.id,
-        title: n.title,
-        content: n.content,
-        read: n.isRead === 1,
-        time: n.createTime,
-        type: n.type || 'system'
-      })),
-      pagination: {
-        currentPage: page,
-        pageSize,
-        total: totalResult?.total || 0
-      },
-      unreadCount: unreadResult?.count || 0
+      data: {
+        list: notifications.map(n => ({
+          id: n.id,
+          title: n.title,
+          content: n.content,
+          read: n.isRead === 1,
+          time: n.createTime,
+          type: n.type || 'system'
+        })),
+        pagination: {
+          currentPage: page,
+          pageSize,
+          total: totalResult?.total || 0
+        },
+        unreadCount: unreadResult?.count || 0
+      }
     };
   } catch (error) {
     logger.error('获取消息列表失败:', error);

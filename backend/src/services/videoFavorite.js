@@ -573,12 +573,7 @@ export async function getVideoList(favoriteId = null, page = 1, pageSize = 20) {
             params
         );
 
-        // 获取本周推荐数（从Redis）
-        const weekStart = getWeekStartTimestamp();
-        const videosWithRecommend = await Promise.all(videos.map(async (video) => {
-            const recommendKey = getRedisKey('recommend_count', weekStart);
-            const weeklyRecommend = await global.redis.hget(recommendKey, video.id.toString()) || 0;
-
+        const videosWithRecommend = videos.map((video) => {
             return {
                 id: video.id,
                 bvid: video.bvid,
@@ -590,10 +585,9 @@ export async function getVideoList(favoriteId = null, page = 1, pageSize = 20) {
                 favoriteId: video.favorite_id,
                 isReview: video.is_review,
                 totalRecommend: video.total_recommend,
-                weeklyRecommend: parseInt(weeklyRecommend),
                 createTime: video.create_time
             };
-        }));
+        });
 
         return createSuccessResponse('获取视频列表成功', {
             list: videosWithRecommend,

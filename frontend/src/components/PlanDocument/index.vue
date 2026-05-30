@@ -196,16 +196,29 @@ function formatTime(timestamp) {
   })
 }
 
-function downloadDocument(doc) {
+async function downloadDocument(doc) {
   if (!doc || !doc.filePath) return
   const apiPrefix = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : '/api'
   const url = `${baseUrl}${apiPrefix}/file/${doc.filePath}`
-  const link = document.createElement('a')
-  link.href = url
-  link.download = doc.fileName || 'document.docx'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+
+    const blobUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = blobUrl
+    link.download = doc.fileName
+
+    document.body.appendChild(link)
+    link.click()
+
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(blobUrl)
+  } catch (err) {
+    ElMessage.error('下载失败，请稍后重试')
+  }
 }
 
 function onPreviewError(payload) {

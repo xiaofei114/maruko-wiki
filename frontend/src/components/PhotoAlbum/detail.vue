@@ -225,33 +225,27 @@ function getFullImageUrl(relativeUrl) {
 // 下载照片
 async function downloadPhoto(photo) {
   try {
-    const token = localStorage.getItem('token')
-    const imageUrl = getFullImageUrl(photo.url)
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL
+    const url = `${baseUrl}${photo.img}`
+
+    const res = await fetch(url)
+    const blob = await res.blob()
     
-    const response = await fetch(imageUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('下载失败')
-    }
-    
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
+    const blobUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = url
-    link.download = `${photo.name}.jpg`
-    link.style.display = 'none'
+    link.href = blobUrl
+    
+    const urlParts = photo.img.split('.')
+    const extension = urlParts.length > 1 ? urlParts.pop() : 'jpg'
+    link.download = `${photo.title}.${extension}`
+    
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-    
-    ElMessage.success('下载成功')
+    window.URL.revokeObjectURL(blobUrl)
   } catch (error) {
     ElMessage.error('下载失败，请稍后重试')
+    console.log(error);
   }
 }
 

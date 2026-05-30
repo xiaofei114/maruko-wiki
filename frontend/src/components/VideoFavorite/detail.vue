@@ -335,7 +335,7 @@ onMounted(async () => {
             <div class="video-card-footer">
               <div class="video-card-recommend">
                 <el-icon><Star /></el-icon>
-                <span>{{ video.weeklyRecommend || 0 }}</span>
+                <span>{{ video.totalRecommend }}</span>
               </div>
               <el-button
                 v-if="isAuthenticated"

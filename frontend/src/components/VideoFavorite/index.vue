@@ -115,7 +115,9 @@ onMounted(() => {
 
 <template>
   <div class="video-favorite-page">
-    <PageHero :title="`${nickName}视频`" subtitle="汇集二创剪影，邀你编织闪耀星光" />
+    <div class="container">
+      <PageHero :title="`${nickName}视频`" subtitle="汇集二创剪影，邀你编织闪耀星光" />
+    </div>
 
     <div class="content-wrapper">
       <!-- 本周排行榜 -->
@@ -294,17 +296,21 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@use '@/assets/theme' as *;
-
 .video-favorite-page {
   min-height: 100vh;
   background: var(--color-primary-alpha-05);
 }
 
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 0 0 0;
+}
+
 .content-wrapper {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 20px 20px 60px;
+  padding: 0px 20px 20px;
 }
 
 .content-section {

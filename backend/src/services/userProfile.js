@@ -218,18 +218,18 @@ export async function getUserPlans(userId, pagination = { page: 1, pageSize: 10 
     const offset = (page - 1) * pageSize;
 
     const plans = queryAll(
-      `SELECT id, title, file_name as fileName, upload_time as uploadTime, 
-              is_current as isCurrent, is_review as status
-       FROM plan_document
-       WHERE uploader_id = ? AND deleted = 0
-       ORDER BY upload_time DESC
+      `SELECT id, title, file_name, type, anchor_category, dd_visibility,
+              time_type, date, start_date, end_date, create_time
+       FROM plan
+       WHERE deleted = 0
+       ORDER BY create_time DESC
        LIMIT ? OFFSET ?`,
-      [userId, pageSize, offset]
+      [pageSize, offset]
     );
 
     const totalResult = queryOne(
-      `SELECT COUNT(*) as total FROM plan_document WHERE uploader_id = ? AND deleted = 0`,
-      [userId]
+      `SELECT COUNT(*) as total FROM plan WHERE deleted = 0`,
+      []
     );
 
     return {
@@ -238,10 +238,15 @@ export async function getUserPlans(userId, pagination = { page: 1, pageSize: 10 
         list: plans.map(p => ({
           id: p.id,
           title: p.title,
-          fileName: p.fileName,
-          uploadTime: p.uploadTime,
-          isCurrent: p.isCurrent === 1,
-          status: p.status
+          fileName: p.file_name,
+          type: p.type,
+          anchorCategory: p.anchor_category,
+          ddVisibility: p.dd_visibility,
+          timeType: p.time_type,
+          date: p.date,
+          startDate: p.start_date,
+          endDate: p.end_date,
+          createTime: p.create_time
         })),
         pagination: {
           currentPage: page,
@@ -458,46 +463,26 @@ export async function updateAudio(audioId, userId, data) {
  */
 export async function updatePlan(planId, userId, data) {
   try {
-    // 验证企划是否属于该用户
     const plan = queryOne(
-      `SELECT id, title FROM plan_document WHERE id = ? AND uploader_id = ? AND deleted = 0`,
-      [planId, userId]
+      `SELECT id, title FROM plan WHERE id = ? AND deleted = 0`,
+      [planId]
     );
 
     if (!plan) {
-      return { success: false, message: '企划不存在或无权限修改', code: 403 };
+      return { success: false, message: '企划不存在', code: 404 };
     }
-
-    // 获取用户权限
-    const user = queryOne(
-      `SELECT permission FROM user WHERE id = ?`,
-      [userId]
-    );
-    const isAdmin = user && (user.permission === 1 || user.permission === 2);
 
     const { title } = data;
-    const updateTime = Math.floor(Date.now() / 1000);
-
-    // 普通用户修改后需要重新审核，管理员直接通过
-    const isReview = isAdmin ? 1 : 0;
 
     update(
-      `UPDATE plan_document SET title = ?, update_time = ?, is_review = ? WHERE id = ?`,
-      [title, updateTime, isReview, planId]
+      `UPDATE plan SET title = ? WHERE id = ?`,
+      [title, planId]
     );
 
-    // 如果是普通用户修改，通知管理员审核
-    if (!isAdmin) {
-      notifyAdminsForReview('企划', title || plan.title).catch(err => {
-        logger.error('发送管理员审核通知失败:', err);
-      });
-    }
-
-    logger.info(`用户 ${userId} 更新了企划 ${planId}`);
+    logger.info(`用户 ${userId} 更新了企划 ${planId}: ${plan.title} -> ${title}`);
     return {
       success: true,
-      message: isAdmin ? '企划信息更新成功' : '企划信息更新成功，等待管理员审核',
-      data: { isReview }
+      message: '企划信息更新成功'
     };
   } catch (error) {
     logger.error('更新企划失败:', error);
@@ -577,21 +562,16 @@ export async function deleteAudio(audioId, userId) {
  */
 export async function deletePlan(planId, userId) {
   try {
-    // 验证企划是否属于该用户
     const plan = queryOne(
-      `SELECT id FROM plan_document WHERE id = ? AND uploader_id = ? AND deleted = 0`,
-      [planId, userId]
+      `SELECT id FROM plan WHERE id = ? AND deleted = 0`,
+      [planId]
     );
 
     if (!plan) {
-      return { success: false, message: '企划不存在或无权限删除', code: 403 };
+      return { success: false, message: '企划不存在', code: 404 };
     }
 
-    const updateTime = Math.floor(Date.now() / 1000);
-    update(
-      `UPDATE plan_document SET deleted = 1, update_time = ? WHERE id = ?`,
-      [updateTime, planId]
-    );
+    update(`UPDATE plan SET deleted = 1 WHERE id = ?`, [planId]);
 
     logger.info(`用户 ${userId} 删除了企划 ${planId}`);
     return { success: true, message: '企划删除成功' };
@@ -600,6 +580,8 @@ export async function deletePlan(planId, userId) {
     return { success: false, message: '删除失败', code: 500 };
   }
 }
+
+/**
 
 /**
  * 更新用户头像

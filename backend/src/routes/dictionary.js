@@ -2,6 +2,7 @@ import express from 'express';
 import { createAdminValidatedRouteHandler, createAdminRoute, createRouteHandler } from '../method/route-helpers.js';
 import { authenticateToken, requirePermission } from '../method/auth.js';
 import { handleServiceResult, sendError } from '../method/response.js';
+import { queryAll } from '../method/database.js';
 import { addLog } from '../services/logs.js';
 import {
     getTypesPaged,
@@ -258,3 +259,37 @@ router.put('/dictionary/items/:id/ban', ...createAdminValidatedRouteHandler({
 }, 2, 500, { logName: '禁用/启用字典项' }));
 
 export default router;
+
+// ======================== 公开查询接口（独立路由） ========================
+
+export const publicDictionaryRouter = express.Router();
+
+/**
+ * 获取字典项列表（公开，无需登录）
+ * GET /api/dictionary/items
+ * Query参数:
+ * - dictType: 字典类型标识（必填）
+ */
+publicDictionaryRouter.get('/dictionary/items', createRouteHandler(async (req) => {
+    const { dictType } = req.query;
+
+    if (!dictType) {
+        return sendError('缺少必要参数 dictType', 400);
+    }
+
+    const sql = `
+        SELECT id, dict_label, dict_key, dict_key2, sort, display_style
+        FROM dictionary_item
+        WHERE dict_type = ?
+        AND is_deleted = 0
+        AND is_banned = 0
+        ORDER BY sort ASC, id DESC
+    `;
+    const items = queryAll(sql, [dictType]);
+
+    return {
+        success: true,
+        message: '获取字典项列表成功',
+        data: items
+    };
+}));

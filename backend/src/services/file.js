@@ -49,8 +49,18 @@ export async function getFile(filePath, req, res) {  // 添加 req 参数
         const ext = path.extname(fullPath).toLowerCase();
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
+        // 检查是否为下载请求
+        const isDownload = req.query?.download === '1';
+        if (isDownload) {
+            // 优先使用前端传的文件名，否则用原始文件名
+            let downloadName = req.query?.filename
+                ? decodeURIComponent(req.query.filename)
+                : path.basename(filePath);
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadName)}"`);
+        }
+
         // 记录访问日志
-        logger.info(`文件访问: ${filePath} (${contentType})`);
+        logger.info(`文件访问: ${filePath} (${contentType})${isDownload ? ' [下载]' : ''}`);
 
         // 设置 CORS 头，允许跨域访问媒体文件
         res.setHeader('Access-Control-Allow-Origin', '*');

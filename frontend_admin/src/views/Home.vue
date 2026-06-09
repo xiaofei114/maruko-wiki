@@ -35,12 +35,6 @@ const menuConfig = ref([
                 route: 'audio'
             },
             {
-                title: '企划管理',
-                icon: 'Document',
-                index: 'plan-document',
-                route: 'plan-document'
-            },
-            {
                 title: '视频管理',
                 icon: 'VideoCamera',
                 index: 'video-favorite',
@@ -55,6 +49,12 @@ const menuConfig = ref([
         index: 'operation',
         children: [
             {
+                title: '企划管理',
+                icon: 'Document',
+                index: 'plan-document',
+                route: 'plan-document'
+            },
+            {
                 title: '舰礼管理',
                 icon: 'Present',
                 index: 'captain-gift',
@@ -65,7 +65,7 @@ const menuConfig = ref([
                 icon: 'Bell',
                 index: 'announcement',
                 route: 'announcement'
-            }
+            },
         ]
     },
     {

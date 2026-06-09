@@ -38,7 +38,7 @@ const sidebar = [
   {
     path: 'plan-document',
     name: 'plan-document',
-    component: () => import('../components/Content/PlanDocument/index.vue'),
+    component: () => import('../components/Operation/PlanDocument/index.vue'),
     meta: { needLogin: true, name: "企划文档管理", cnname: "企划文档管理", }
   },
   {

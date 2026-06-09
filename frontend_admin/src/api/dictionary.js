@@ -25,6 +25,11 @@ export function get_getItemsPaged(data) {
     return Client.get('/api/admin/dictionary/items', data)
 }
 
+//获取通用字典项列表
+export function get_getPublicItemsPaged(data) {
+    return Client.get('/api/dictionary/items', data)
+}
+
 //添加/修改字典项
 export function get_addorupdateItem(data) {
     return Client.post('/api/admin/dictionary/items', data)

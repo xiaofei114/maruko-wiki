@@ -12,11 +12,11 @@ import userProfileRoutes from '../routes/userProfile.js';
 import bilibiliRoutes from '../routes/bilibili.js';
 import aiRoutes from '../routes/ai.js';
 import announcementRoutes from '../routes/announcement.js';
-import planDocumentRoutes from '../routes/planDocument.js';
+import planRoutes from '../routes/plan.js';
 import videoFavoriteRoutes from '../routes/videoFavorite.js';
 import favoriteRoutes from '../routes/favorite.js';
 import logsRoutes from '../routes/logs.js';
-import dictionaryRoutes from '../routes/dictionary.js';
+import dictionaryRoutes, { publicDictionaryRouter } from '../routes/dictionary.js';
 import anchorStatsRoutes from '../routes/anchorStats.js';
 import captainGiftRoutes from '../routes/captainGift.js';
 import redisAdminRoutes from '../routes/redisAdmin.js';
@@ -63,7 +63,7 @@ export default async () => {
     App.use('/api', audioRoutes);
     App.use('/api', albumRoutes);
     App.use('/api', announcementRoutes); // 公告相关路由
-    App.use('/api', planDocumentRoutes); // 企划文档相关路由
+    App.use('/api', planRoutes); // 企划相关路由（日历版）
     App.use('/api', captainGiftRoutes); // 舰长礼物路由
     App.use('/api', anchorStatsRoutes); // 主播统计数据路由
     App.use('/api', homeModulesRoutes); // 首页功能模块数据路由
@@ -72,6 +72,7 @@ export default async () => {
     App.use('/api/admin', adminRoutes);
     App.use('/api/admin', logsRoutes); // 日志查询路由
     App.use('/api/admin', dictionaryRoutes); // 字典管理路由
+    App.use('/api', publicDictionaryRouter); // 字典公开查询路由
     App.use('/api/super-admin', superAdminRoutes);
     App.use('/api/bilibili', bilibiliRoutes); // Bilibili API 代理路由
     App.use('/api/ai', aiRoutes); // AI相关路由

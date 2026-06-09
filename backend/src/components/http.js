@@ -23,6 +23,7 @@ import redisAdminRoutes from '../routes/redisAdmin.js';
 import configRoutes from '../routes/config.js';
 import taskConfigRoutes from '../routes/taskConfig.js';
 import homeModulesRoutes from '../routes/homeModules.js';
+import versionRoutes from '../routes/version.js';
 import chalk from 'chalk';
 
 export default async () => {
@@ -77,6 +78,7 @@ export default async () => {
     App.use('/api', redisAdminRoutes); // Redis 管理路由（超级管理员）
     App.use('/api/admin/config', configRoutes); // 系统配置管理路由
     App.use('/api/admin/task-config', taskConfigRoutes); // 定时任务配置管理路由
+    App.use('/api', versionRoutes); // 版本号路由
 
     // 通过url获取/data/document下的文件 - 必须在用户路由之前
     App.get('/api/file/*', async (req, res) => {

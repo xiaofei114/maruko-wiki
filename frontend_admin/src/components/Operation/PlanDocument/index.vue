@@ -360,8 +360,9 @@ onMounted(() => { fetchPlans(); fetchCategories() })
                 </template>
             </el-table-column>
             <el-table-column align="center" label="周期" width="80">
-                <template #default="s">{{ { single: '单日', range: '持续', long: '长期' }[s.row.timeType] || s.row.timeType
-                    }}</template>
+                <template #default="s">
+                    <el-tag :type="s.row.timeType === 'single' ? 'primary' : s.row.timeType === 'range' ? 'success' : 'info'" size="small">{{ { single: '单日', range: '持续', long: '长期' }[s.row.timeType] || s.row.timeType }}</el-tag>
+                </template>
             </el-table-column>
             <el-table-column align="center" label="时间/范围" min-width="170">
                 <template #default="s">{{ getTimeLabel(s.row) }}</template>
@@ -372,7 +373,7 @@ onMounted(() => { fetchPlans(); fetchCategories() })
             <el-table-column align="center" label="创建时间" width="160">
                 <template #default="s">{{ formatTime(s.row.createTime) }}</template>
             </el-table-column>
-            <el-table-column align="center" label="操作" width="250" fixed="right">
+            <el-table-column align="center" label="操作" width="250">
                 <template #default="s">
                     <div v-if="s.row.fileName">
                         <el-button type="primary" text size="small" @click="viewDocument(s.row)">
@@ -585,5 +586,54 @@ onMounted(() => { fetchPlans(); fetchCategories() })
 
 .act-btn {
     padding: 4px 8px;
+}
+
+@media (max-width: 768px) {
+    .plan-management {
+        padding: 12px;
+    }
+
+    .section-header {
+        margin-bottom: 12px;
+    }
+
+    .section-header h3 {
+        font-size: 17px;
+    }
+
+    .operate {
+        flex-direction: column;
+        align-items: stretch;
+        margin-bottom: 12px;
+    }
+
+    .search-area {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .search-area .el-input,
+    .search-area .el-select {
+        width: calc(50% - 3px) !important;
+        margin-right: 0 !important;
+    }
+
+    .search-area .el-input {
+        width: 100% !important;
+    }
+
+    .search-area .el-button {
+        flex: 1;
+    }
+
+    .paging {
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .paging > span {
+        margin-right: 0;
+    }
 }
 </style>

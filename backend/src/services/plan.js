@@ -7,36 +7,44 @@ const logger = global.logger;
 /**
  * 获取企划列表（未登录看不到DD内部企划）
  * @param {object|null} user - 登录用户信息（可选）
+ * @param {object} query - { year, month } 用于过滤当月企划
  */
-export async function getPlanList(user = null) {
+export async function getPlanList(user = null, query = {}) {
     try {
         const isLoggedIn = !!(user && user.id);
 
-        let sql, params;
-        if (isLoggedIn) {
-            // 已登录：返回全部
-            sql = `
-                SELECT id, title, type, anchor_category, dd_visibility,
-                       time_type, date, start_date, end_date,
-                       file_path, file_name, create_time
-                FROM plan
-                WHERE deleted = 0
-                ORDER BY create_time DESC
-            `;
-            params = [];
-        } else {
-            // 未登录：排除DD内部企划
-            sql = `
-                SELECT id, title, type, anchor_category, dd_visibility,
-                       time_type, date, start_date, end_date,
-                       file_path, file_name, create_time
-                FROM plan
-                WHERE deleted = 0
-                AND (type != 'dd' OR dd_visibility != 'internal')
-                ORDER BY create_time DESC
-            `;
-            params = [];
+        const { year, month } = query;
+        let whereClause = 'WHERE deleted = 0';
+        const params = [];
+
+        // 月份过滤
+        if (year && month) {
+            const mm = String(month).padStart(2, '0');
+            const monthStart = `${year}-${mm}-01`;
+            const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
+            const monthEnd = `${year}-${mm}-${String(daysInMonth).padStart(2, '0')}`;
+
+            whereClause += ` AND (
+                (time_type = 'single' AND date >= ? AND date <= ?)
+                OR (time_type = 'range' AND start_date <= ? AND end_date >= ?)
+                OR (time_type = 'long')
+            )`;
+            params.push(monthStart, monthEnd, monthEnd, monthStart);
         }
+
+        // 未登录过滤DD内部
+        if (!isLoggedIn) {
+            whereClause += ' AND (type != \'dd\' OR dd_visibility != \'internal\')';
+        }
+
+        const sql = `
+            SELECT id, title, type, anchor_category, dd_visibility,
+                   time_type, date, start_date, end_date,
+                   file_path, file_name, create_time
+            FROM plan
+            ${whereClause}
+            ORDER BY create_time DESC
+        `;
 
         const records = queryAll(sql, params);
 
@@ -55,10 +63,63 @@ export async function getPlanList(user = null) {
             createTime: r.create_time
         }));
 
+        // 计算统计数据
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        const anchorCategories = queryAll(`
+            SELECT dict_key, dict_label FROM dictionary_item WHERE dict_type = 'anchor_plan_category'
+        `);
+
+        const allPlans = queryAll(`
+            SELECT type, anchor_category, time_type, date, start_date, end_date
+            FROM plan
+            WHERE deleted = 0
+        `);
+
+        const stats = (anchorCategories || []).map(cat => {
+            const catPlans = allPlans.filter(p =>
+                p.type === 'anchor' && p.anchor_category === cat.dict_key
+            );
+
+            // 只统计已结束的
+            const pastPlans = catPlans.filter(p => {
+                const dateStr = p.date || p.end_date || p.start_date;
+                return dateStr && dateStr <= todayStr;
+            });
+
+            const count = pastPlans.length;
+
+            let lastDate = null;
+            for (const plan of pastPlans) {
+                const planDateStr = plan.date || plan.start_date;
+                if (planDateStr && (!lastDate || planDateStr > lastDate)) {
+                    lastDate = planDateStr;
+                }
+            }
+
+            let daysSince = null;
+            if (lastDate) {
+                const last = new Date(lastDate);
+                daysSince = Math.floor((today - last) / (1000 * 60 * 60 * 24));
+            }
+
+            return {
+                label: cat.dict_label,
+                key: cat.dict_key,
+                count,
+                lastDate,
+                daysSince
+            };
+        }).filter(s => s.count > 0);
+
         return {
             success: true,
             message: '获取企划列表成功',
-            data
+            data: {
+                list: data,
+                stats
+            }
         };
     } catch (error) {
         logger.error('获取企划列表失败:', error);

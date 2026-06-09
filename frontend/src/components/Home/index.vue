@@ -2,10 +2,12 @@
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRoomInfo, getMasterInfo, getTopListNew, getLiveDuration } from '@/api/bilibiliApis.js'
-import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock, Switch, Picture, Headset, Document, VideoPlay, VideoPause, ArrowRight, Download } from '@element-plus/icons-vue'
+import { Check, CircleCheckFilled, Present, UserFilled, Timer, Loading, Lock, Switch, Picture, Headset, Document, VideoPlay, VideoPause, ArrowRight, Download, Calendar } from '@element-plus/icons-vue'
 import { getAnchorStats, getCurrentMonthMaxCaptainCount } from '@/api/anchorStats.js'
 import { getCurrentMonthGifts } from '@/api/captainGift.js'
 import { getHomeModules } from '@/api/homeModules.js'
+import { getPlanList } from '@/api/planDocument.js'
+import { getDictionaryItems } from '@/api/dictionary.js'
 import DocxPreview from '@/components/ComponentStyle/DocxPreview.vue'
 
 const router = useRouter()
@@ -409,6 +411,8 @@ const showGiftsDetailDialog = ref(false) // 舰礼详情弹窗
 const latestPhoto = ref(null) // 最新照片
 const hotAudio = ref(null) // 本周最热音声
 const currentPlan = ref(null) // 当前企划
+const todayPlans = ref([]) // 今日企划列表
+const anchorCategoryMap = ref({}) // dict_key -> dict_label 映射
 const hotVideo = ref(null) // 本周最热视频
 
 // 音频播放相关
@@ -492,6 +496,18 @@ function onPlanPreviewError(payload) {
   const detail = payload?.message ? `（${payload.message}）` : ''
   planPreviewError.value = `当前文档暂不支持在线预览，请下载后查看${detail}`
   console.error('企划文档预览失败:', detail)
+}
+
+// 获取企划时间显示
+function getTimeDisplay(plan) {
+  if (plan.timeType === 'single') return `日期：${plan.date}`
+  if (plan.timeType === 'range') return `时间：${plan.startDate} ~ ${plan.endDate}`
+  return '长期有效'
+}
+
+// 获取企划分类标签
+function getAnchorCategoryLabel(key) {
+  return anchorCategoryMap.value[key] || key || ''
 }
 
 // 下载企划文档
@@ -1312,6 +1328,59 @@ const changeStatsTimeRange = async (range) => {
   await fetchStatsData()
 }
 
+// 获取今日企划
+const fetchTodayPlans = async () => {
+  try {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth() + 1
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    
+    const res = await getPlanList({ year, month })
+    if (res.code === 200) {
+      const plans = res.data?.list || []
+      // 只保留今天的企划
+      todayPlans.value = plans.filter(plan => {
+        if (plan.timeType === 'single') {
+          return plan.date === dateStr
+        } else if (plan.timeType === 'range') {
+          return plan.startDate <= dateStr && plan.endDate >= dateStr
+        } else if (plan.timeType === 'long') {
+          return true
+        }
+        return false
+      })
+      // 按类型排序：主播 > DD公开 > DD内部
+      todayPlans.value.sort((a, b) => {
+        const getPriority = (p) => {
+          if (p.type === 'anchor') return 0
+          if (p.ddVisibility === 'public') return 1
+          return 2
+        }
+        return getPriority(a) - getPriority(b)
+      })
+    }
+  } catch (error) {
+    console.error('获取今日企划失败:', error)
+  }
+}
+
+// 加载主播企划分类字典
+const fetchAnchorCategories = async () => {
+  try {
+    const res = await getDictionaryItems('anchor_plan_category')
+    if (res.code === 200) {
+      const map = {}
+      ;(res.data || []).forEach(item => {
+        map[item.dict_key] = item.dict_label
+      })
+      anchorCategoryMap.value = map
+    }
+  } catch (error) {
+    console.error('获取企划分类失败:', error)
+  }
+}
+
 // 获取功能模块数据（聚合接口）
 const fetchHomeModules = async () => {
   try {
@@ -1381,6 +1450,12 @@ onMounted(async () => {
 
   // 获取功能模块数据
   await fetchHomeModules()
+
+  // 获取今日企划
+  await fetchTodayPlans()
+
+  // 加载企划分类字典
+  await fetchAnchorCategories()
 
   generateCalendar()
 })
@@ -1524,9 +1599,9 @@ onUnmounted(() => {
 
         <!-- 直播详细信息弹窗 -->
         <el-dialog
-          v-model="showLiveDetailDialog"
-          title="直播时长详细"
-          width="600px"
+            v-model="showLiveDetailDialog"
+            title="直播时长详细"
+            width="600px"
           :close-on-click-modal="false"
           custom-class="live-detail-dialog"
           align-center
@@ -1970,33 +2045,41 @@ onUnmounted(() => {
         <!-- 企划详情弹窗 -->
         <el-dialog
           v-model="planDialogVisible"
-          :title="planDetail?.title || '企划详情'"
-          width="900px"
+          :title="'企划详情'"
+          :width="planDetail?.filePath ? '900px' : '600px'"
           :close-on-click-modal="true"
           align-center
           destroy-on-close
-          custom-class="plan-preview-dialog"
         >
-          <div v-if="planDetail" class="plan-preview-content">
-             <div class="plan-preview-panel">
-               <el-empty v-if="planPreviewError" :description="planPreviewError" :image-size="60" />
-               <docx-preview
-                  v-else
-                  :key="planPreviewKey"
-                  :src="getPlanPreviewUrl(planDetail.filePath)"
-                  style="height: 60vh"
-                  @error="onPlanPreviewError"
-                />
-             </div>
-            <div class="plan-preview-footer">
-              <el-button @click="planDialogVisible = false">关闭</el-button>
-              <el-button type="primary" @click="downloadPlanDocument(planDetail)">
-                <el-icon><Download /></el-icon>
-                下载文档
+          <div v-if="planDetail" class="plan-detail-body">
+            <div class="plan-detail-title">{{ planDetail.title }}</div>
+            <div class="plan-detail-bar">
+              <el-tag
+                size="small"
+                :type="planDetail.type === 'anchor' ? 'primary' : planDetail.ddVisibility === 'internal' ? 'danger' : 'warning'"
+              >
+                {{ planDetail.type === 'anchor' ? '主播企划' : planDetail.ddVisibility === 'internal' ? 'DD内部' : 'DD公开' }}
+              </el-tag>
+              <span v-if="planDetail.anchorCategory" class="plan-bar-item">{{ getAnchorCategoryLabel(planDetail.anchorCategory) }}</span>
+              <span class="plan-bar-item"><el-icon><Calendar /></el-icon>{{ getTimeDisplay(planDetail) }}</span>
+            </div>
+            <template v-if="planDetail.filePath">
+              <div v-if="planPreviewError" class="plan-doc-error">{{ planPreviewError }}</div>
+              <docx-preview
+                v-else
+                :key="planPreviewKey"
+                :src="getPlanPreviewUrl(planDetail.filePath)"
+                style="height: 55vh; border-radius: 8px; overflow: hidden;"
+                @error="onPlanPreviewError"
+              />
+            </template>
+            <div v-else class="plan-no-doc">该企划暂无附件</div>
+            <div class="plan-detail-actions">
+              <el-button size="small" @click="planDialogVisible = false">关闭</el-button>
+              <el-button v-if="planDetail.filePath" size="small" type="primary" @click="downloadPlanDocument(planDetail)">
+                <el-icon><Download /></el-icon> 下载文档
               </el-button>
-              <el-button type="success" @click="goTo('/plan-document', true); planDialogVisible = false">
-                查看全部企划
-              </el-button>
+              <el-button size="small" type="success" @click="goTo('/plan-document', true); planDialogVisible = false">全部企划</el-button>
             </div>
           </div>
         </el-dialog>
@@ -2075,25 +2158,34 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 丸子企划 -->
+          <!-- 今日企划 -->
           <div class="module-card feature-module">
             <div class="module-header">
               <h2>{{ nickName }}企划</h2>
               <el-button type="text" size="small" style="color: var(--color-primary);" @click="goTo('/plan-document', true)">查看全部</el-button>
             </div>
             <div class="module-body feature-body">
-              <div v-if="currentPlan" class="feature-content plan-content clickable" @click="viewPlanDetail(currentPlan)">
-                <div class="plan-icon-large">
-                  <el-icon><Document /></el-icon>
-                </div>
-                <div class="plan-info">
-                  <span class="plan-label">当前企划</span>
-                  <span class="plan-title">{{ currentPlan.title }}</span>
+              <div v-if="todayPlans.length > 0" class="today-plans">
+                <div class="today-plans-label">今日企划</div>
+                <div
+                  v-for="plan in todayPlans"
+                  :key="plan.id"
+                  class="today-plan-item clickable"
+                  @click="viewPlanDetail(plan)"
+                >
+                  <el-tag
+                    size="small"
+                    :type="plan.type === 'anchor' ? 'primary' : plan.ddVisibility === 'internal' ? 'danger' : 'warning'"
+                  >
+                    {{ plan.type === 'anchor' ? '主播' : plan.ddVisibility === 'internal' ? '内部' : '公开' }}
+                  </el-tag>
+                  <span class="today-plan-title" :title="plan.title">{{ plan.title }}</span>
+                  <el-icon v-if="plan.fileName" style="font-size:14px;color:#909399;flex-shrink:0;"><Document /></el-icon>
                 </div>
               </div>
               <div v-else class="feature-empty">
                 <el-icon><Document /></el-icon>
-                <p>暂无企划</p>
+                <p>今日暂无企划</p>
               </div>
             </div>
           </div>
@@ -3279,6 +3371,56 @@ onUnmounted(() => {
   max-width: 200px;
 }
 
+/* 今日企划列表 */
+.today-plans {
+  width: 100%;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.today-plans::-webkit-scrollbar {
+  width: 4px;
+}
+
+.today-plans::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 2px;
+}
+
+.today-plans-label {
+  font-size: 11px;
+  color: #909399;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.today-plan-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+  margin-bottom: 4px;
+}
+
+.today-plan-item:hover {
+  background: #f5f7fa;
+}
+
+.today-plan-item:last-child {
+  margin-bottom: 0;
+}
+
+.today-plan-title {
+  flex: 1;
+  font-size: 13px;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* 播放中状态 */
 .audio-icon-large.is-playing {
   background: #e74c3c;
@@ -3301,27 +3443,66 @@ onUnmounted(() => {
   }
 }
 
-/* 企划预览弹窗 */
-.plan-preview-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+/* 企划详情弹窗 */
+.plan-detail-body {
+  padding: 0;
 }
 
-.plan-preview-panel {
-  flex: 1;
-  background: #f5f5f5;
-  border-radius: 8px;
-  overflow: hidden;
+.plan-detail-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.plan-detail-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
 }
 
-.plan-preview-footer {
+.plan-bar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #909399;
+}
+
+.plan-bar-item .el-icon {
+  font-size: 14px;
+}
+
+.plan-doc-error {
+  background: #fef0f0;
+  border: 1px solid #fde2e2;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: #f56c6c;
+  font-size: 13px;
+}
+
+.plan-no-doc {
+  background: #fafbfc;
+  border: 1px dashed #dcdfe6;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+}
+
+.plan-detail-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding-top: 16px;
-  border-top: 1px solid #e4e7ed;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #ebeef5;
 }
 
 /* 信息展示 */
@@ -3522,22 +3703,17 @@ onUnmounted(() => {
   }
 
   .maruko-content {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(1, 1fr);
     gap: 12px;
   }
 
   .feature-body {
-    min-height: 120px;
+    height: 150px;
     padding: 10px;
   }
 
   .feature-preview {
-    height: 100px;
-  }
-
-  .preview-overlay {
-    padding: 8px;
-    font-size: 12px;
+    height: 100%;
   }
 
   .feature-empty .el-icon {
@@ -3558,7 +3734,11 @@ onUnmounted(() => {
   }
 
   .feature-content {
-    height: 100px;
+    height: 100%;
+  }
+
+  .today-plans {
+    height: 100%;
   }
 
   .audio-icon-large,
@@ -3643,11 +3823,19 @@ onUnmounted(() => {
   }
 
   .feature-body {
-    min-height: 100px;
+    height: 130px;
   }
 
   .feature-preview {
-    height: 80px;
+    height: 100%;
+  }
+
+  .feature-content {
+    height: 100%;
+  }
+
+  .today-plans {
+    height: 100%;
   }
 
   .feature-icon-large {
@@ -4784,12 +4972,20 @@ onUnmounted(() => {
 
   /* 功能模块小屏优化 */
   .feature-body {
-    min-height: 100px;
+    height: 130px;
     padding: 8px;
   }
 
   .feature-preview {
-    height: 90px;
+    height: 100%;
+  }
+
+  .feature-content {
+    height: 100%;
+  }
+
+  .today-plans {
+    height: 100%;
   }
 
   .preview-overlay {

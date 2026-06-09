@@ -26,6 +26,7 @@ const currentMonth = ref(new Date().getMonth() + 1)
 
 // 上传对话框
 const uploadDialogVisible = ref(false)
+const uploadRef = ref(null)
 const uploadForm = ref({
     title: '',
     type: 'anchor', // anchor: 主播企划, dd: DD企划
@@ -64,48 +65,7 @@ watch(() => uploadForm.value.type, (newType) => {
 })
 
 // 分类统计数据
-const categoryStats = computed(() => {
-    const categories = anchorCategories.value
-    const anchorPlansForStats = plans.value.filter(p => p.type === 'anchor' && p.anchorCategory)
-    const today = new Date()
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    
-    return categories.map(cat => {
-        const catPlans = anchorPlansForStats.filter(p => p.anchorCategory === cat.dict_key)
-        
-        // 只统计已结束的企划（日期 <= 今天）
-        const pastPlans = catPlans.filter(p => {
-            const dateStr = p.date || p.endDate || p.startDate
-            return dateStr && dateStr <= todayStr
-        })
-        
-        const count = pastPlans.length
-        
-        // 找到最近一次已结束企划的日期
-        let lastDate = null
-        for (const plan of pastPlans) {
-            const planDateStr = plan.date || plan.startDate
-            if (planDateStr && (!lastDate || planDateStr > lastDate)) {
-                lastDate = planDateStr
-            }
-        }
-        
-        // 计算距今天数
-        let daysSince = null
-        if (lastDate) {
-            const last = new Date(lastDate)
-            daysSince = Math.floor((today - last) / (1000 * 60 * 60 * 24))
-        }
-        
-        return {
-            label: cat.dict_label,
-            key: cat.dict_key,
-            count,
-            lastDate,
-            daysSince
-        }
-    }).filter(s => s.count > 0)
-})
+const categoryStats = ref([])
 
 // 详情对话框
 const detailDialogVisible = ref(false)
@@ -124,9 +84,13 @@ const plansLoading = ref(false)
 async function fetchPlans() {
     try {
         plansLoading.value = true
-        const res = await getPlanList()
+        const res = await getPlanList({
+            year: currentYear.value,
+            month: currentMonth.value
+        })
         if (res.code === 200) {
-            plans.value = (res.data || []).map(item => ({
+            const data = res.data || {}
+            plans.value = (data.list || []).map(item => ({
                 id: item.id,
                 title: item.title,
                 type: item.type,
@@ -140,6 +104,7 @@ async function fetchPlans() {
                 endDate: item.endDate,
                 createTime: item.createTime * 1000
             }))
+            categoryStats.value = data.stats || []
         }
     } catch (err) {
         console.error('获取企划列表失败', err)
@@ -349,6 +314,7 @@ function prevMonth() {
     } else {
         currentMonth.value--
     }
+    fetchPlans()
 }
 
 // 下一月
@@ -359,6 +325,7 @@ function nextMonth() {
     } else {
         currentMonth.value++
     }
+    fetchPlans()
 }
 
 // 回到今天
@@ -366,6 +333,7 @@ function goToToday() {
     const today = new Date()
     currentYear.value = today.getFullYear()
     currentMonth.value = today.getMonth() + 1
+    fetchPlans()
 }
 
 // 打开上传对话框
@@ -391,6 +359,7 @@ function resetUploadForm() {
         startDate: '',
         endDate: ''
     }
+    uploadRef.value?.clearFiles()
 }
 
 // 文件选择（el-upload on-change）
@@ -792,8 +761,10 @@ onMounted(() => {
 
           <el-form-item label="附件">
             <el-upload
+              ref="uploadRef"
               :auto-upload="false"
               :show-file-list="true"
+              :limit="1"
               accept=".docx"
               :on-change="handleFileChange"
               :on-exceed="handleFileExceed"
@@ -1030,14 +1001,12 @@ onMounted(() => {
 }
 
 .stats-grid {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
 }
 
 .stat-item {
-  flex: 1;
-  min-width: 160px;
   background: #f8f9fb;
   border-radius: 12px;
   padding: 14px 18px;
@@ -1357,45 +1326,182 @@ onMounted(() => {
   font-size: 12px !important;
 }
 
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 15px;
+  padding-left: 10px;
+}
+
+.section-title:first-child {
+  margin-top: 0;
+}
+
+.plan-section {
+  margin-bottom: 20px;
+}
+
 @media (max-width: 768px) {
   .container {
-    padding: 15px;
+    padding: 12px;
+  }
+
+  .toolbar-card {
+    padding: 12px 16px;
+    margin-bottom: 12px;
+  }
+
+  .stats-card {
+    padding: 14px 16px;
+    margin-bottom: 12px;
   }
 
   .stats-grid {
-    flex-direction: column;
-    gap: 12px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
   .stat-item {
-    min-width: auto;
+    padding: 10px 12px;
   }
 
-  .calendar-card {
-    padding: 16px;
+  .stat-label {
+    font-size: 12px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
   }
 
-  .calendar-day {
-    min-height: 80px;
-    padding: 4px;
-  }
-
-  .day-number {
+  .stat-row {
     font-size: 12px;
   }
 
-  .plan-tag {
-    font-size: 10px;
-    padding: 1px 4px;
+  .calendar-card {
+    padding: 8px;
+  }
+
+  .calendar-header {
+    margin-bottom: 8px;
+  }
+
+  .month-selector {
+    gap: 6px;
   }
 
   .month-text {
-    font-size: 16px;
-    min-width: 120px;
+    font-size: 14px;
+    min-width: 90px;
+  }
+
+  .weekday-header {
+    margin-bottom: 3px;
+    gap: 1px;
+  }
+
+  .weekday {
+    padding: 4px 0;
+    font-size: 11px;
+  }
+
+  .calendar-week {
+    min-height: auto !important;
+    gap: 1px;
+  }
+
+  .calendar-day {
+    min-height: 90px;
+    padding: 2px;
+  }
+
+  .day-number {
+    font-size: 10px;
+    margin-bottom: 1px;
+  }
+
+  .plan-tag {
+    font-size: 8px;
+    padding: 0 2px;
+    height: 14px;
+    line-height: 14px;
+    border-radius: 2px;
+  }
+
+  .plan-tag:nth-child(1) { top: 0 !important; }
+  .plan-tag:nth-child(2) { top: 14px !important; }
+  .plan-tag:nth-child(3) { top: 28px !important; }
+  .plan-tag:nth-child(4) { top: 42px !important; }
+  .plan-tag:nth-child(5) { top: 56px !important; }
+
+  .more-plans {
+    font-size: 10px;
+  }
+
+  .plan-item {
+    padding: 12px;
+  }
+
+  .plan-item-header h4 {
+    font-size: 14px;
+  }
+
+  .plan-section h3 {
+    font-size: 14px !important;
+  }
+
+  .plan-item-info p {
+    font-size: 13px;
+  }
+
+  .plan-file-actions {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .plan-file-actions .el-button {
+    flex: 1;
   }
 
   .preview-dialog-body {
     height: 50vh;
+  }
+
+  .date-range {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .date-range .el-date-picker {
+    width: 100% !important;
+  }
+
+  .range-separator {
+    align-self: center;
+  }
+
+  :deep(.el-dialog) {
+    width: 95% !important;
+    max-width: 95% !important;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 16px 20px;
+  }
+
+  :deep(.el-form-item) {
+    flex-wrap: wrap;
+  }
+
+  :deep(.el-form-item__label) {
+    width: 70px !important;
+  }
+
+  :deep(.el-form-item__content) {
+    width: calc(100% - 70px);
+  }
+
+  :deep(.el-upload-dragger) {
+    width: 100%;
+    padding: 12px;
   }
 }
 </style>

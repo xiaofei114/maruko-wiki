@@ -9,7 +9,8 @@ const router = express.Router();
 
 // 获取企划列表（未登录看不到DD内部企划）
 router.get('/plan/list', optionalAuth, createRouteHandler(async (req) => {
-    return await getPlanList(req.user);
+    const { year, month } = req.query;
+    return await getPlanList(req.user, { year, month });
 }));
 
 // 上传企划（需要登录，上传权限等级2）

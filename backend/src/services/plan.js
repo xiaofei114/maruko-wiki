@@ -152,9 +152,6 @@ export async function createPlan(file, planData) {
         if (timeType === 'range' && (!startDate || !endDate)) {
             return { success: false, message: '持续企划必须填写时间范围' };
         }
-        if (type === 'anchor' && !anchorCategory) {
-            return { success: false, message: '主播企划必须选择分类' };
-        }
         if (type === 'dd' && !ddVisibility) {
             return { success: false, message: 'DD企划必须选择可见范围' };
         }

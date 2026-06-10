@@ -408,7 +408,7 @@ async function handleSubmit() {
     formData.append('type', uploadForm.value.type)
     formData.append('timeType', uploadForm.value.timeType)
     
-    if (uploadForm.value.type === 'anchor') {
+    if (uploadForm.value.type === 'anchor' && uploadForm.value.anchorCategory) {
         formData.append('anchorCategory', uploadForm.value.anchorCategory)
     }
     if (uploadForm.value.type === 'dd') {

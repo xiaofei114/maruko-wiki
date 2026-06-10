@@ -15,7 +15,6 @@ router.get('/version', (req, res) => {
             version: versionData.version
         }));
     } catch (error) {
-        logger.error('获取版本号失败:', error);
         return res.json(createErrorResponse('获取版本号失败'));
     }
 });

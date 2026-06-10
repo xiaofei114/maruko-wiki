@@ -105,14 +105,14 @@ async function checkVersion(isInitialCheck = false) {
   const localVersion = localStorage.getItem(VERSION_STORAGE_KEY)
 
   if (!localVersion) {
-    localStorage.setItem(VERSION_STORAGE_KEY, serverVersion)
+    localStorage.setItem(VERSION_STORAGE_KEY, String(serverVersion))
     window.location.reload()
     return
   }
 
-  if (localVersion !== serverVersion) {
+  if (localVersion !== String(serverVersion)) {
     if (isInitialCheck) {
-      localStorage.setItem(VERSION_STORAGE_KEY, serverVersion)
+      localStorage.setItem(VERSION_STORAGE_KEY, String(serverVersion))
       clearCacheAndReload()
     } else {
       showUpdateDialog(serverVersion)

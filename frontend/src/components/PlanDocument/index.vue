@@ -589,7 +589,7 @@ onMounted(() => {
       <PageHero :title="`${nickName}企划`" subtitle="绘出明日蓝图，邀你共同执笔未来" />
 
       <!-- 工具栏 -->
-      <div class="toolbar-card" v-if="isAuthenticated && canManage">
+      <div class="toolbar-card" v-if="isAuthenticated">
         <el-button @click="openUploadDialog" type="primary" plain>
           <el-icon><Plus /></el-icon>
           上传企划

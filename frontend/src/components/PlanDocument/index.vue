@@ -382,10 +382,6 @@ async function handleSubmit() {
         return
     }
     
-    if (uploadForm.value.type === 'anchor' && !uploadForm.value.anchorCategory) {
-        ElMessage.error('请选择企划分类')
-        return
-    }
     if (uploadForm.value.type === 'dd' && !uploadForm.value.ddVisibility) {
         ElMessage.error('请选择可见范围')
         return
@@ -694,7 +690,7 @@ onMounted(() => {
             </el-radio-group>
           </el-form-item>
 
-          <el-form-item label="企划分类" v-if="uploadForm.type === 'anchor'">
+          <el-form-item label="企划分类" v-if="uploadForm.type === 'anchor'" class="optional-field">
             <el-select 
               v-model="uploadForm.anchorCategory" 
               placeholder="请选择企划分类" 

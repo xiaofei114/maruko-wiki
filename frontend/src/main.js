@@ -7,6 +7,7 @@ import { createPinia } from 'pinia'
 
 import router from './router'
 import ElementPlus from 'element-plus'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import App from './App.vue'
 
 // 引入 ECharts
@@ -25,7 +26,7 @@ const app = createApp(App)
 app.component('v-chart', VueECharts)
 
 app.use(router)
-app.use(ElementPlus)
+app.use(ElementPlus, { locale: zhCn })
 const pinia = createPinia()
 app.use(pinia)
 

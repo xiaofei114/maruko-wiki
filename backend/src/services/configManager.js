@@ -128,7 +128,9 @@ export async function getPM2Status() {
 
         // 获取进程列表
         const { stdout } = await execAsync('pm2 jlist');
-        const processes = JSON.parse(stdout);
+        // 去除 ANSI 转义码后再解析 JSON
+        const cleanStdout = stdout.replace(/\u001b\[\d+m/g, '').trim();
+        const processes = JSON.parse(cleanStdout);
 
         // 如果没有进程在运行
         if (!processes || processes.length === 0) {

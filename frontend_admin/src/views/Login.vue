@@ -1,45 +1,73 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { api_Login } from '@/api/login.js'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user.js'
+import { useRouter, useRoute } from 'vue-router'
+import { useUserStore, getUserIdFromToken } from '@/stores/user.js'
 import { ElMessage } from 'element-plus'
 import background from "@/assets/background.png"
 
 const router = useRouter()
+const route = useRoute()
 const ruleForm = ref({})
 const userStore = useUserStore()
+
+// 已经用哪个用户的 token 尝试过自动登录，避免同一账号反复请求
+let attemptedUserId = undefined
 
 const loginMethod = data => {
     api_Login(data).then(res => {
         if (res.data?.token) {
-            userStore.loginIn(res.data.token, res.data.name, res.data.permission)
-            router.push("/home")
+            // 只有管理员才能进入后台，普通用户保留主站登录态
+            if (res.data.permission <= 2) {
+                userStore.loginIn(res.data.token, res.data.name, res.data.permission, res.data.avatar)
+                router.push("/home")
+            } else {
+                ElMessage.warning('当前账号无管理权限，请使用管理员账号登录')
+            }
         }
+    }).catch(() => {
+        // 错误提示由 HttpClient 统一处理，这里只需要停留在登录页
     })
 }
 
 const Login = () => {
-    if (Object.values(ruleForm.value).some(v => !v)) {
+    const { accountNumber, password } = ruleForm.value
+    if (!accountNumber || !password) {
         ElMessage.warning('请输入账号密码')
+        return
     }
     loginMethod(ruleForm.value)
 }
 
+// 同源部署，直接复用用户端保存的 token，无需从 URL 参数传入
+const tryAutoLogin = () => {
+    const token = userStore.token
+    if (!token) return
+
+    const userId = getUserIdFromToken(token)
+    // 同一个 token / 同一个账号只自动尝试一次
+    if (userId === attemptedUserId) return
+
+    attemptedUserId = userId
+    loginMethod({ token })
+}
+
 onMounted(() => {
-    // 优先从 URL 参数中解析 token（跨域跳转场景）
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlToken = urlParams.get('token')
-    if (urlToken) {
-        loginMethod({ token: urlToken })
+    // 守卫刚刚校验过这个 token 且确认不是管理员，先不重复请求
+    if (route.query.checked === '1') {
+        attemptedUserId = getUserIdFromToken(userStore.token)
         return
     }
+    tryAutoLogin()
+})
 
-    // 其次使用 localStorage 中已保存的 token
-    if (userStore.isAuthenticated) {
-        const { token } = userStore
-        loginMethod({ token })
+// 另一个标签页（主站）登录或切换账号后，后台停留在登录页时也能自动进入
+watch(() => userStore.token, (token) => {
+    if (!token) {
+        attemptedUserId = undefined
+        return
     }
+    tryAutoLogin()
 })
 </script>
 

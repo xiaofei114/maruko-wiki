@@ -45,7 +45,11 @@ http.interceptors.response.use(
         let errorCode = 'NETWORK_ERROR'
 
         // 认证错误时清除本地存储的token和用户信息
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        // 登录接口本身的失败（账号密码错误 / token 失效）不能清理共享 token，
+        // 否则会把同源的管理后台登录态一起清掉
+        if (error.response
+            && (error.response.status === 401 || error.response.status === 403)
+            && error.config?.url !== '/login') {
             localStorage.removeItem(import.meta.env.VITE_APP_TOKEN)
             localStorage.removeItem(import.meta.env.VITE_APP_USER)
 

@@ -9,6 +9,9 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
+    // 管理后台统一挂载在主站的 /admin/ 子路径下
+    // 开发环境地址也会变成 http://localhost:5174/admin/
+    base: '/admin/',
     plugins: [
       vue(),
       vueDevTools(),
@@ -25,8 +28,8 @@ export default defineConfig(({ command, mode }) => {
       proxy: env.VITE_PROXY === 'true' ? {
         '/api': {
           target: 'http://localhost:6660', // 开发环境后端地址
-          changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          changeOrigin: true
+          // 不要 rewrite 掉 /api，后端所有接口都挂载在 /api 前缀下
         }
       } : undefined
     },

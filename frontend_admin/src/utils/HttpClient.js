@@ -55,9 +55,12 @@ class HttpClient {
                     switch (status) {
                         case 401:
                             errorMessage = data?.message ?? '登录已过期，请重新登录'
-                            // 清除 token 并触发页面刷新
-                            const userStore = useUserStore()
-                            userStore.loginOut()
+                            // 登录接口失败（账号密码错误 / token 失效）不能清理共享 token，
+                            // 否则会把用户端主站的登录态一起清掉
+                            if (error.config?.url !== '/login') {
+                                const userStore = useUserStore()
+                                userStore.loginOut()
+                            }
                             break
                         case 403:
                             errorMessage = '没有操作权限，请联系管理员'

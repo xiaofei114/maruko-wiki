@@ -549,7 +549,7 @@ async function downloadPlanDocument(doc) {
     // 如果 fetch 失败，回退到直接打开链接
     const baseUrl = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : (import.meta.env.VITE_APP_BASE_URL?.replace(/\/api\/?$/, '') || '')
     const apiPrefix = import.meta.env.VITE_APP_BASE_URL === '/api' ? '' : '/api'
-    const url = `${baseUrl}${apiPrefix}/all/file/${doc.filePath}`
+    const url = `${baseUrl}${apiPrefix}/file/${doc.filePath}`
     window.open(url, '_blank')
   }
 }

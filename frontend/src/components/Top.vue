@@ -110,7 +110,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 // 使用storeToRefs确保响应性
-const { token, user, isAuthenticated } = storeToRefs(userStore)
+const { user, isAuthenticated } = storeToRefs(userStore)
 
 // 用户状态的计算属性
 const username = computed(() => user.value?.name || '')
@@ -212,14 +212,13 @@ const handleMenuSelect = (index) => {
   if (index === '/admin') {
     const adminVersion = localStorage.getItem('adminDefaultVersion') || 'new'
     if (adminVersion === 'new') {
-      // 跳转到新版管理后台
-      const token = userStore.token
-      if (token) {
-        window.open(`${import.meta.env.VITE_APP_ADMIN_URL}/?token=${token}`, '_blank')
-        return
-      }
+      // 同源部署，直接打开管理端，登录态通过 localStorage 共享
+      window.open(import.meta.env.VITE_APP_ADMIN_URL, '_blank')
+      return
     }
-    // 否则跳转到旧版管理后台（/admin）
+    // 否则跳转到旧版管理页（/admin 已被新后台占用，旧版在 /admin-legacy）
+    navigateTo('/admin-legacy')
+    return
   }
 
   // 否则进行路由跳转

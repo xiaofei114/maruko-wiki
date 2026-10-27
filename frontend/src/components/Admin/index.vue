@@ -386,12 +386,8 @@ const getPermissionType = (permission) => {
 
 // 前往新版管理后台
 const goToNewAdmin = () => {
-    const token = userStore.token
-    if (token) {
-        window.open(`${import.meta.env.VITE_APP_ADMIN_URL}/?token=${token}`, '_blank')
-    } else {
-        window.open('/admin/', '_blank')
-    }
+    // 同源部署，登录态通过 localStorage 共享，无需在 URL 中传 token
+    window.open(import.meta.env.VITE_APP_ADMIN_URL, '_blank')
 }
 
 const getStatusLabel = (isBanned) => {

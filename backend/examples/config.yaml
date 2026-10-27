@@ -3,6 +3,7 @@ domainName: # 允许的域名
   - http://localhost:6660
   - http://localhost:5173
   - http://localhost:5174
+  - https://your-domain.com # 生产环境唯一域名（用户端、管理端、API 同源）
 token: maruko # token密钥
 log: # 日志级别
   cmd: info # 命令行日志级别

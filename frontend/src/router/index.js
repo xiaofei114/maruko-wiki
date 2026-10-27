@@ -64,10 +64,11 @@ const router = createRouter({
                     meta: { title: '收藏夹详情', public: true }
                 },
                 {
-                    path: '/admin',
-                    name: 'admin',
+                    // /admin 已经被新版管理后台占用，旧版管理页挪到 /admin-legacy
+                    path: '/admin-legacy',
+                    name: 'admin-legacy',
                     component: () => import('../components/Admin/index.vue'),
-                    meta: { title: '管理', requiresAuth: true }
+                    meta: { title: '管理（旧版）', requiresAuth: true }
                 },
                 {
                     path: '/profile',

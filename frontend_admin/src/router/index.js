@@ -141,10 +141,10 @@ router.beforeEach((to, from, next) => {
       // 已登录且是管理员，允许访问
       next()
     } else if (userStore.isAuthenticated && !userStore.isAdmin) {
-      // 已登录但不是管理员
+      // 已登录但不是管理员，保留共享 token，避免影响主站登录态
       ElMessage.warning('无管理权限，仅管理员可登录')
-      userStore.loginOut()
-      next({ name: 'login' })
+      userStore.clearSession()
+      next({ name: 'login', query: { checked: '1' } })
     } else {
       // 未登录，先尝试登录
       if (token) {
@@ -152,17 +152,21 @@ router.beforeEach((to, from, next) => {
           if (res.data?.token) {
             // 检查是否为管理员
             if (res.data.permission <= 2) {
-              userStore.loginIn(res.data.token, res.data.name, res.data.permission)
+              userStore.loginIn(res.data.token, res.data.name, res.data.permission, res.data.avatar)
               next()
             } else {
+              // 普通用户访问后台时不清理共享 token，主站登录态保持不变
               ElMessage.warning('无管理权限，仅管理员可登录')
-              userStore.loginOut()
-              next({ name: 'login' })
+              userStore.clearSession()
+              next({ name: 'login', query: { checked: '1' } })
             }
           } else {
             ElMessage.warning('请先登录')
             next({ name: 'login' })
           }
+        }).catch(() => {
+          // 网络异常或 token 失效，回到登录页，避免导航卡住
+          next({ name: 'login', query: { checked: '1' } })
         })
       } else {
         ElMessage.warning('请先登录')

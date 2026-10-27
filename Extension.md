@@ -209,17 +209,35 @@ VITE_APP_DD_NAME=猫丸伴
 **生产环境：** `frontend/.env.production`
 
 ```bash
-VITE_APP_BASE_URL=/api
+# 唯一域名（用户端、管理端、API 同源部署）
+VITE_APP_BASE_URL=https://your-domain.com
+# 管理后台挂在同一域名的 /admin/ 子路径
+VITE_APP_ADMIN_URL=https://your-domain.com/admin
 # 其他配置与开发环境相同
 ```
 
 ### 3.3 管理后台配置
 
-**配置文件：** `frontend_admin/.env.development`
+**开发环境：** `frontend_admin/.env.development`
 
 ```bash
-VITE_APP_BASE_URL=http://localhost:6660
+# API 地址
+VITE_APP_API_BASE=http://localhost:6660
+# 主页面地址
+VITE_APP_PAGE_URL=http://localhost:5173
+# 与用户端共享同一个 Token Key，同源直接复用登录态
 VITE_APP_TOKEN=maruko_token
+# 与用户端共享用户信息，切换账号时身份保持一致
+VITE_APP_USER=maruko_user
+```
+
+**生产环境：** `frontend_admin/.env.production`
+
+```bash
+VITE_APP_API_BASE=https://your-domain.com
+VITE_APP_PAGE_URL=https://your-domain.com
+VITE_APP_TOKEN=maruko_token
+VITE_APP_USER=maruko_user
 ```
 
 ### 3.4 主题颜色
@@ -289,7 +307,7 @@ npm run dev
 ```bash
 cd frontend_admin
 npm run dev
-# 服务运行在 http://localhost:5174
+# 服务运行在 http://localhost:5174/admin/ （管理端挂载在 /admin/ 子路径）
 ```
 
 ### 4.2 生产环境部署
@@ -333,62 +351,47 @@ npm run build
 cd frontend_admin
 npm install
 npm run build
-# 构建产物在 dist/ 目录
+# 构建产物在 dist/ 目录，Vite base 已固定为 /admin/
 ```
+
+#### 单域名部署（用户端 + 管理端 + API 同源）
+
+生产环境只保留一个域名和一张证书，把两个前端产物放到同一个站点目录：
+
+```bash
+# /var/www/oiwiki/frontend/dist 是 nginx 配置里的站点根目录，服务器路径不同时同步修改 nginx 的 root
+# 注意：用户端同步要排除 admin/，否则 --delete 会把管理端产物一起删掉
+rsync -a --delete --exclude=admin frontend/dist/ /var/www/oiwiki/frontend/dist/
+rsync -a --delete frontend_admin/dist/ /var/www/oiwiki/frontend/dist/admin/
+```
+
+最终目录结构：
+
+```
+/var/www/oiwiki/frontend/dist/
+├── index.html          # 用户端
+├── assets/
+└── admin/
+    ├── index.html      # 管理后台
+    └── assets/
+```
+
+访问路径：
+
+- `https://your-domain.com/` → 用户端
+- `https://your-domain.com/admin/` → 新管理后台
+- `https://your-domain.com/api/...` → 反代后端 `127.0.0.1:6660`
 
 #### Nginx 配置
 
-**开发环境：** `nginxconf_environment/nginx.conf`
+完整配置见 `nginxconf_environment/nginx_services.conf`，需要重点确认：
 
-```nginx
-server {
-    listen 8080;
-    server_name maruko.test;
-    client_max_body_size 100M;
+1. `location /api/` 的 `proxy_pass http://127.0.0.1:6660;` **末尾不要加 `/`**，否则会丢掉 `/api` 前缀导致后端 404。
+2. 根级认证接口 `/login`、`/register`、`/sendVerification`、`/verifyCode`、`/resetPassword` 不在 `/api` 下，必须单独反代，否则会被静态规则拦截成 405。
+3. `/admin/` 用 `/admin/index.html` 兜底，`/` 用 `/index.html` 兜底，两个 SPA 的 history 路由互不影响。
+4. `location = /admin` 跳转到 `/admin/`，同源部署下登录态走 `localStorage`，不需要在 URL 中透传 token。
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:6660;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location / {
-        root /path/to/maruko-wiki/frontend/dist;
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-**生产环境：** `nginxconf_environment/nginx_services.conf`
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    client_max_body_size 100M;
-
-    # 安全头部
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:6660;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location / {
-        root /var/www/maruko-wiki/frontend/dist;
-        try_files $uri $uri/ /index.html;
-        
-        # 静态资源缓存
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-    }
-}
-```
+**共享登录态：** 用户端和管理端使用同一个 `maruko_token` 和 `maruko_user`（见两端 `.env.*`）。在用户端登录后直接打开 `/admin/` 即可自动识别登录态，不再通过 URL 传 token；后台登录或续期时也会同步写回用户信息，切换账号后主站身份保持一致。需要注意两边共用同一个会话：管理员在后台退出登录时，主站的 token 和用户信息也会被清除；普通用户误入 `/admin/` 只会提示无权限，不会被清掉主站登录态。旧版管理页已从 `/admin` 挪到 `/admin-legacy`，不会和新后台冲突。
 
 #### Docker 部署（可选）
 
@@ -593,12 +596,12 @@ Access to XMLHttpRequest has been blocked by CORS policy
 
 **解决方案：**
 
-编辑 `backend/configs/config.yaml`，添加前端域名到白名单：
+同源部署后前后端在同一个域名下，一般不会再触发跨域；但 POST 请求仍会携带 Origin，建议把唯一域名加入白名单，避免日志出现“拒绝跨域请求”：
 
 ```yaml
 domainName:
   - http://localhost:5173
-  - http://your-domain.com  # 添加你的域名
+  - https://your-domain.com  # 唯一域名
 ```
 
 #### Q: 413 文件过大错误
@@ -646,10 +649,12 @@ pm2 logs maruko-backend
 
 ```nginx
 location / {
-    root /var/www/maruko-wiki/frontend/dist;
+    root /var/www/oiwiki/frontend/dist;
     try_files $uri $uri/ /index.html;  # 确保这行存在
 }
 ```
+
+管理端资源 404 时，检查站点根目录下的 `admin/` 是否存在，以及 `/admin/` 是否用 `/admin/index.html` 兜底。
 
 #### Q: 页面刷新后 404
 

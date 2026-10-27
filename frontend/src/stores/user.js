@@ -43,8 +43,8 @@ export const useUserStore = defineStore('user', () => {
 
             return response.data
         } catch (error) {
-            // 登录失败时清除状态
-            logout()
+            // 登录失败只提示错误，不清除已有会话
+            // 同源部署下清 token 会连带把管理后台登录态一并清掉
             throw error
         }
     }
@@ -108,6 +108,25 @@ export const useUserStore = defineStore('user', () => {
         localStorage.removeItem(TOKEN_KEY)
         localStorage.removeItem(USER_KEY)
     }
+
+    // 同源共享会话：其他标签页（如管理后台）登录、退出时同步当前标签页状态
+    window.addEventListener('storage', (event) => {
+        if (event.key === TOKEN_KEY) {
+            if (event.newValue) {
+                token.value = event.newValue
+            } else {
+                logout()
+            }
+        } else if (event.key === USER_KEY) {
+            try {
+                user.value = event.newValue ? JSON.parse(event.newValue) : null
+            } catch (error) {
+                // 本地缓存被写坏时按未登录处理，避免监听器抛错
+                console.warn('本地用户信息解析失败:', error)
+                user.value = null
+            }
+        }
+    })
 
     /**
      * 初始化用户状态（从本地存储恢复并刷新token）

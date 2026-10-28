@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "vite build && node scripts/deploy-dist.js",
+    "build:only": "vite build",
+    "deploy": "node scripts/deploy-dist.js",
     "preview": "vite preview"
   },
   "dependencies": {

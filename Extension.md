@@ -352,7 +352,21 @@ cd frontend_admin
 npm install
 npm run build
 # 构建产物在 dist/ 目录，Vite base 已固定为 /admin/
+# build 结束后会自动把 dist/ 同步到 <仓库根>/frontend/dist/admin，并先删掉旧的管理端产物
 ```
+
+脚本是 `frontend_admin/scripts/deploy-dist.js`，相关命令：
+
+| 命令 | 作用 |
+| --- | --- |
+| `pnpm run build`（或 `npm run build`） | 构建 + 自动同步（会先删除旧的 `admin/`，再复制新产物） |
+| `pnpm run build:only` | 只构建，不同步 |
+| `pnpm run deploy` | 不重新构建，把现有 `dist/` 再同步一次 |
+| `node scripts/deploy-dist.js --target=/var/www/xxx/frontend/dist/admin` | 目标不在默认位置时手动指定（Windows 用 `--target=D:\...`） |
+| `ADMIN_DEPLOY_TARGET=/var/www/xxx/frontend/dist/admin pnpm run build` | 连构建带同步，目标用环境变量指定 |
+| `node scripts/deploy-dist.js --force` | 目标目录看起来不像管理端产物时强制覆盖 |
+
+默认目标固定为「仓库根 `/frontend/dist/admin`」，所以 maruko 和 huhu 两份仓库各自执行即可，不需要改脚本；脚本会自动跳过仓库根、`frontend/`、`frontend/dist` 这类危险目录。
 
 #### 单域名部署（用户端 + 管理端 + API 同源）
 
@@ -360,10 +374,16 @@ npm run build
 
 ```bash
 # /var/www/oiwiki/frontend/dist 是 nginx 配置里的站点根目录，服务器路径不同时同步修改 nginx 的 root
-# 注意：用户端同步要排除 admin/，否则 --delete 会把管理端产物一起删掉
+# 用户端产物同步要排除 admin/，否则 --delete 会把管理端产物一起删掉
 rsync -a --delete --exclude=admin frontend/dist/ /var/www/oiwiki/frontend/dist/
-rsync -a --delete frontend_admin/dist/ /var/www/oiwiki/frontend/dist/admin/
+
+# 管理端：仓库不在站点根下（Linux 常见），需要用 --target 指定，或用环境变量
+cd frontend_admin
+ADMIN_DEPLOY_TARGET=/var/www/oiwiki/frontend/dist/admin node scripts/deploy-dist.js
+# 也可以：node scripts/deploy-dist.js --target=/var/www/oiwiki/frontend/dist/admin
 ```
+
+`deploy-dist.js` 是跨平台的，Windows 和 Linux 都能用，只依赖 Node 内置模块（`fs.rmSync` / `fs.cpSync`，需要 Node >= 16.7）。Windows 的 junction 和 Linux 的 symlink 都会被识别成链接、只删链接本身；Linux 下目标目录属主不是构建用户时记得先 `chown`，否则会报 EACCES。
 
 最终目录结构：
 
@@ -380,16 +400,41 @@ rsync -a --delete frontend_admin/dist/ /var/www/oiwiki/frontend/dist/admin/
 
 - `https://your-domain.com/` → 用户端
 - `https://your-domain.com/admin/` → 新管理后台
-- `https://your-domain.com/api/...` → 反代后端 `127.0.0.1:6660`
+- `https://your-domain.com/api/...` → 反代后端
+
+本机服务器是 Windows，实际站点目录和配置如下：
+
+| 站点 | 站点根目录 | 后端端口 |
+| --- | --- | --- |
+| maruko | `C:/data/web/maruko-wiki/frontend/dist` | 6662 |
+| huhu | `C:/data/web/maruko-wiki-huhu/frontend/dist` | 6660 |
+
+对应 nginx 配置是 `nginxconf_environment/nginx copy.conf`；`nginx_services.conf` 是 Linux 通用模板。Windows 上管理端不需要再手动复制，`pnpm run build` 会自动同步到 `<仓库根>\frontend\dist\admin`：
+
+```powershell
+cd C:\data\web\maruko-wiki\frontend_admin
+pnpm run build
+# 产出 C:\data\web\maruko-wiki\frontend\dist\admin，旧的 admin 产物会被先删掉
+```
+
+huhu 站点同理，在 `C:\data\web\maruko-wiki-huhu\frontend_admin` 下执行即可，产物落到 `C:\data\web\maruko-wiki-huhu\frontend\dist\admin`。
+
+用户端产物本来就在仓库的 `frontend/dist`，就是 nginx 的站点根，不需要移动。如果是从别的机器同步用户端产物，记得排除 `admin/`，否则会把管理端产物覆盖掉：
+
+```powershell
+robocopy <构建机>\frontend\dist C:\data\web\maruko-wiki\frontend\dist /MIR /XD admin
+```
 
 #### Nginx 配置
 
-完整配置见 `nginxconf_environment/nginx_services.conf`，需要重点确认：
+本机实际配置见 `nginxconf_environment/nginx copy.conf`，需要重点确认：
 
-1. `location /api/` 的 `proxy_pass http://127.0.0.1:6660;` **末尾不要加 `/`**，否则会丢掉 `/api` 前缀导致后端 404。
+1. `location /api/` 的 `proxy_pass` **末尾不要加 `/`**，否则会丢掉 `/api` 前缀导致后端 404；maruko 是 `6662`，huhu 是 `6660`。
 2. 根级认证接口 `/login`、`/register`、`/sendVerification`、`/verifyCode`、`/resetPassword` 不在 `/api` 下，必须单独反代，否则会被静态规则拦截成 405。
 3. `/admin/` 用 `/admin/index.html` 兜底，`/` 用 `/index.html` 兜底，两个 SPA 的 history 路由互不影响。
 4. `location = /admin` 跳转到 `/admin/`，同源部署下登录态走 `localStorage`，不需要在 URL 中透传 token。
+5. `marukoadmin`/`huhuadmin`/`marukonode`/`huhunode` 这些旧域名的 server 块已从配置中移除，确保证书目录不再引用后，可以连同 DNS 解析一起删除；外部系统（B站回调、旧脚本、旧链接）如仍需访问，请直接改成 `https://maruko.xiaofei.icu/api/...` 或 `https://huhu.xiaofei.icu/api/...`。
+6. `location /file/` 必须保留：后端部分接口仍会返回 `/file/xxx` 形式的头像等资源路径。
 
 **共享登录态：** 用户端和管理端使用同一个 `maruko_token` 和 `maruko_user`（见两端 `.env.*`）。在用户端登录后直接打开 `/admin/` 即可自动识别登录态，不再通过 URL 传 token；后台登录或续期时也会同步写回用户信息，切换账号后主站身份保持一致。需要注意两边共用同一个会话：管理员在后台退出登录时，主站的 token 和用户信息也会被清除；普通用户误入 `/admin/` 只会提示无权限，不会被清掉主站登录态。旧版管理页已从 `/admin` 挪到 `/admin-legacy`，不会和新后台冲突。
 
